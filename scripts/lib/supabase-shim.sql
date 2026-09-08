@@ -1,0 +1,95 @@
+-- =============================================================================
+-- Reproduction locale de ce que Supabase fournit avant nos migrations.
+--
+-- Ce fichier n'est JAMAIS poussé en production : il n'existe que pour exécuter
+-- les migrations dans un Postgres nu (PGlite) et y tester la RLS. Les objets
+-- recréés ici sont ceux dont dépendent nos migrations : le schéma `auth`, la
+-- table `auth.users`, les fonctions `auth.uid()` / `auth.role()` / `auth.jwt()`,
+-- et les trois rôles de PostgREST.
+-- =============================================================================
+
+create schema if not exists auth;
+
+-- Rôles PostgREST. `anon` pour le visiteur, `authenticated` pour l'utilisateur
+-- connecté, `service_role` pour les webhooks (contourne la RLS via bypassrls).
+do $$
+begin
+  if not exists (select 1 from pg_roles where rolname = 'anon') then
+    create role anon nologin noinherit;
+  end if;
+  if not exists (select 1 from pg_roles where rolname = 'authenticated') then
+    create role authenticated nologin noinherit;
+  end if;
+  if not exists (select 1 from pg_roles where rolname = 'service_role') then
+    create role service_role nologin noinherit bypassrls;
+  end if;
+end
+$$;
+
+-- Version simplifiée de auth.users : seules les colonnes que notre schéma
+-- référence réellement.
+create table if not exists auth.users (
+  id uuid primary key default gen_random_uuid(),
+  email text unique,
+  raw_user_meta_data jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+-- Mêmes définitions que Supabase : la revendication peut arriver soit
+-- décomposée (`request.jwt.claim.sub`), soit sous forme de JSON complet
+-- (`request.jwt.claims`). Les deux doivent fonctionner.
+create or replace function auth.jwt()
+returns jsonb
+language sql
+stable
+as $$
+  select coalesce(
+    nullif(current_setting('request.jwt.claims', true), '')::jsonb,
+    '{}'::jsonb
+  )
+$$;
+
+create or replace function auth.uid()
+returns uuid
+language sql
+stable
+as $$
+  select nullif(
+    coalesce(
+      nullif(current_setting('request.jwt.claim.sub', true), ''),
+      auth.jwt() ->> 'sub'
+    ),
+    ''
+  )::uuid
+$$;
+
+create or replace function auth.role()
+returns text
+language sql
+stable
+as $$
+  select coalesce(
+    nullif(current_setting('request.jwt.claim.role', true), ''),
+    auth.jwt() ->> 'role',
+    'anon'
+  )
+$$;
+
+create or replace function auth.email()
+returns text
+language sql
+stable
+as $$
+  select coalesce(
+    nullif(current_setting('request.jwt.claim.email', true), ''),
+    auth.jwt() ->> 'email'
+  )
+$$;
+
+-- Droits accordés par Supabase : les politiques RLS appellent auth.uid() avec
+-- les privilèges de l'appelant, donc anon et authenticated doivent pouvoir
+-- traverser le schéma auth et exécuter ces fonctions. La table auth.users, elle,
+-- reste inaccessible.
+grant usage on schema auth to anon, authenticated, service_role;
+grant execute on function auth.uid(), auth.jwt(), auth.role(), auth.email()
+  to anon, authenticated, service_role;

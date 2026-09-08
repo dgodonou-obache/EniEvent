@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Motif décoratif aux tons orange pêche">
+  <title>Fond décoratif ÉniEvent</title>
+
+  <defs>
+    <!-- Dégradé de fond : pêche très clair vers blanc, dans la lignée de la
+         charte (orange-50 → blanc), pour rester sur fond clair. -->
+    <linearGradient id="fond" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFF7ED" />
+      <stop offset="55%" stop-color="#FFFBF5" />
+      <stop offset="100%" stop-color="#FFFFFF" />
+    </linearGradient>
+
+    <radialGradient id="halo-orange" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FB923C" stop-opacity="0.45" />
+      <stop offset="100%" stop-color="#FB923C" stop-opacity="0" />
+    </radialGradient>
+
+    <radialGradient id="halo-peche" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FDBA74" stop-opacity="0.5" />
+      <stop offset="100%" stop-color="#FDBA74" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Touche de teal : la couleur secondaire de la charte, par petites doses. -->
+    <radialGradient id="halo-teal" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#14B8A6" stop-opacity="0.22" />
+      <stop offset="100%" stop-color="#14B8A6" stop-opacity="0" />
+    </radialGradient>
+
+    <pattern id="pointilles" width="32" height="32" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.6" fill="#F97316" fill-opacity="0.13" />
+    </pattern>
+
+    <!-- Fondu vers le gris de fond de l'application, pour que la section
+         suivante enchaîne sans rupture visible. -->
+    <linearGradient id="fondu" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F8FAFC" stop-opacity="0" />
+      <stop offset="100%" stop-color="#F8FAFC" stop-opacity="1" />
+    </linearGradient>
+
+    <filter id="flou" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="60" />
+    </filter>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#fond)" />
+
+  <!-- Halos diffus : donnent de la profondeur sans image photographique. -->
+  <g filter="url(#flou)">
+    <ellipse cx="1280" cy="200" rx="460" ry="360" fill="url(#halo-orange)" />
+    <ellipse cx="1520" cy="720" rx="380" ry="320" fill="url(#halo-peche)" />
+    <ellipse cx="180" cy="820" rx="340" ry="280" fill="url(#halo-teal)" />
+  </g>
+
+  <rect width="1600" height="900" fill="url(#pointilles)" />
+
+  <!-- Arcs concentriques, évoquant sobrement une scène et son rayonnement. -->
+  <g fill="none" stroke="#F97316" stroke-opacity="0.14" stroke-width="1.5">
+    <circle cx="1300" cy="380" r="220" />
+    <circle cx="1300" cy="380" r="330" />
+    <circle cx="1300" cy="380" r="450" />
+  </g>
+
+  <rect y="640" width="1600" height="260" fill="url(#fondu)" />
+</svg>
