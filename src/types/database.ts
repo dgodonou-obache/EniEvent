@@ -73,6 +73,90 @@ export type Database = {
         }
         Relationships: []
       }
+      approvals: {
+        Row: {
+          amount: number | null
+          cost_center_id: string | null
+          created_at: string
+          currency: string
+          decided_at: string | null
+          decided_by: string | null
+          id: string
+          org_id: string
+          reason: string | null
+          requested_by: string
+          status: Database["public"]["Enums"]["approval_status"]
+          subject: Database["public"]["Enums"]["approval_subject"]
+          subject_id: string
+        }
+        Insert: {
+          amount?: number | null
+          cost_center_id?: string | null
+          created_at?: string
+          currency?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          org_id: string
+          reason?: string | null
+          requested_by: string
+          status?: Database["public"]["Enums"]["approval_status"]
+          subject: Database["public"]["Enums"]["approval_subject"]
+          subject_id: string
+        }
+        Update: {
+          amount?: number | null
+          cost_center_id?: string | null
+          created_at?: string
+          currency?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          org_id?: string
+          reason?: string | null
+          requested_by?: string
+          status?: Database["public"]["Enums"]["approval_status"]
+          subject?: Database["public"]["Enums"]["approval_subject"]
+          subject_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approvals_cost_center_id_fkey"
+            columns: ["cost_center_id"]
+            isOneToOne: false
+            referencedRelation: "company_budget_usage"
+            referencedColumns: ["cost_center_id"]
+          },
+          {
+            foreignKeyName: "approvals_cost_center_id_fkey"
+            columns: ["cost_center_id"]
+            isOneToOne: false
+            referencedRelation: "cost_centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approvals_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approvals_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approvals_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -313,6 +397,41 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      company_settings: {
+        Row: {
+          approval_threshold: number | null
+          approve_publication: boolean
+          created_at: string
+          currency: string
+          org_id: string
+          updated_at: string
+        }
+        Insert: {
+          approval_threshold?: number | null
+          approve_publication?: boolean
+          created_at?: string
+          currency?: string
+          org_id: string
+          updated_at?: string
+        }
+        Update: {
+          approval_threshold?: number | null
+          approve_publication?: boolean
+          created_at?: string
+          currency?: string
+          org_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_settings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cost_centers: {
         Row: {
@@ -1087,6 +1206,7 @@ export type Database = {
           budget_min: number | null
           city: string
           contact_phone: string | null
+          cost_center_id: string | null
           created_at: string
           currency: string
           description: string | null
@@ -1111,6 +1231,7 @@ export type Database = {
           budget_min?: number | null
           city: string
           contact_phone?: string | null
+          cost_center_id?: string | null
           created_at?: string
           currency?: string
           description?: string | null
@@ -1135,6 +1256,7 @@ export type Database = {
           budget_min?: number | null
           city?: string
           contact_phone?: string | null
+          cost_center_id?: string | null
           created_at?: string
           currency?: string
           description?: string | null
@@ -1155,6 +1277,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "quote_requests_cost_center_fkey"
+            columns: ["cost_center_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "company_budget_usage"
+            referencedColumns: ["cost_center_id", "org_id"]
+          },
+          {
+            foreignKeyName: "quote_requests_cost_center_fkey"
+            columns: ["cost_center_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "cost_centers"
+            referencedColumns: ["id", "org_id"]
+          },
           {
             foreignKeyName: "quote_requests_org_id_fkey"
             columns: ["org_id"]
@@ -1427,6 +1563,31 @@ export type Database = {
       }
     }
     Views: {
+      company_budget_usage: {
+        Row: {
+          budget_amount: number | null
+          code: string | null
+          committed: number | null
+          cost_center_id: string | null
+          currency: string | null
+          is_active: boolean | null
+          name: string | null
+          org_id: string | null
+          period_end: string | null
+          period_start: string | null
+          remaining: number | null
+          request_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cost_centers_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       listing_search: {
         Row: {
           amenity_slugs: string[] | null
@@ -1471,12 +1632,23 @@ export type Database = {
     }
     Functions: {
       accept_quote: { Args: { target: string }; Returns: undefined }
+      decide_approval: {
+        Args: { p_approve: boolean; p_reason?: string; target: string }
+        Returns: undefined
+      }
       next_reference: { Args: { prefix: string }; Returns: string }
+      request_publication_approval: {
+        Args: { target: string }
+        Returns: string
+      }
+      request_quote_approval: { Args: { target: string }; Returns: string }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       account_type: "particulier" | "entreprise" | "partenaire" | "admin"
+      approval_status: "pending" | "approved" | "rejected" | "cancelled"
+      approval_subject: "quote_request" | "quote"
       availability_slot: "journee" | "matin" | "apres_midi" | "soiree"
       availability_status: "open" | "closed" | "booked"
       booking_mode: "instant" | "quote" | "both"
@@ -1523,6 +1695,7 @@ export type Database = {
         | "forfait"
       quote_request_status:
         | "draft"
+        | "pending_approval"
         | "open"
         | "closed"
         | "awarded"
@@ -1666,6 +1839,8 @@ export const Constants = {
   public: {
     Enums: {
       account_type: ["particulier", "entreprise", "partenaire", "admin"],
+      approval_status: ["pending", "approved", "rejected", "cancelled"],
+      approval_subject: ["quote_request", "quote"],
       availability_slot: ["journee", "matin", "apres_midi", "soiree"],
       availability_status: ["open", "closed", "booked"],
       booking_mode: ["instant", "quote", "both"],
@@ -1716,6 +1891,7 @@ export const Constants = {
       ],
       quote_request_status: [
         "draft",
+        "pending_approval",
         "open",
         "closed",
         "awarded",

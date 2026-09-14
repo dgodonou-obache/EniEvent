@@ -38,6 +38,8 @@ interface BriefFormProps {
   /** Présélection quand la demande part d'une fiche annonce. */
   preselectedCategoryId?: string;
   preselectedCity?: string;
+  /** Entreprise uniquement : rattache la dépense à une enveloppe. */
+  costCenters?: { id: string; code: string; name: string }[];
 }
 
 export function BriefForm({
@@ -45,6 +47,7 @@ export function BriefForm({
   cities,
   preselectedCategoryId,
   preselectedCity,
+  costCenters = [],
 }: BriefFormProps) {
   const [state, formAction, pending] = React.useActionState<BriefState, FormData>(
     submitBrief,
@@ -296,6 +299,25 @@ export function BriefForm({
             <FieldError message={state.errors?.responseWindowHours} />
           </div>
         </div>
+
+        {costCenters.length > 0 ? (
+          <div>
+            <Label htmlFor="costCenterId">Centre de coût</Label>
+            <Select id="costCenterId" name="costCenterId" defaultValue="">
+              <option value="">Aucun</option>
+              {costCenters.map((center) => (
+                <option key={center.id} value={center.id}>
+                  {center.code} — {center.name}
+                </option>
+              ))}
+            </Select>
+            <FieldError message={state.errors?.costCenterId} />
+            <p className="mt-1 text-xs text-slate-400">
+              C&apos;est ce rattachement qui fait apparaître la dépense dans le suivi
+              budgétaire de votre entreprise.
+            </p>
+          </div>
+        ) : null}
 
         <div>
           <Label htmlFor="contactPhone">Téléphone</Label>

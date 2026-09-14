@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { ClipboardList, Clock, Scale } from "lucide-react";
 
 import { BriefForm } from "@/components/marketplace/BriefForm";
-import { getUser } from "@/lib/auth/session";
+import { getSessionContext, getUser } from "@/lib/auth/session";
+import { getCostCenters } from "@/lib/company";
 import { getBriefOptions } from "@/lib/quotes";
 import { createClient } from "@/utils/supabase/server";
 
@@ -29,7 +30,16 @@ export default async function BriefPage({
 
   if (!user) redirect("/connexion?suite=/demande-de-devis");
 
-  const options = await getBriefOptions();
+  const [options, context] = await Promise.all([getBriefOptions(), getSessionContext()]);
+
+  // Un demandeur rattaché à une entreprise peut imputer sa dépense. Un
+  // particulier ne voit jamais ce champ.
+  const companyOrgId =
+    context?.memberships.find(
+      (membership) => membership.orgType === "company" && membership.memberStatus === "active",
+    )?.orgId ?? null;
+
+  const costCenters = companyOrgId ? await getCostCenters(companyOrgId) : [];
 
   // Demande partie d'une fiche : la catégorie et la ville sont déjà connues.
   let preselectedCategoryId: string | undefined;
@@ -69,6 +79,11 @@ export default async function BriefPage({
           cities={options.cities}
           preselectedCategoryId={preselectedCategoryId}
           preselectedCity={preselectedCity}
+          costCenters={costCenters.map((center) => ({
+            id: center.id,
+            code: center.code,
+            name: center.name,
+          }))}
         />
       </div>
 

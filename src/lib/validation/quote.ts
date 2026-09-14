@@ -94,6 +94,8 @@ export const briefSchema = z
      * pas encore répartir — l'exiger ferait abandonner le formulaire.
      */
     categoryBudgets: z.array(categoryBudgetSchema).max(8).optional(),
+    /** Entreprise uniquement : rattache la dépense à une enveloppe. */
+    costCenterId: z.uuid().optional().or(z.literal("")),
     description: z
       .string()
       .trim()

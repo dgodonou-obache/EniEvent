@@ -10,12 +10,15 @@ import {
   Users,
 } from "lucide-react";
 
+import { publicEnv } from "@/lib/env";
+import { galleryPhotos } from "@/lib/media";
 import { DEFAULT_CURRENCY, format, money, type CurrencyCode } from "@/lib/money";
 import type { ListingDetail as Listing, ListingSummary } from "@/lib/listings";
 import type { AvailabilityRow } from "@/lib/pricing";
 
 import { BookingBox } from "./BookingBox";
 import { ListingCard } from "./ListingCard";
+import { ListingGallery } from "./ListingGallery";
 
 interface ListingDetailProps {
   listing: Listing;
@@ -37,9 +40,13 @@ export function ListingDetail({ listing, availabilities, similar }: ListingDetai
     .map((row) => row.amenities)
     .filter((a): a is NonNullable<typeof a> => a != null);
 
-  const media = [...(listing.listing_media ?? [])].sort(
-    (a, b) => (a.position ?? 0) - (b.position ?? 0),
-  );
+  // La couverture ouvre la série, puis les autres dans l'ordre du partenaire.
+  const photos = galleryPhotos({
+    supabaseUrl: publicEnv().supabaseUrl,
+    coverUrl: listing.cover_url,
+    media: listing.listing_media ?? [],
+    title: listing.title,
+  });
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -79,34 +86,7 @@ export function ListingDetail({ listing, availabilities, similar }: ListingDetai
         </p>
       </header>
 
-      {/* Galerie */}
-      <div className="mb-8 overflow-hidden rounded-2xl bg-slate-100">
-        {listing.cover_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={listing.cover_url}
-            alt={listing.title}
-            className="aspect-[16/9] w-full object-cover"
-          />
-        ) : (
-          <div className="flex aspect-[16/9] items-center justify-center text-slate-400">
-            Photos à venir
-          </div>
-        )}
-        {media.length > 0 ? (
-          <div className="flex gap-2 overflow-x-auto p-2">
-            {media.map((item) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={item.storage_path}
-                src={item.storage_path}
-                alt={item.alt ?? ""}
-                className="h-20 w-28 shrink-0 rounded-lg object-cover"
-              />
-            ))}
-          </div>
-        ) : null}
-      </div>
+      <ListingGallery photos={photos} title={listing.title} />
 
       <div className="grid gap-8 lg:grid-cols-[1fr_22rem]">
         <div className="min-w-0 space-y-8">

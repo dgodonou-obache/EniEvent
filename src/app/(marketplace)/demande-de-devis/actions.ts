@@ -44,6 +44,7 @@ export async function submitBrief(
     description: formData.get("description"),
     contactPhone: optionalText(formData.get("contactPhone")) ?? "",
     categoryIds,
+    costCenterId: optionalText(formData.get("costCenterId")) ?? "",
     // Un champ vide vaut « je ne sais pas encore », pas zéro : `optionalNumber`
     // rend `undefined`, et le budget de la prestation reste nul en base.
     categoryBudgets: categoryIds.map((categoryId) => ({
@@ -83,6 +84,9 @@ export async function submitBrief(
       budget_max: brief.budgetMax ?? null,
       description: brief.description,
       contact_phone: brief.contactPhone ? normaliseBeninPhone(brief.contactPhone) : null,
+      // La contrainte composite refuse un centre de coût d'une autre entreprise,
+      // et un centre de coût sans entreprise.
+      cost_center_id: companyOrgId ? brief.costCenterId || null : null,
       respond_by: respondBy,
     })
     .select("id")
@@ -107,6 +111,28 @@ export async function submitBrief(
     // que la laisser en brouillon muet.
     await supabase.from("quote_requests").delete().eq("id", created.id);
     return { message: `Demande non enregistrée : ${itemsError.message}` };
+  }
+
+  // Certaines entreprises relisent leurs appels d'offres avant publication :
+  // publier engage leur image autant que leur budget.
+  const { data: settings } = companyOrgId
+    ? await supabase
+        .from("company_settings")
+        .select("approve_publication")
+        .eq("org_id", companyOrgId)
+        .maybeSingle()
+    : { data: null };
+
+  if (settings?.approve_publication) {
+    const { error } = await supabase.rpc("request_publication_approval", {
+      target: created.id,
+    });
+
+    if (error) return { message: `Soumission impossible : ${error.message}` };
+
+    revalidatePath("/entreprise/validations");
+    revalidatePath("/projets");
+    redirect(`/projets/${created.id}`);
   }
 
   // La publication est une transition d'état : le déclencheur pose la date de

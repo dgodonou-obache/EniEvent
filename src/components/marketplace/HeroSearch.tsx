@@ -64,7 +64,21 @@ export function HeroSearch({ cities, categoryGroups, amenities }: HeroSearchProp
   return (
     <form
       onSubmit={submit}
-      className="rounded-2xl border border-slate-100 bg-white/95 p-2 backdrop-blur sm:p-3"
+      /**
+       * ⚠️ `relative z-20` n'est pas cosmétique.
+       *
+       * `backdrop-blur` pose un `backdrop-filter`, qui **crée un contexte
+       * d'empilement**. Le `z-50` du calendrier déroulant est donc enfermé
+       * ici : il ne peut plus passer au-dessus de quoi que ce soit hors de ce
+       * formulaire. Sans z-index sur ce conteneur, le titre du bandeau — qui
+       * porte `drop-shadow-sm`, un `filter`, donc un contexte d'empilement lui
+       * aussi, et vient après dans le DOM — se peignait par-dessus le
+       * calendrier ouvert.
+       *
+       * Reste sous l'en-tête collant (`z-40`), qui doit continuer de couvrir
+       * le calendrier au défilement.
+       */
+      className="relative z-20 rounded-2xl border border-slate-100 bg-white/95 p-2 backdrop-blur sm:p-3"
       role="search"
       aria-label="Rechercher un lieu ou un prestataire"
     >

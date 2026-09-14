@@ -57,7 +57,8 @@ export async function getPartnerListing(orgId: string, listingId: string) {
        venue_details(*),
        service_details(*),
        pricing_rules(id, unit, base_price, weekend_multiplier),
-       cancellation_policies(id, slug, name, summary)`,
+       cancellation_policies(id, slug, name, summary),
+       listing_media(id, storage_path, alt, position)`,
     )
     .eq("org_id", orgId)
     .eq("id", listingId)

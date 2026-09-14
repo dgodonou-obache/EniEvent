@@ -4,6 +4,7 @@ import { ArrowLeft, CalendarDays, MapPin, Users, Wallet } from "lucide-react";
 
 import { QuoteComparator } from "@/components/account/QuoteComparator";
 import { requireUser } from "@/lib/auth/session";
+import { getCompanySettings, getPendingQuoteApprovals } from "@/lib/company";
 import { format, money, type CurrencyCode } from "@/lib/money";
 import { getRequestDetail } from "@/lib/quotes";
 import {
@@ -32,6 +33,15 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   const stillOpen = acceptsNewQuotes(status, request.respond_by);
 
   const received = items.reduce((total, item) => total + (item.quotes?.length ?? 0), 0);
+
+  // Demande portée par une entreprise : le seuil décide si retenir une offre
+  // passe par un valideur. Un particulier n'a ni seuil ni valideur.
+  const [settings, pendingQuoteIds] = request.org_id
+    ? await Promise.all([
+        getCompanySettings(request.org_id),
+        getPendingQuoteApprovals(request.org_id),
+      ])
+    : [null, []];
 
   return (
     <div>
@@ -118,6 +128,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         items={items}
         currency={currency}
         isDecidable={status === "open" || status === "closed"}
+        approval={{ threshold: settings?.approval_threshold ?? null, pendingQuoteIds }}
       />
     </div>
   );

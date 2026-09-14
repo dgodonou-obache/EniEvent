@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -20,15 +20,28 @@ import {
  * passer le produit pour cassé. Ces tests lisent donc la migration et comparent.
  */
 
-const migration = readFileSync(
-  new URL("../supabase/migrations/0009_devis.sql", import.meta.url),
-  "utf8",
-);
+const migrationsDir = new URL("../supabase/migrations/", import.meta.url);
 
-/** Extrait les transitions écrites dans un garde SQL donné. */
+/**
+ * Concaténation de toutes les migrations, dans l'ordre.
+ *
+ * Lire la seule migration qui a créé un garde ne suffit pas : une migration
+ * ultérieure peut le redéfinir — c'est ce qu'a fait `0014` en ouvrant l'état
+ * « en attente de validation ». Le test comparerait alors le code à une
+ * définition périmée, et passerait en croyant vérifier quelque chose.
+ */
+const migration = readdirSync(migrationsDir)
+  .filter((name) => name.endsWith(".sql"))
+  .sort()
+  .map((name) => readFileSync(new URL(name, migrationsDir), "utf8"))
+  .join("\n");
+
+/** Extrait les transitions du garde SQL, dans sa **dernière** définition. */
 function transitionsFromSql(functionName: string): Record<string, string[]> {
-  const start = migration.indexOf(`function app.${functionName}()`);
-  expect(start, `${functionName} introuvable dans la migration`).toBeGreaterThan(-1);
+  // Ancré sur la déclaration, pas sur le nom seul : celui-ci apparaît aussi
+  // dans le `create trigger`, qui vient après le corps et ne contient rien.
+  const start = migration.lastIndexOf(`create or replace function app.${functionName}()`);
+  expect(start, `${functionName} introuvable dans les migrations`).toBeGreaterThan(-1);
 
   const body = migration.slice(start, migration.indexOf("$$;", start));
   const pattern = /\(old\.status = '(\w+)'\s*and new\.status in \(([^)]*)\)\)/g;

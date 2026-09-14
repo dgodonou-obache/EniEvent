@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarDays } from "lucide-react";
 
 import { ListingEditor } from "@/components/dashboard/ListingEditor";
+import { PhotoManager } from "@/components/dashboard/PhotoManager";
 import { Button } from "@/components/ui/button";
 import { requireSpace } from "@/lib/auth/session";
 import { getListingFormOptions, getPartnerListing } from "@/lib/partner";
@@ -54,12 +55,23 @@ export default async function EditListingPage({ params }: { params: Params }) {
         </Link>
       </div>
 
-      <ListingEditor
-        listing={listing}
-        categoryGroups={options.categoryGroups}
-        cities={options.cities}
-        policies={options.policies}
-      />
+      {/* Les photos passent avant le reste du formulaire : c'est ce qu'un
+          client regarde en premier, et ce qui manquait le plus aux annonces. */}
+      <div className="space-y-6">
+        <PhotoManager
+          listingId={listing.id}
+          orgId={decision.org.orgId}
+          photos={[...(listing.listing_media ?? [])].sort((a, b) => a.position - b.position)}
+          coverUrl={listing.cover_url}
+        />
+
+        <ListingEditor
+          listing={listing}
+          categoryGroups={options.categoryGroups}
+          cities={options.cities}
+          policies={options.policies}
+        />
+      </div>
     </div>
   );
 }

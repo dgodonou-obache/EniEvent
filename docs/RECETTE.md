@@ -75,7 +75,11 @@ SMTP Resend et un domaine vérifié.
 4. Ajouter **le samedi suivant** : ce jour est majoré (195 000 FCFA), la mention
    « week-end » apparaît, et le total est recalculé.
 5. Les **lundis sont grisés** : le jeu de démonstration les ferme.
-6. Ouvrir `/prestataires/buffet-beninois-200-couverts` : pas de calendrier, un
+6. Sur une annonce ayant des photos, cliquer la grande image **ou une vignette**.
+   **Attendu** : la visionneuse s'ouvre sur la photo cliquée, avec le compteur
+   « 2 / 5 ». Flèches du clavier, glissement du doigt sur mobile, Échap pour
+   fermer — et le focus revient sur la vignette de départ.
+7. Ouvrir `/prestataires/buffet-beninois-200-couverts` : pas de calendrier, un
    bouton « Demander un devis » seul — cette annonce est en mode devis.
 
 ## 5. Cloisonnement des espaces
@@ -105,25 +109,37 @@ C'est le parcours qui fait exister le catalogue.
 4. Dans l'éditeur, cliquer **Soumettre à la validation** sans rien remplir.
    **Attendu** : refus expliquant ce qui manque — une description d'au moins
    40 caractères et un tarif.
-5. Dans **Tarifs**, dérouler **Unité**. **Attendu** : sept unités, dont
+5. Dans **Photos**, cliquer **Ajouter des photos** et en choisir deux ou trois.
+   **Attendu** : elles apparaissent en vignettes, la première devient la
+   couverture. Le fichier part directement du navigateur vers le stockage.
+6. Essayer une photo HEIC prise avec un iPhone. **Attendu** : refus expliquant
+   qu'il faut la convertir — ce format n'est pas lisible par tous les
+   navigateurs, l'accepter donnerait une annonce aux photos invisibles.
+7. Cliquer l'étoile d'une autre photo. **Attendu** : elle devient la couverture,
+   et c'est elle qui apparaîtra dans les résultats de recherche.
+8. Dans **Tarifs**, dérouler **Unité**. **Attendu** : sept unités, dont
    **Au mètre carré** — facturation courante pour les chapiteaux, la moquette,
    les stands et l'habillage de salle.
-6. Compléter description, tarif principal et capacités, puis soumettre.
+9. Compléter description, tarif principal et capacités, puis soumettre.
    **Attendu** : « En cours de vérification ».
-7. Se déconnecter, se connecter avec `demo-admin@enievent.bj`, aller sur
-   **`/admin/moderation`**. **Attendu** : l'annonce apparaît, avec ses points de
-   contrôle (description, tarif, conditions, prix plancher, capacités).
-8. Cliquer **Renvoyer au partenaire** avec un motif de moins de 15 caractères.
-   **Attendu** : refus — un motif inexploitable n'aiderait pas le partenaire.
-9. Donner un vrai motif, envoyer. Se reconnecter en partenaire : l'annonce est
-   « À corriger », le motif est affiché.
-10. Resoumettre, revenir en admin, **Valider et publier**.
-11. Sans être connecté, chercher l'annonce sur `/recherche`. **Attendu** : elle
-    y est, avec son tarif **et son unité**.
+10. Se déconnecter, se connecter avec `demo-admin@enievent.bj`, aller sur
+    **`/admin/moderation`**. **Attendu** : l'annonce apparaît, avec ses points de
+    contrôle (description, tarif, conditions, prix plancher, capacités).
+11. Cliquer **Renvoyer au partenaire** avec un motif de moins de 15 caractères.
+    **Attendu** : refus — un motif inexploitable n'aiderait pas le partenaire.
+12. Donner un vrai motif, envoyer. Se reconnecter en partenaire : l'annonce est
+    « À corriger », le motif est affiché.
+13. Resoumettre, revenir en admin, **Valider et publier**.
+14. Sans être connecté, chercher l'annonce sur `/recherche`. **Attendu** : elle
+    y est, avec sa photo de couverture, son tarif **et son unité**.
 
 > Le même parcours est vérifié automatiquement par `npm run smoke:offre`, y
 > compris ce qui ne se teste pas à la main : qu'un partenaire ne peut pas valider
 > sa propre annonce, ni modifier celle d'un concurrent.
+>
+> `npm run smoke:photos` vérifie le stockage réel : qu'un concurrent ne peut ni
+> déposer ni effacer dans le dossier d'autrui, et que l'URL publique est bien
+> lisible sans connexion.
 
 ## 7. Planning et tarifs
 
@@ -202,13 +218,52 @@ Le cœur du produit : décrire une fois, recevoir plusieurs devis, comparer.
 > s'accepte pas par une simple mise à jour, et qu'accepter refuse le rival dans
 > la même transaction.
 
-## 9. Écrans à venir
+## 9. Espace entreprise — engager à plusieurs
+
+Ce qui distingue une entreprise d'un particulier : **la personne qui choisit
+n'est pas celle qui paie**. `npm run demo:reset` prépare deux centres de coûts,
+un seuil de validation à 1 500 000 FCFA et une offre au-dessus de ce seuil.
+
+1. Se connecter avec `demo-entreprise@enievent.bj` sur `/connexion`.
+   **Attendu** : le tableau de bord annonce l'engagement qui attend un aval, et
+   la consommation budgétaire.
+2. **Budgets** : deux centres de coûts avec leur enveloppe, leur consommation et
+   ce qu'il reste. « Engagé » compte les offres **retenues**, pas les sommes
+   versées — une acceptation engage bien avant le premier paiement.
+3. Créer un centre de coût avec un code déjà pris. **Attendu** : refus nommant
+   le doublon, pas une erreur technique.
+4. **Projets** : les demandes de **toute l'entreprise**, avec leur auteur et leur
+   centre de coût. C'est la différence avec `/projets` côté particulier : un
+   collègue qui reprend un dossier doit tout retrouver.
+5. Ouvrir le projet, déplier l'offre reçue. **Attendu** : le bouton dit
+   « Aval demandé » et non « Retenir cette offre » — au-dessus du seuil, on ne
+   propose pas un geste que la base refusera.
+6. **Validations** : l'engagement avec tout son contexte — projet, prestataire,
+   centre de coût, et ce qu'il reste dessus. Refuser avec un motif de moins de
+   10 caractères. **Attendu** : refus.
+7. Cliquer **Approuver et retenir l'offre**. **Attendu** : l'offre passe
+   « Votre choix » et le budget du centre de coût bouge dans la foulée —
+   l'aval **est** l'acceptation, en une seule transaction.
+8. **Paramètres** : vider le seuil de validation. **Attendu** : plus aucun aval
+   demandé ; chaque organisateur engage seul l'entreprise.
+9. **Équipe** : les membres et leur rôle en clair. Si aucun valideur n'est actif
+   alors qu'un seuil est fixé, un avertissement le signale — sinon les
+   engagements resteraient bloqués sans que personne ne comprenne.
+10. Déposer une demande depuis **Demander des devis**. **Attendu** : un champ
+    « Centre de coût » apparaît, absent pour un particulier.
+
+> `npm run smoke:entreprise` rejoue ce circuit en réel, y compris ce qui ne se
+> teste pas à la main : qu'un organisateur ne peut pas valider son propre
+> engagement, et qu'un prestataire ne voit ni les budgets ni les avals de son
+> client.
+
+## 10. Écrans à venir
 
 Cliquer n'importe quelle entrée de menu non encore construite — par exemple
 **Versements**, **Promotions** ou **Journal d'audit**.
 **Attendu** : une page qui nomme le lot livrant cet écran, et non un 404.
 
-## 10. Inscription réelle
+## 11. Inscription réelle
 
 1. Se déconnecter, ouvrir `/inscription`.
 2. Onglet **Particulier** : renseigner un e-mail neuf, un mot de passe de
@@ -220,9 +275,9 @@ Cliquer n'importe quelle entrée de menu non encore construite — par exemple
    fiche prestataire sont créés ensemble ; le tableau de bord affiche le nom de
    la structure.
 
-## 11. Mobile
+## 12. Mobile
 
-Refaire les étapes 1, 2, 4, 7 et 8 dans une fenêtre de **390 px de large**.
+Refaire les étapes 1, 2, 4, 7, 8 et 9 dans une fenêtre de **390 px de large**.
 **Attendu** : les filtres se replient derrière un bouton « Afficher », aucun
 débordement horizontal, le calendrier reste dans l'écran, et la barre d'action
 du planning reste collée en bas — la sélection se fait en haut de l'écran, les
@@ -233,12 +288,14 @@ boutons doivent rester atteignables sans remonter.
 ## Vérifications automatiques
 
 ```bash
-npm run verify         # typecheck + lint + 298 tests
-npm run db:verify      # migrations rejouées dans un Postgres jetable, RLS partout
-npm run smoke          # 13 contrôles contre le vrai Supabase, comptes purgés après
-npm run smoke:offre    # la boucle partenaire → modération → catalogue, en réel
-npm run smoke:planning # ouverture des dates, prix plancher, cloisonnement
-npm run smoke:devis    # appel d'offres : offres scellées, acceptation atomique
+npm run verify           # typecheck + lint + 360 tests
+npm run db:verify        # migrations rejouées dans un Postgres jetable, RLS partout
+npm run smoke            # 13 contrôles contre le vrai Supabase, comptes purgés après
+npm run smoke:offre      # la boucle partenaire → modération → catalogue, en réel
+npm run smoke:planning   # ouverture des dates, prix plancher, cloisonnement
+npm run smoke:devis      # appel d'offres : offres scellées, acceptation atomique
+npm run smoke:entreprise # seuil de validation, aval, imputation budgétaire
+npm run smoke:photos     # stockage réel : cloisonnement par dossier, URL publique
 ```
 
 ---
@@ -253,8 +310,10 @@ correspondantes affichent un écran nommant leur lot, pas un 404.
 | Panier, paiement, réservation effective | Lot 2 |
 | Créneaux (matin, après-midi, soirée) — le planning ouvre à la journée | Lot 4 |
 | Notification par e-mail d'un nouveau devis (domaine Resend à vérifier) | Lot 4, suite |
-| Espace entreprise : budgets, centres de coûts, facturation | Lot 5 |
+| Entreprise : factures et rapports de dépenses | Lot 2, puis lot 5 |
+| Invitation d'un collègue dans l'espace entreprise | Lot 6 |
 | Avis, litiges, contrats, messagerie | Lot 6 |
 | Reste du back-office admin : KYC, finances, CMS, audit | Lot 7 |
 | Packs, pages éditoriales, blog, pages légales | Lots 4 et 8 |
-| Photos réelles des annonces | Quand les partenaires téléverseront |
+| Recadrage et compression des photos côté navigateur | Lot 8 |
+| Purge du cache CDN à la suppression d'une photo (une heure d'écart) | Lot 8 |

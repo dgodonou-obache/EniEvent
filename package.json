@@ -16,11 +16,14 @@
     "db:seed": "node --env-file=.env.local scripts/db-exec.mjs supabase/seed.sql",
     "demo:users": "node --env-file=.env.local scripts/seed-demo-users.mjs",
     "demo:devis": "node --env-file=.env.local scripts/seed-demo-devis.mjs",
-    "demo:reset": "npm run db:seed && npm run demo:users && npm run demo:devis",
+    "demo:entreprise": "node --env-file=.env.local scripts/seed-demo-entreprise.mjs",
+    "demo:reset": "npm run db:seed && npm run demo:users && npm run demo:devis && npm run demo:entreprise",
     "smoke": "node --env-file=.env.local scripts/smoke-remote.mjs",
     "smoke:offre": "node --env-file=.env.local scripts/smoke-supply-loop.mjs",
     "smoke:planning": "node --env-file=.env.local scripts/smoke-planning.mjs",
     "smoke:devis": "node --env-file=.env.local scripts/smoke-devis.mjs",
+    "smoke:entreprise": "node --env-file=.env.local scripts/smoke-entreprise.mjs",
+    "smoke:photos": "node --env-file=.env.local scripts/smoke-photos.mjs",
     "verify": "npm run typecheck && npm run lint && npm run test"
   },
   "dependencies": {

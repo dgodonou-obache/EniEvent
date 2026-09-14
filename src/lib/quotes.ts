@@ -56,7 +56,8 @@ export async function getRequestDetail(requestId: string) {
     .select(
       `id, reference, title, event_type, event_date, event_end_date, is_date_flexible,
        city, district, guests, budget_min, budget_max, currency, description,
-       contact_phone, status, respond_by, published_at, created_at,
+       contact_phone, status, respond_by, published_at, created_at, org_id,
+       cost_centers(code, name),
        quote_request_items(
          id, quantity, budget_max, notes, listing_id, awarded_quote_id,
          categories(id, name, slug),

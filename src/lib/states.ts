@@ -12,6 +12,8 @@
 
 export type QuoteRequestStatus =
   | "draft"
+  /** Entreprise : l'appel d'offres attend l'aval d'un valideur avant publication. */
+  | "pending_approval"
   | "open"
   | "closed"
   | "awarded"
@@ -27,7 +29,9 @@ export type QuoteStatus =
   | "expired";
 
 export const REQUEST_TRANSITIONS: Record<QuoteRequestStatus, readonly QuoteRequestStatus[]> = {
-  draft: ["open", "cancelled"],
+  draft: ["pending_approval", "open", "cancelled"],
+  // Un aval refusé renvoie au brouillon : l'auteur corrige et resoumet.
+  pending_approval: ["open", "draft", "cancelled"],
   open: ["closed", "awarded", "cancelled", "expired"],
   closed: ["open", "awarded", "cancelled"],
   awarded: [],
@@ -68,6 +72,7 @@ export const QUOTE_STATES_RESERVED_TO_SERVER: readonly QuoteStatus[] = ["accepte
 
 export const REQUEST_STATUS_LABELS: Record<QuoteRequestStatus, string> = {
   draft: "Brouillon",
+  pending_approval: "En attente de validation",
   open: "En attente de devis",
   closed: "Devis clos",
   awarded: "Prestataires choisis",
@@ -156,6 +161,12 @@ export function describeDeadline(respondBy: string | Date | null, now: Date = ne
 }
 
 /** Une demande n'accepte de nouvelles offres que publiée et dans les délais. */
+/** Les états dans lesquels une demande d'entreprise attend une action interne. */
+export const REQUEST_STATES_AWAITING_COMPANY: readonly QuoteRequestStatus[] = [
+  "draft",
+  "pending_approval",
+];
+
 export function acceptsNewQuotes(
   status: QuoteRequestStatus,
   respondBy: string | Date | null,

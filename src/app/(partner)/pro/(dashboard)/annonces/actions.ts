@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireSpace } from "@/lib/auth/session";
+import { publicEnv } from "@/lib/env";
+import { BUCKET, MAX_PHOTOS, orgOfPath, publicUrl } from "@/lib/media";
 import {
   fieldErrors,
   listingDetailsSchema,
@@ -346,6 +348,182 @@ export async function submitForReview(
   revalidatePath("/pro/annonces");
 
   return { message: "Annonce soumise. Nos équipes la vérifient sous 48 h ouvrées." };
+}
+
+// -----------------------------------------------------------------------------
+// Photos
+//
+// Le fichier lui-même ne passe pas par ici : le navigateur l'envoie directement
+// au stockage, où les politiques vérifient que le chemin commence par
+// l'organisation de l'utilisateur. Une photo de 5 Mo qui transiterait par le
+// serveur Next doublerait le temps d'envoi sur une connexion mobile.
+//
+// Ces actions ne font que **tenir le registre** : la ligne dans `listing_media`,
+// l'ordre, et la photo de couverture.
+// -----------------------------------------------------------------------------
+
+/** Vérifie l'appartenance et renvoie l'annonce, ou `null`. */
+async function ownedListing(orgId: string, listingId: string) {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("listings")
+    .select("id, cover_url")
+    .eq("id", listingId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+
+  return data;
+}
+
+/** Recalcule la couverture : la photo désignée, ou la première à défaut. */
+async function refreshCover(listingId: string, orgId: string) {
+  const supabase = await createClient();
+  const env = publicEnv();
+
+  const { data: media } = await supabase
+    .from("listing_media")
+    .select("storage_path")
+    .eq("listing_id", listingId)
+    .order("position")
+    .limit(1);
+
+  const first = media?.[0]?.storage_path ?? null;
+
+  await supabase
+    .from("listings")
+    .update({ cover_url: first ? publicUrl(env.supabaseUrl, first) : null })
+    .eq("id", listingId)
+    .eq("org_id", orgId);
+}
+
+/** Enregistre une photo déjà déposée dans le stockage. */
+export async function registerPhoto(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const orgId = await requirePartnerOrg();
+  const listingId = String(formData.get("listingId") ?? "");
+  const path = String(formData.get("path") ?? "");
+  const alt = optionalText(formData.get("alt")) ?? null;
+
+  if (!(await ownedListing(orgId, listingId))) return { message: "Annonce introuvable." };
+
+  // Le chemin vient du client : on revérifie qu'il désigne bien cette annonce.
+  // Les politiques de stockage ont déjà refusé une autre organisation, mais
+  // rien ne les empêche de viser une autre annonce de la même organisation.
+  if (orgOfPath(path) !== orgId || !path.startsWith(`${orgId}/${listingId}/`)) {
+    return { message: "Chemin de photo invalide." };
+  }
+
+  const supabase = await createClient();
+
+  const { count } = await supabase
+    .from("listing_media")
+    .select("id", { count: "exact", head: true })
+    .eq("listing_id", listingId);
+
+  if ((count ?? 0) >= MAX_PHOTOS) {
+    return { message: `${MAX_PHOTOS} photos au maximum par annonce.` };
+  }
+
+  // La position est l'ordre d'arrivée. `unique (listing_id, position)` interdit
+  // les doublons : on repart du plus grand rang existant, pas du décompte, pour
+  // qu'une suppression ne provoque pas de collision.
+  const { data: last } = await supabase
+    .from("listing_media")
+    .select("position")
+    .eq("listing_id", listingId)
+    .order("position", { ascending: false })
+    .limit(1);
+
+  const { error } = await supabase.from("listing_media").insert({
+    listing_id: listingId,
+    storage_path: path,
+    alt,
+    position: (last?.[0]?.position ?? -1) + 1,
+  });
+
+  if (error) return { message: `Photo non enregistrée : ${error.message}` };
+
+  await refreshCover(listingId, orgId);
+  revalidatePath(`/pro/annonces/${listingId}`);
+  revalidatePath("/pro/annonces");
+
+  return { message: "Photo ajoutée." };
+}
+
+export async function removePhoto(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const orgId = await requirePartnerOrg();
+  const listingId = String(formData.get("listingId") ?? "");
+  const mediaId = String(formData.get("mediaId") ?? "");
+
+  const listing = await ownedListing(orgId, listingId);
+  if (!listing) return { message: "Annonce introuvable." };
+
+  const supabase = await createClient();
+
+  const { data: removed, error } = await supabase
+    .from("listing_media")
+    .delete()
+    .eq("id", mediaId)
+    .eq("listing_id", listingId)
+    .select("storage_path");
+
+  if (error) return { message: `Suppression impossible : ${error.message}` };
+  if (!removed || removed.length === 0) return { message: "Photo introuvable." };
+
+  // Le fichier part aussi : le laisser encombrerait le stockage sans que rien
+  // ne le référence plus.
+  await supabase.storage.from(BUCKET).remove([removed[0].storage_path]);
+
+  await refreshCover(listingId, orgId);
+  revalidatePath(`/pro/annonces/${listingId}`);
+  revalidatePath("/pro/annonces");
+
+  return { message: "Photo retirée." };
+}
+
+/** Désigne la photo de couverture, sans renuméroter les autres. */
+export async function setCoverPhoto(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const orgId = await requirePartnerOrg();
+  const listingId = String(formData.get("listingId") ?? "");
+  const mediaId = String(formData.get("mediaId") ?? "");
+
+  if (!(await ownedListing(orgId, listingId))) return { message: "Annonce introuvable." };
+
+  const supabase = await createClient();
+  const env = publicEnv();
+
+  const { data: media } = await supabase
+    .from("listing_media")
+    .select("storage_path")
+    .eq("id", mediaId)
+    .eq("listing_id", listingId)
+    .maybeSingle();
+
+  if (!media) return { message: "Photo introuvable." };
+
+  const { data, error } = await supabase
+    .from("listings")
+    .update({ cover_url: publicUrl(env.supabaseUrl, media.storage_path) })
+    .eq("id", listingId)
+    .eq("org_id", orgId)
+    .select("id");
+
+  if (error) return { message: `Action impossible : ${error.message}` };
+  if (!data || data.length === 0) return { message: "Annonce introuvable." };
+
+  revalidatePath(`/pro/annonces/${listingId}`);
+  revalidatePath("/pro/annonces");
+
+  return { message: "Photo de couverture mise à jour." };
 }
 
 /** Met en pause ou remet en ligne — sans repasser par la modération. */

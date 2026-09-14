@@ -1,8 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { BadgeCheck, Check, ChevronDown, Info, Loader2, X } from "lucide-react";
+import { BadgeCheck, Check, ChevronDown, Info, Loader2, ShieldQuestion, X } from "lucide-react";
 
+import {
+  requestQuoteApproval,
+  type CompanyState,
+} from "@/app/(company)/entreprise/actions";
 import {
   acceptQuote,
   declineQuote,
@@ -57,16 +61,25 @@ interface Item {
   quotes: Quote[];
 }
 
+export interface ApprovalRules {
+  /** Au-delà, retenir une offre demande l'aval d'un valideur. */
+  threshold: number | null;
+  /** Devis déjà soumis, pour ne pas proposer l'aval deux fois. */
+  pendingQuoteIds: string[];
+}
+
 export function QuoteComparator({
   requestId,
   items,
   currency,
   isDecidable,
+  approval,
 }: {
   requestId: string;
   items: Item[];
   currency: CurrencyCode;
   isDecidable: boolean;
+  approval?: ApprovalRules;
 }) {
   return (
     <div className="space-y-6">
@@ -77,6 +90,7 @@ export function QuoteComparator({
           item={item}
           currency={currency}
           isDecidable={isDecidable}
+          approval={approval}
         />
       ))}
     </div>
@@ -88,11 +102,13 @@ function ItemBlock({
   item,
   currency,
   isDecidable,
+  approval,
 }: {
   requestId: string;
   item: Item;
   currency: CurrencyCode;
   isDecidable: boolean;
+  approval?: ApprovalRules;
 }) {
   // Les brouillons des prestataires ne sont pas remontés par la base ; on
   // écarte ici ce qui n'est plus en lice pour ne comparer que le comparable.
@@ -142,6 +158,10 @@ function ItemBlock({
               overBudget={item.budget_max != null && quote.subtotal > item.budget_max}
               // On ne décide plus dès qu'un choix est fait pour ce besoin.
               isDecidable={isDecidable && !item.awarded_quote_id}
+              needsApproval={
+                approval?.threshold != null && quote.subtotal > approval.threshold
+              }
+              approvalPending={approval?.pendingQuoteIds.includes(quote.id) ?? false}
             />
           ))}
         </ul>
@@ -157,6 +177,8 @@ function QuoteCard({
   isAwarded,
   overBudget,
   isDecidable,
+  needsApproval,
+  approvalPending,
 }: {
   requestId: string;
   quote: Quote;
@@ -164,6 +186,8 @@ function QuoteCard({
   isAwarded: boolean;
   overBudget: boolean;
   isDecidable: boolean;
+  needsApproval: boolean;
+  approvalPending: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
   const [declining, setDeclining] = React.useState(false);
@@ -176,6 +200,10 @@ function QuoteCard({
     ProjectState,
     FormData
   >(declineQuote, {});
+  const [approvalState, approvalAction, requesting] = React.useActionState<CompanyState, FormData>(
+    requestQuoteApproval,
+    {},
+  );
 
   const currency = (quote.currency ?? "XOF") as CurrencyCode;
   const partner = quote.organizations?.brand_name ?? quote.organizations?.legal_name ?? "Prestataire";
@@ -272,18 +300,39 @@ function QuoteCard({
 
       {isDecidable && status === "sent" ? (
         <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
-          <form action={acceptAction}>
-            <input type="hidden" name="quoteId" value={quote.id} />
-            <input type="hidden" name="requestId" value={requestId} />
-            <Button type="submit" size="sm" disabled={accepting}>
-              {accepting ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-              ) : (
-                <Check className="h-3.5 w-3.5" aria-hidden />
-              )}
-              Retenir cette offre
-            </Button>
-          </form>
+          {/* Au-dessus du seuil, on ne propose pas un bouton que la base
+              refusera : on propose le geste qui, lui, aboutit. */}
+          {approvalPending ? (
+            <p className="flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <ShieldQuestion className="h-4 w-4 shrink-0" aria-hidden />
+              Aval demandé — un valideur de votre entreprise doit se prononcer.
+            </p>
+          ) : needsApproval ? (
+            <form action={approvalAction}>
+              <input type="hidden" name="quoteId" value={quote.id} />
+              <Button type="submit" size="sm" disabled={requesting}>
+                {requesting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                ) : (
+                  <ShieldQuestion className="h-3.5 w-3.5" aria-hidden />
+                )}
+                Demander l&apos;aval
+              </Button>
+            </form>
+          ) : (
+            <form action={acceptAction}>
+              <input type="hidden" name="quoteId" value={quote.id} />
+              <input type="hidden" name="requestId" value={requestId} />
+              <Button type="submit" size="sm" disabled={accepting}>
+                {accepting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                ) : (
+                  <Check className="h-3.5 w-3.5" aria-hidden />
+                )}
+                Retenir cette offre
+              </Button>
+            </form>
+          )}
 
           {declining ? null : (
             <Button
@@ -324,17 +373,17 @@ function QuoteCard({
         </form>
       ) : null}
 
-      {acceptState.message || declineState.message ? (
+      {acceptState.message || declineState.message || approvalState.message ? (
         <p
           role="status"
           className={`mt-3 flex items-start gap-2 rounded-xl px-3 py-2 text-sm ${
-            acceptState.ok || declineState.ok
+            acceptState.ok || declineState.ok || approvalState.ok
               ? "bg-teal-50 text-teal-800"
               : "bg-red-50 text-red-700"
           }`}
         >
           <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          {acceptState.message ?? declineState.message}
+          {acceptState.message ?? declineState.message ?? approvalState.message}
         </p>
       ) : null}
     </li>
