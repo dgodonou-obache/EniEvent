@@ -46,7 +46,9 @@ export function PublicHeader() {
         </nav>
 
         <div className="ml-auto hidden items-center gap-2 lg:flex">
-          <Link href="/devenir-partenaire">
+          {/* L'inscription partenaire vit dans l'espace `/pro`, qui porte sa
+              propre connexion : on y envoie directement, comme le pied de page. */}
+          <Link href="/pro/inscription">
             <Button variant="ghost" size="sm">
               Devenir partenaire
             </Button>
@@ -101,7 +103,7 @@ export function PublicHeader() {
             <Link href="/inscription" onClick={close}>
               <Button className="w-full">Inscription</Button>
             </Link>
-            <Link href="/devenir-partenaire" onClick={close}>
+            <Link href="/pro/inscription" onClick={close}>
               <Button variant="ghost" className="w-full">
                 Devenir partenaire
               </Button>
