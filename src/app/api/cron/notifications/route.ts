@@ -24,6 +24,15 @@ import { createServiceRoleClient } from "@/utils/supabase/server";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * `pg_net` appelle en POST, la tâche planifiée Vercel en GET. Le traitement est
+ * le même : vider la file. On expose donc les deux verbes plutôt que de forcer
+ * l'un des deux appelants à se contorsionner.
+ */
+export async function POST(request: Request) {
+  return GET(request);
+}
+
 /** Au-delà, la fonction risque le délai d'exécution. La tâche repassera. */
 const BATCH = 25;
 

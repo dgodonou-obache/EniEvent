@@ -1,0 +1,52 @@
+name: Vidage de la file de notifications
+
+# Filet de sécurité, et non chemin principal.
+#
+# Depuis la migration 0019, la base appelle elle-même la route dès qu'une
+# notification est mise en file : un partenaire est prévenu dans les secondes
+# qui suivent l'action du client. Ce passage régulier sert à rattraper ce que
+# cette sonnerie a pu manquer — passerelle SMS momentanément injoignable,
+# déploiement en cours, appel HTTP perdu. Les échecs sont rejoués jusqu'à trois
+# fois par `claim_notifications`.
+#
+# D'où un quart d'heure : plus fréquent ne servirait à rien, puisque le chemin
+# normal est immédiat.
+#
+# Prérequis : le secret `CRON_SECRET` du dépôt (Settings > Secrets and
+# variables > Actions) doit valoir celui posé sur Vercel. Sans lui, la route
+# répond 401 et l'exécution échoue bruyamment — ce qui est le comportement
+# voulu : une file qui ne part plus doit se voir.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+# Deux exécutions simultanées ne feraient que se disputer les mêmes lignes.
+concurrency:
+  group: notifications
+  cancel-in-progress: false
+
+jobs:
+  vider:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Appeler la route de vidage
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Le secret CRON_SECRET n'est pas défini sur le dépôt."
+            exit 1
+          fi
+
+          reponse=$(curl --silent --show-error --fail-with-body \
+            --max-time 60 \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            https://eni-event.vercel.app/api/cron/notifications)
+
+          echo "$reponse"
+
+          # Une notification en échec n'arrête pas le travail : elle sera
+          # rejouée. On la signale pour qu'elle apparaisse dans le résumé.
+          echo "$reponse" | grep -q '"echouees":0' || echo "::warning::Des envois ont échoué — voir notifications.last_error"
