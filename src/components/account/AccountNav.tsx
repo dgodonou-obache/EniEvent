@@ -3,18 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { accountNav } from "@/components/dashboard/nav-config";
 import { cn } from "@/lib/utils";
 
-const LINKS = [
-  { href: "/compte", label: "Aperçu", exact: true },
-  { href: "/compte/reservations", label: "Réservations" },
-  { href: "/projets", label: "Projets" },
-  { href: "/compte/messages", label: "Messages" },
-  { href: "/compte/favoris", label: "Favoris" },
-  { href: "/compte/paiements", label: "Paiements" },
-  { href: "/compte/documents", label: "Documents" },
-  { href: "/compte/profil", label: "Profil" },
-];
+/**
+ * Une seule source de vérité : `nav-config`. Cette liste vivait ici en double,
+ * hors de portée du contrôle des liens morts — et six de ses huit entrées
+ * renvoyaient un 404 sans que rien ne le signale.
+ */
+const LINKS = accountNav.sections.flatMap((section) => section.items);
 
 /**
  * Navigation du compte particulier. Onglets horizontaux plutôt qu'une barre

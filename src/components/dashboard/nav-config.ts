@@ -61,7 +61,7 @@ export interface SpaceNav {
   sections: NavSection[];
 }
 
-export type Space = "partner" | "company" | "admin";
+export type Space = "partner" | "company" | "admin" | "account";
 
 /** Espace partenaire — /pro */
 export const partnerNav: SpaceNav = {
@@ -233,8 +233,37 @@ export const adminNav: SpaceNav = {
  * serveur ne transmet donc que le nom de l'espace, et la barre latérale va
  * chercher son menu ici.
  */
+/**
+ * Espace particulier — /compte
+ *
+ * Le seul espace dont le menu s'affiche en onglets horizontaux plutôt qu'en
+ * barre latérale : un particulier a peu d'écrans, et le défilement horizontal
+ * passe mieux au pouce. Il figure ici malgré tout, pour que les écrans
+ * d'attente et le contrôle des liens morts le couvrent comme les autres.
+ */
+export const accountNav: SpaceNav = {
+  brand: "ÉniEvent",
+  home: "/compte",
+  signOutTo: "/",
+  sections: [
+    {
+      items: [
+        { label: "Aperçu", href: "/compte", icon: LayoutDashboard, exact: true },
+        { label: "Réservations", href: "/compte/reservations", icon: ShoppingBag },
+        { label: "Projets", href: "/projets", icon: FolderKanban },
+        { label: "Messages", href: "/compte/messages", icon: MessageSquare },
+        { label: "Favoris", href: "/compte/favoris", icon: Star },
+        { label: "Paiements", href: "/compte/paiements", icon: CreditCard },
+        { label: "Documents", href: "/compte/documents", icon: FileText },
+        { label: "Profil", href: "/compte/profil", icon: Settings },
+      ],
+    },
+  ],
+};
+
 export const NAV_BY_SPACE: Record<Space, SpaceNav> = {
   partner: partnerNav,
   company: companyNav,
   admin: adminNav,
+  account: accountNav,
 };

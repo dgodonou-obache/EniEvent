@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { adminNav, companyNav, partnerNav } from "@/components/dashboard/nav-config";
+import { accountNav, adminNav, companyNav, partnerNav } from "@/components/dashboard/nav-config";
 import { lotFor, navItemFor } from "@/components/dashboard/roadmap";
 
 /**
@@ -13,6 +13,9 @@ const ALL = [
   ...partnerNav.sections.flatMap((s) => s.items.map((i) => ({ space: "partner" as const, ...i }))),
   ...companyNav.sections.flatMap((s) => s.items.map((i) => ({ space: "company" as const, ...i }))),
   ...adminNav.sections.flatMap((s) => s.items.map((i) => ({ space: "admin" as const, ...i }))),
+  // L'espace particulier tenait sa propre liste, hors de portée de ces
+  // contrôles : six de ses huit onglets renvoyaient un 404 en production.
+  ...accountNav.sections.flatMap((s) => s.items.map((i) => ({ space: "account" as const, ...i }))),
 ];
 
 describe("couverture des menus", () => {

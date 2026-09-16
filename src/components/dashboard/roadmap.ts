@@ -38,6 +38,17 @@ const LOT_BY_PREFIX: { prefix: string; lot: string }[] = [
   { prefix: "/admin/demandes", lot: "Lot 4 — Tunnel de devis" },
   { prefix: "/admin/projets", lot: "Lot 4 — Tunnel de devis" },
   { prefix: "/admin", lot: "Lot 7 — Back-office & ops" },
+
+  // Espace particulier. Ses écrans suivent le client, pas un métier : ils
+  // arrivent donc avec le lot qui crée la donnée qu'ils affichent.
+  { prefix: "/compte/reservations", lot: "Lot 2 — Chaîne financière" },
+  { prefix: "/compte/paiements", lot: "Lot 2 — Chaîne financière" },
+  { prefix: "/compte/documents", lot: "Lot 2 — Chaîne financière" },
+  { prefix: "/compte/messages", lot: "Lot 6 — Confiance" },
+  { prefix: "/compte/favoris", lot: "Lot 8 — Éditorial & SEO" },
+  { prefix: "/compte/profil", lot: "Lot 3 — Comptes & paramètres" },
+  { prefix: "/compte", lot: "Lot 2 — Chaîne financière" },
+  { prefix: "/projets", lot: "Lot 4 — Tunnel de devis" },
 ];
 
 export function lotFor(pathname: string): string {

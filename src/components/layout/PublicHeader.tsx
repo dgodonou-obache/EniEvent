@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
+import { Menu, UserRound, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import type { HeaderAccount } from "@/lib/auth/home";
 import { cn } from "@/lib/utils";
 
 // Seules les routes réellement construites figurent ici : un lien mort fait
@@ -17,7 +18,15 @@ const LINKS = [
   { href: "/demande-de-devis", label: "Demander des devis" },
 ];
 
-export function PublicHeader() {
+/**
+ * `account` vaut `null` pour un visiteur. Sans lui, l'en-tête affichait
+ * « Connexion / Inscription » à un client déjà connecté : revenu sur l'accueil
+ * depuis son espace, il croyait sa session perdue.
+ *
+ * Un objet nu, jamais une fonction : la sérialisation serveur → client
+ * échouerait à l'exécution seulement (`CLAUDE.md` §6).
+ */
+export function PublicHeader({ account = null }: { account?: HeaderAccount | null }) {
   const [isOpen, setIsOpen] = React.useState(false);
   const close = React.useCallback(() => setIsOpen(false), []);
 
@@ -47,20 +56,34 @@ export function PublicHeader() {
 
         <div className="ml-auto hidden items-center gap-2 lg:flex">
           {/* L'inscription partenaire vit dans l'espace `/pro`, qui porte sa
-              propre connexion : on y envoie directement, comme le pied de page. */}
-          <Link href="/pro/inscription">
-            <Button variant="ghost" size="sm">
-              Devenir partenaire
-            </Button>
-          </Link>
-          <Link href="/connexion">
-            <Button variant="outline" size="sm">
-              Connexion
-            </Button>
-          </Link>
-          <Link href="/inscription">
-            <Button size="sm">Inscription</Button>
-          </Link>
+              propre connexion : on y envoie directement, comme le pied de page.
+              Inutile de la proposer à quelqu'un de déjà connecté. */}
+          {account ? null : (
+            <Link href="/pro/inscription">
+              <Button variant="ghost" size="sm">
+                Devenir partenaire
+              </Button>
+            </Link>
+          )}
+          {account ? (
+            <Link href={account.href}>
+              <Button size="sm">
+                <UserRound className="h-4 w-4" aria-hidden />
+                {account.name}
+              </Button>
+            </Link>
+          ) : (
+            <>
+              <Link href="/connexion">
+                <Button variant="outline" size="sm">
+                  Connexion
+                </Button>
+              </Link>
+              <Link href="/inscription">
+                <Button size="sm">Inscription</Button>
+              </Link>
+            </>
+          )}
         </div>
 
         <Button
@@ -95,19 +118,30 @@ export function PublicHeader() {
 
           {/* Les actions de compte restent près des liens : atteignables au pouce. */}
           <div className="grid gap-2 pt-3">
-            <Link href="/connexion" onClick={close}>
-              <Button variant="outline" className="w-full">
-                Connexion
-              </Button>
-            </Link>
-            <Link href="/inscription" onClick={close}>
-              <Button className="w-full">Inscription</Button>
-            </Link>
-            <Link href="/pro/inscription" onClick={close}>
-              <Button variant="ghost" className="w-full">
-                Devenir partenaire
-              </Button>
-            </Link>
+            {account ? (
+              <Link href={account.href} onClick={close}>
+                <Button className="w-full">
+                  <UserRound className="h-4 w-4" aria-hidden />
+                  {account.name}
+                </Button>
+              </Link>
+            ) : (
+              <>
+                <Link href="/connexion" onClick={close}>
+                  <Button variant="outline" className="w-full">
+                    Connexion
+                  </Button>
+                </Link>
+                <Link href="/inscription" onClick={close}>
+                  <Button className="w-full">Inscription</Button>
+                </Link>
+                <Link href="/pro/inscription" onClick={close}>
+                  <Button variant="ghost" className="w-full">
+                    Devenir partenaire
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
         </nav>
       </div>
