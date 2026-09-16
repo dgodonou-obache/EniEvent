@@ -110,6 +110,11 @@ const REPLACEMENTS: readonly (readonly [RegExp, string])[] = [
   [/ | | /g, " "], // espaces insécables, dont la fine avant « : »
   [/œ/g, "oe"],
   [/Œ/g, "OE"],
+  // L'alphabet GSM contient « Ç » mais **pas** « ç » minuscule. Sans cette
+  // ligne, « reçu », « français » ou « ça » suffisent à faire passer tout le
+  // message en UCS-2 — le piège le plus discret de la liste, puisque les
+  // autres accents français, eux, passent sans frais.
+  [/ç/g, "c"],
 ];
 
 export function toGsmSafe(body: string): string {

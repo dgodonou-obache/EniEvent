@@ -800,6 +800,59 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          attempts: number
+          channel: Database["public"]["Enums"]["notification_channel"]
+          created_at: string
+          id: string
+          kind: string
+          last_error: string | null
+          payload: Json
+          recipient: string
+          ref_id: string | null
+          sent_at: string | null
+          status: Database["public"]["Enums"]["notification_status"]
+          target_org_id: string | null
+        }
+        Insert: {
+          attempts?: number
+          channel: Database["public"]["Enums"]["notification_channel"]
+          created_at?: string
+          id?: string
+          kind: string
+          last_error?: string | null
+          payload?: Json
+          recipient: string
+          ref_id?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["notification_status"]
+          target_org_id?: string | null
+        }
+        Update: {
+          attempts?: number
+          channel?: Database["public"]["Enums"]["notification_channel"]
+          created_at?: string
+          id?: string
+          kind?: string
+          last_error?: string | null
+          payload?: Json
+          recipient?: string
+          ref_id?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["notification_status"]
+          target_org_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_target_org_id_fkey"
+            columns: ["target_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_members: {
         Row: {
           created_at: string
@@ -1632,8 +1685,35 @@ export type Database = {
     }
     Functions: {
       accept_quote: { Args: { target: string }; Returns: undefined }
+      claim_notifications: {
+        Args: { batch?: number }
+        Returns: {
+          attempts: number
+          channel: Database["public"]["Enums"]["notification_channel"]
+          created_at: string
+          id: string
+          kind: string
+          last_error: string | null
+          payload: Json
+          recipient: string
+          ref_id: string | null
+          sent_at: string | null
+          status: Database["public"]["Enums"]["notification_status"]
+          target_org_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "notifications"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       decide_approval: {
         Args: { p_approve: boolean; p_reason?: string; target: string }
+        Returns: undefined
+      }
+      mark_notification: {
+        Args: { delivered: boolean; detail?: string; target: string }
         Returns: undefined
       }
       next_reference: { Args: { prefix: string }; Returns: string }
@@ -1673,6 +1753,8 @@ export type Database = {
       listing_status: "draft" | "pending" | "approved" | "rejected" | "archived"
       media_type: "image" | "video"
       member_status: "invited" | "active" | "revoked"
+      notification_channel: "sms" | "email"
+      notification_status: "pending" | "sending" | "sent" | "failed"
       org_role:
         | "owner"
         | "admin"
@@ -1867,6 +1949,8 @@ export const Constants = {
       listing_status: ["draft", "pending", "approved", "rejected", "archived"],
       media_type: ["image", "video"],
       member_status: ["invited", "active", "revoked"],
+      notification_channel: ["sms", "email"],
+      notification_status: ["pending", "sending", "sent", "failed"],
       org_role: [
         "owner",
         "admin",
