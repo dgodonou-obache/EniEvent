@@ -21,7 +21,21 @@ Cette V2 remplace l'app v1 située dans `..\ÉniEvent` (lecture seule, source de
 
 Next.js 16 (App Router, RSC, Server Actions) · React 19 · TypeScript strict ·
 Tailwind 3.4 · Supabase (Postgres, Auth, Storage, RLS) · Zod + react-hook-form ·
-CinetPay (Mobile Money, carte) · Resend · Vitest.
+**Premux** (SMS, branché) · CinetPay (Mobile Money, carte — à venir) ·
+Resend (e-mail — à venir) · Vitest.
+
+## Production
+
+Le site tourne sur **https://enievent.com** (apex ; `www` y redirige en 308).
+`eni-event.vercel.app` reste servi et sert de cible aux appels internes — sonnerie
+`pg_net` et filet GitHub Actions — pour qu'ils ne dépendent d'aucun DNS.
+
+La zone DNS est chez **OVH**, pas chez Vercel : seuls les enregistrements `A` pointent
+vers Vercel. Les 4 `MX`, le `SPF` et les 2 `CNAME` DKIM font vivre la messagerie du
+domaine. **Ne jamais déplacer les serveurs de noms** — cela couperait les e-mails sans
+le moindre message d'erreur.
+
+Mise en ligne, variables à poser, lecture des pannes : `docs/DEPLOIEMENT.md`.
 
 ## Commandes
 
@@ -32,8 +46,12 @@ CinetPay (Mobile Money, carte) · Resend · Vitest.
 | `npm run db:verify` | Rejoue les migrations dans un Postgres jetable (PGlite) et exige la RLS partout |
 | `npm run db:types` | Régénère `src/types/database.ts` après une migration |
 | `npm run db:seed` | Applique `supabase/seed.sql` (rejouable) |
-| `npm run demo:reset` | Seed + comptes de démonstration |
+| `npm run demo:reset` | Seed + comptes de démonstration + jeu entreprise |
 | `npm run smoke` | Contrôles de bout en bout contre le vrai Supabase |
+| `npm run smoke:sms` | **Envoie un vrai SMS** via Premux — consomme un crédit, exige `SMS_TEST_TO` |
+
+Les autres `smoke:*` (`offre`, `planning`, `devis`, `entreprise`, `photos`) jouent un
+parcours métier contre le vrai Supabase.
 
 Recette manuelle : `docs/RECETTE.md`.
 
@@ -115,10 +133,51 @@ avant », pas « Politique flexible ». Interface en français.
   livrée ; un test contre la base ne prouve pas que l'écran s'affiche.
 - Mobile-first, vérifié à 390 px : pas de débordement de modale ni de menu déroulant.
 - Zones défilables : `overflow-y-auto no-scrollbar`.
+- ⚠️ Un `href` n'est qu'une chaîne : **rien ne le confronte à l'arborescence de
+  `src/app`**. Le bouton « Devenir partenaire » a renvoyé un 404 en production sans
+  qu'aucun outil ne bronche. `tests/navigation.test.ts` garde l'en-tête et le pied de
+  page ; les nouveaux liens de menu y passent aussi.
+- ⚠️ `backdrop-blur` et `drop-shadow` **créent un contexte d'empilement** : un menu
+  déroulant enfermé dedans ne peut plus passer au-dessus du reste, quel que soit son
+  `z-index`. Voir `tests/stacking.test.ts`.
 
 ### 7. Données
-Aucune donnée mockée dans les back-offices ni dans les pages de production — tout vient
-de Supabase. La v1 avait un `src/lib/mock/` ; il n'a pas été repris, ne pas le réintroduire.
+- Aucune donnée mockée dans les back-offices ni dans les pages de production — tout vient
+  de Supabase. La v1 avait un `src/lib/mock/` ; il n'a pas été repris, ne pas le réintroduire.
+- **Les numéros sont stockés en E.164** (`+22901XXXXXXXX`), forme imposée par une
+  contrainte `CHECK` depuis la migration 0017 et produite par `normaliseBeninPhone`. La
+  contrainte est volontairement **agnostique du pays** — le schéma reste multi-pays. Le
+  seed écrivait autrefois la forme lisible « +229 01 97 00 00 01 » : six organisations
+  sur sept étaient injoignables par SMS sans que rien ne le signale.
+
+### 8. Notifications
+Un partenaire ne consulte pas `/pro/demandes` de lui-même : **toute action d'un client
+qui appelle une réponse doit déclencher une notification.**
+
+- **La mise en file se fait en base, jamais dans une Server Action.** Savoir quels
+  partenaires sont concernés demande de lire les annonces de tous, ce que le client qui
+  dépose un brief n'a pas le droit de faire. Des déclencheurs `SECURITY DEFINER`
+  remplissent `notifications` au passage à l'état utile (`quote_requests` → `open`,
+  `quotes` → `sent`) — donc quel que soit le chemin, publication directe ou validation
+  d'entreprise.
+- **L'envoi n'a lieu que dans `/api/cron/notifications`**, seul endroit où
+  `SUPABASE_SECRET_KEY` est admise (§3). La base **sonne** cette route par `pg_net` dès
+  qu'une ligne est écrite : la notification part en quelques secondes. Le passage
+  GitHub Actions toutes les 15 min n'est qu'un filet pour les échecs.
+- **La file est secrète** : elle dit qui a été prévenu, donc qui sont les concurrents en
+  lice. Lecture réservée à l'administration ; `claim_notifications` et
+  `mark_notification` sont retirées à `authenticated`.
+- **Plafond de 20 destinataires par demande.** Un brief « traiteur à Cotonou » concerne
+  tous les traiteurs approuvés de la ville, et chaque SMS est facturé. Au-delà, la
+  demande reste visible dans `/pro/demandes`.
+- **Un SMS français ne fait pas 160 caractères.** L'alphabet GSM 03.38 contient `é`, `è`,
+  `à`, `Ç` — mais **ni `ç` minuscule, ni l'apostrophe typographique `’`, ni `« »`, ni
+  `…`**. Un seul de ces caractères fait tomber la capacité à 70 et triple la facture.
+  Les textes vivent dans `src/lib/notify/messages.ts`, passent par `toGsmSafe`, et sont
+  testés **au pire cas** (nom d'enseigne long, identifiant de 36 caractères).
+- Premux est isolé dans `src/lib/sms/premux.ts` — seul fichier du dépôt à le connaître.
+  `X-Premux-Domain` attend **le domaine de la clé** (`enievent.com`), pas `premux.bj`
+  comme le montre leur documentation.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
