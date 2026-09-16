@@ -11,7 +11,7 @@ export default async function PublicLayout({ children }: { children: React.React
     <div className="flex min-h-dvh flex-col">
       <PublicHeader account={account} />
       <div className="flex-1">{children}</div>
-      <PublicFooter />
+      <PublicFooter account={account} />
     </div>
   );
 }

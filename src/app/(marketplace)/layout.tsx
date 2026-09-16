@@ -11,7 +11,7 @@ export default async function MarketplaceLayout({ children }: { children: React.
     <div className="flex min-h-dvh flex-col">
       <PublicHeader account={account} />
       <div className="flex-1 bg-slate-50">{children}</div>
-      <PublicFooter />
+      <PublicFooter account={account} />
     </div>
   );
 }

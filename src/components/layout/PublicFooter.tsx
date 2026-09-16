@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import type { HeaderAccount } from "@/lib/auth/home";
+
 // Comme dans l'en-tête : uniquement les routes construites. Les pages
 // éditoriales et légales viendront avec leur lot, et reprendront leur place ici.
 const COLUMNS = [
@@ -29,7 +31,20 @@ const COLUMNS = [
   },
 ];
 
-export function PublicFooter() {
+/**
+ * `account` suit la même règle que l'en-tête : proposer « Connexion » à
+ * quelqu'un de déjà connecté lui fait douter de sa session. La colonne « Mon
+ * compte » se réduit alors à son espace.
+ */
+export function PublicFooter({ account = null }: { account?: HeaderAccount | null }) {
+  const columns = account
+    ? COLUMNS.map((column) =>
+        column.title === "Mon compte"
+          ? { ...column, links: [{ href: account.href, label: "Mon espace" }] }
+          : column,
+      )
+    : COLUMNS;
+
   return (
     <footer className="border-t border-slate-100 bg-white">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
@@ -43,7 +58,7 @@ export function PublicFooter() {
             </p>
           </div>
 
-          {COLUMNS.map((column) => (
+          {columns.map((column) => (
             <div key={column.title}>
               <p className="micro-label text-slate-400">{column.title}</p>
               <ul className="mt-3 space-y-2">
