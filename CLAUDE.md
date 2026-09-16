@@ -55,9 +55,14 @@ parcours métier contre le vrai Supabase.
 
 Recette manuelle : `docs/RECETTE.md`.
 
-> ⚠️ La **confirmation d'e-mail est désactivée** sur le projet de développement, pour que
-> les comptes de test soient utilisables sans dépendre d'un envoi. À réactiver avant la
-> production, avec un SMTP Resend et un domaine vérifié.
+> ⚠️ La **confirmation d'e-mail est active**. Une inscription n'ouvre pas de session :
+> le formulaire affiche « Vérifiez votre boîte mail ». Les envois passent par le SMTP
+> d'`contact@enievent.com` (OVH, `ssl0.ovh.net:465`), déclaré côté Supabase.
+>
+> ⚠️ Le mot de passe des comptes de démonstration vit dans `DEMO_PASSWORD`
+> (`.env.local`), **jamais dans le dépôt** : `demo-admin` est de type `admin`, et le
+> dépôt est public. Aucun repli codé en dur — un repli, c'est le secret qui revient par
+> la porte de service.
 
 ## Architecture
 

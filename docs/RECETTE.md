@@ -17,7 +17,15 @@ npm run dev
 
 ### Comptes de démonstration
 
-Mot de passe commun : `Demo!EniEvent2026`
+Mot de passe commun : la valeur de `DEMO_PASSWORD` dans votre `.env.local`.
+
+> Il ne figure **pas** dans ce dépôt, et ne doit jamais y revenir. Écrit en
+> clair, il ouvrait `demo-admin` — un compte de type `admin` — sur un dépôt
+> public : n'importe quel lecteur entrait dans le back-office.
+>
+> Pour en poser un sur une machine neuve :
+> `node -e "console.log(require('crypto').randomBytes(18).toString('base64url'))"`,
+> puis `npm run demo:users` pour l'appliquer aux quatre comptes.
 
 | Compte | Se connecter sur | Atterrit sur |
 |---|---|---|
@@ -26,9 +34,14 @@ Mot de passe commun : `Demo!EniEvent2026`
 | `demo-partenaire@enievent.bj` | `/pro/connexion` | `/pro/dashboard` |
 | `demo-admin@enievent.bj` | `/connexion` | `/admin` |
 
-La confirmation d'e-mail est **désactivée sur le projet de développement** : la
-création d'un compte est immédiate. À réactiver avant la production, avec un
-SMTP Resend et un domaine vérifié.
+La confirmation d'e-mail est **active**. Une inscription n'ouvre donc pas de
+session : le formulaire affiche « Vérifiez votre boîte mail », et le compte ne
+sert qu'après le clic sur le lien reçu. Les quatre comptes ci-dessus sont créés
+déjà confirmés par l'API d'administration — ils se connectent directement.
+
+Les messages partent par le SMTP d'`contact@enievent.com` (OVH, `ssl0.ovh.net`
+port 465). Une inscription qui n'aboutit jamais se diagnostique donc dans cette
+boîte d'abord, et dans les journaux d'authentification Supabase ensuite.
 
 ---
 

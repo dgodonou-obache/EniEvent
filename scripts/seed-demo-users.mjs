@@ -23,7 +23,22 @@ if (!url || !secret) {
 
 const admin = createClient(url, secret, { auth: { persistSession: false } });
 
-export const DEMO_PASSWORD = "Demo!EniEvent2026";
+/**
+ * Mot de passe des comptes de démonstration.
+ *
+ * **Jamais dans le dépôt.** Écrit en clair, il ouvrait le compte `demo-admin`,
+ * de type `admin`, sur un dépôt public : n'importe quel lecteur entrait dans le
+ * back-office. Aucun repli codé en dur — un repli, c'est le secret qui revient
+ * par la porte de service.
+ */
+export const DEMO_PASSWORD = process.env.DEMO_PASSWORD;
+
+if (!DEMO_PASSWORD) {
+  console.error(
+    "DEMO_PASSWORD est absente. Ajoutez-la à .env.local, puis relancez avec --env-file=.env.local.",
+  );
+  process.exit(1);
+}
 
 /** L'organisation du seed à laquelle rattacher le partenaire de démonstration. */
 const PARTNER_ORG_SLUG = "espaces-cotonou";

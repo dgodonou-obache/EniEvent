@@ -14,7 +14,7 @@ import { createClient } from "@supabase/supabase-js";
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publishable = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const secret = process.env.SUPABASE_SECRET_KEY;
-const PASSWORD = "Demo!EniEvent2026";
+const PASSWORD = process.env.DEMO_PASSWORD;
 const BUCKET = "annonces";
 
 if (!url || !publishable || !secret) {
