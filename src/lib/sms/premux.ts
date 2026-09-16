@@ -18,6 +18,13 @@ import { measureSms, toGsmSafe } from "./segments";
  * 2. L'authentification tient en **deux** en-têtes : le jeton porteur *et*
  *    `X-Premux-Domain`. Oublier le second donne une erreur d'autorisation qui
  *    ressemble à une clé invalide, et fait chercher au mauvais endroit.
+ *
+ * Sur ce second en-tête, un piège vérifié en conditions réelles : il attend le
+ * domaine **auquel la clé est rattachée**, pas celui de la passerelle. L'exemple
+ * de la documentation Premux montre `premux.bj` — leur propre domaine — et le
+ * recopier vaut un `HTTP 403 DOMAIN_NOT_ALLOWED`, dont le libellé (« le domaine
+ * de l'appel ne correspond pas au domaine autorisé de la clé ») ne dit pas
+ * lequel des deux est en cause.
  */
 
 const ENDPOINT = "https://premux.bj/api/v1/messages/sms";

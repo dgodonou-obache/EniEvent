@@ -24,7 +24,8 @@
     "smoke:devis": "node --env-file=.env.local scripts/smoke-devis.mjs",
     "smoke:entreprise": "node --env-file=.env.local scripts/smoke-entreprise.mjs",
     "smoke:photos": "node --env-file=.env.local scripts/smoke-photos.mjs",
-    "verify": "npm run typecheck && npm run lint && npm run test"
+    "verify": "npm run typecheck && npm run lint && npm run test",
+    "smoke:sms": "node --env-file=.env.local node_modules/vitest/vitest.mjs run tests/sms-reel.test.ts --reporter=verbose"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
