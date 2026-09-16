@@ -19,12 +19,24 @@
 -- réveille jusqu'à vingt partenaires, insérés en une seule instruction : un
 -- déclencheur par ligne provoquerait vingt appels HTTP pour un seul vidage.
 --
--- **L'URL et le secret ne sont pas ici.** Ils vivent dans les réglages de la
--- base (`alter database ... set`), posés hors du dépôt : un secret dans une
--- migration serait un secret sur GitHub. Absents, le déclencheur ne fait rien
--- et la file reste vidée par la tâche planifiée — c'est ce qui permet aussi aux
--- tests de tourner dans un Postgres jetable, qui n'a pas `pg_net`.
+-- **L'URL et le secret ne sont pas ici.** Ils vivent dans `app.runtime_config`,
+-- renseignée hors du dépôt : un secret dans une migration serait un secret sur
+-- GitHub. Absents, le déclencheur ne fait rien et la file reste vidée par la
+-- tâche planifiée — c'est ce qui permet aussi aux tests de tourner dans un
+-- Postgres jetable, qui n'a pas `pg_net`.
+--
+-- Une table plutôt qu'un réglage de session (`alter database ... set`) : ces
+-- réglages ne sont lus qu'à l'ouverture d'une connexion, et Supabase les met en
+-- pool. La sonnerie serait restée muette sur toutes les connexions déjà
+-- ouvertes, pour une durée que rien ne borne.
 -- =============================================================================
+
+-- Schéma `app` : hors de portée de PostgREST, et sans droit accordé à
+-- `authenticated`. Le secret n'est lisible que par la fonction ci-dessous.
+create table if not exists app.runtime_config (
+  key text primary key,
+  value text not null
+);
 
 do $$
 begin
@@ -41,9 +53,12 @@ security definer
 set search_path = ''
 as $$
 declare
-  url text := current_setting('app.notify_url', true);
-  secret text := current_setting('app.notify_secret', true);
+  url text;
+  secret text;
 begin
+  select value into url from app.runtime_config where key = 'notify_url';
+  select value into secret from app.runtime_config where key = 'notify_secret';
+
   -- Réglages absents : rien à faire. C'est le cas dans le Postgres jetable des
   -- tests, et ce doit rester silencieux — la file sera vidée autrement.
   if url is null or url = '' or secret is null or secret = '' then
@@ -70,7 +85,7 @@ end;
 $$;
 
 comment on function app.ping_notification_drain() is
-  'Sonne la route de vidage dès qu''une notification est mise en file. Sans effet si app.notify_url n''est pas réglée.';
+  'Sonne la route de vidage dès qu''une notification est mise en file. Sans effet si app.runtime_config est vide.';
 
 create trigger notifications_ping
   after insert on notifications
