@@ -13,12 +13,12 @@
 -- -----------------------------------------------------------------------------
 
 insert into organizations (type, legal_name, brand_name, slug, status, country, city, phone) values
-  ('partner', 'Espaces Cotonou SARL',    'Espaces Cotonou',   'espaces-cotonou',   'active', 'BJ', 'Cotonou',       '+229 01 97 00 00 01'),
-  ('partner', 'Saveurs du Bénin',        'Saveurs du Bénin',  'saveurs-du-benin',  'active', 'BJ', 'Cotonou',       '+229 01 97 00 00 02'),
-  ('partner', 'Décor Ahossi',            'Décor Ahossi',      'decor-ahossi',      'active', 'BJ', 'Cotonou',       '+229 01 97 00 00 03'),
-  ('partner', 'Résidences Ouidah SARL',  'Résidences Ouidah', 'residences-ouidah', 'active', 'BJ', 'Ouidah',        '+229 01 96 00 00 04'),
-  ('partner', 'Sono Calavi Pro',         'Sono Calavi',       'sono-calavi',       'active', 'BJ', 'Abomey-Calavi', '+229 01 95 00 00 05'),
-  ('partner', 'Cérémonies du Golfe',     'Cérémonies du Golfe','ceremonies-golfe', 'active', 'BJ', 'Porto-Novo',    '+229 01 94 00 00 06')
+  ('partner', 'Espaces Cotonou SARL',    'Espaces Cotonou',   'espaces-cotonou',   'active', 'BJ', 'Cotonou',       '+2290197000001'),
+  ('partner', 'Saveurs du Bénin',        'Saveurs du Bénin',  'saveurs-du-benin',  'active', 'BJ', 'Cotonou',       '+2290197000002'),
+  ('partner', 'Décor Ahossi',            'Décor Ahossi',      'decor-ahossi',      'active', 'BJ', 'Cotonou',       '+2290197000003'),
+  ('partner', 'Résidences Ouidah SARL',  'Résidences Ouidah', 'residences-ouidah', 'active', 'BJ', 'Ouidah',        '+2290196000004'),
+  ('partner', 'Sono Calavi Pro',         'Sono Calavi',       'sono-calavi',       'active', 'BJ', 'Abomey-Calavi', '+2290195000005'),
+  ('partner', 'Cérémonies du Golfe',     'Cérémonies du Golfe','ceremonies-golfe', 'active', 'BJ', 'Porto-Novo',    '+2290194000006')
 on conflict (slug) do nothing;
 
 insert into partner_profiles (org_id, bio, service_cities, years_experience, is_verified, verified_at)
