@@ -129,8 +129,24 @@ dans `audit_logs`. Les transitions autorisées vivent dans `src/lib/states.ts`.
 ### 4. Isolation des espaces
 Les cinq espaces sont étanches. Un partenaire déconnecté est renvoyé sur
 `/pro/connexion`, jamais sur `/connexion` ; aucun lien « retour au site » dans les
-back-offices. Le middleware ne contrôle que l'authentification ; l'autorisation (rôle,
-appartenance à une organisation) est faite dans le layout serveur de chaque espace.
+back-offices.
+
+L'autorisation (rôle, appartenance à une organisation) est faite dans le layout serveur
+de chaque espace — **sauf `/admin`, refusé dans le proxy**.
+
+⚠️ **Un layout ne bloque pas l'exécution d'une page.** Page et layout se rendent en
+parallèle : un layout qui renvoie un refus au lieu de ses enfants empêche l'affichage,
+mais la page a déjà tourné, ses requêtes sont parties, et son rendu se retrouve dans la
+charge RSC du document. Aucune donnée ne fuyait — la page s'exécute avec les droits du
+visiteur, la RLS filtre — mais la première page d'administration employant
+`SUPABASE_SECRET_KEY` ou une fonction `SECURITY DEFINER` aurait fui pour de bon. D'où la
+réécriture vers `/acces-refuse` depuis le proxy : la page ne s'exécute jamais, et l'URL
+ne change pas, ce qui évite de faire croire à une session expirée.
+
+`npm run smoke:cloisonnement` rejoue l'attaque : chaque compte contre chaque écran
+d'administration, puis les mêmes tables interrogées **sans navigateur**, puis la
+tentative d'auto-promotion. C'est le second bloc qui compte — la RLS est la seule
+barrière devant quelqu'un qui n'ouvre pas de navigateur.
 
 ### 5. Rédaction destinée aux utilisateurs
 - Pas de jargon. Les politiques d'annulation et de paiement se disent en clair :

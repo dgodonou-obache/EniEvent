@@ -26,7 +26,8 @@
     "smoke:photos": "node --env-file=.env.local scripts/smoke-photos.mjs",
     "verify": "npm run typecheck && npm run lint && npm run test",
     "smoke:sms": "node --env-file=.env.local node_modules/vitest/vitest.mjs run tests/sms-reel.test.ts --reporter=verbose",
-    "smoke:ecrans": "node --env-file=.env.local scripts/smoke-ecrans.mjs"
+    "smoke:ecrans": "node --env-file=.env.local scripts/smoke-ecrans.mjs",
+    "smoke:cloisonnement": "node --env-file=.env.local scripts/smoke-cloisonnement.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

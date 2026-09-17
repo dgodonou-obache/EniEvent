@@ -38,6 +38,23 @@ export type DenialReason =
   | "org-suspended"
   | "not-admin";
 
+/**
+ * Les mêmes valeurs, utilisables à l'exécution.
+ *
+ * `satisfies` les arrime aux types ci-dessus : ajouter un espace ou un motif
+ * sans compléter ces listes ne compile pas. Elles servent à valider ce qui
+ * arrive d'une URL, où l'on ne peut se fier à rien.
+ */
+export const SPACES = ["account", "partner", "company", "admin"] as const satisfies readonly Space[];
+
+export const DENIAL_REASONS = [
+  "no-organization",
+  "membership-inactive",
+  "org-pending",
+  "org-suspended",
+  "not-admin",
+] as const satisfies readonly DenialReason[];
+
 export type AccessDecision =
   | { granted: true; org: Membership | null; available: Membership[] }
   | { granted: false; reason: DenialReason };

@@ -96,6 +96,36 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(signInUrl);
   }
 
+  // -------------------------------------------------------------------------
+  // Le back-office se refuse **ici**, pas dans son layout.
+  //
+  // Page et layout se rendent en parallèle dans l'App Router : un layout qui
+  // renvoie un refus au lieu de ses enfants empêche l'affichage, mais **pas
+  // l'exécution de la page**. Les requêtes d'administration partaient donc pour
+  // tout utilisateur connecté qui tapait /admin, et leur rendu se retrouvait
+  // dans la charge RSC du document.
+  //
+  // Rien ne fuyait — la page s'exécutait avec les droits du visiteur, la RLS
+  // filtrait — mais la première page d'administration employant la clé de
+  // service aurait fui pour de bon. Une réécriture coupe court : la page ne
+  // s'exécute jamais, et l'URL reste la même, ce qui évite de faire croire à
+  // une session expirée.
+  // -------------------------------------------------------------------------
+  if (user && (pathname === "/admin" || pathname.startsWith("/admin/"))) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("account_type")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profile?.account_type !== "admin") {
+      const refus = new URL("/acces-refuse", request.url);
+      refus.searchParams.set("espace", "admin");
+      refus.searchParams.set("motif", "not-admin");
+      return NextResponse.rewrite(refus);
+    }
+  }
+
   return supabaseResponse;
 }
 
