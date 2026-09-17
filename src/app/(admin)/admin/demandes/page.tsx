@@ -112,8 +112,11 @@ type Demande = Awaited<ReturnType<typeof getAllRequests>>[number];
 
 function Demande({ demande, maintenant }: { demande: Demande; maintenant: number }) {
   const currency = (demande.currency ?? DEFAULT_CURRENCY) as CurrencyCode;
-  const offres = demande.quotes?.[0]?.count ?? 0;
-  const metiers = (demande.quote_request_items ?? [])
+  // Un devis se rattache à une prestation, pas à la demande : on additionne les
+  // compteurs de chaque item pour obtenir le nombre d'offres reçues.
+  const items = demande.quote_request_items ?? [];
+  const offres = items.reduce((total, item) => total + (item.quotes?.[0]?.count ?? 0), 0);
+  const metiers = items
     .map((item) => item.categories?.name)
     .filter((name): name is string => Boolean(name));
 

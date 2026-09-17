@@ -70,8 +70,15 @@ export type RequestStatus = Database["public"]["Enums"]["quote_request_status"];
  * ouverte depuis trois jours sans la moindre offre, une échéance dépassée, un
  * appel d'offres attribué qu'on peut citer en exemple.
  *
- * `quotes(count)` compte les offres reçues sans en révéler le contenu : c'est
- * le seul chiffre nécessaire pour repérer une demande qui n'intéresse personne.
+ * On compte les offres reçues sans en révéler le contenu : c'est le seul
+ * chiffre nécessaire pour repérer une demande qui n'intéresse personne.
+ *
+ * ⚠️ **Un devis ne se rattache pas à la demande, mais à l'une de ses
+ * prestations** (`quotes.item_id`). `quotes(count)` depuis `quote_requests`
+ * échoue donc — « no relationship found » — et le comptage passe par les
+ * items. Deux clés étrangères relient `quotes` et `quote_request_items` : sans
+ * l'indication `!quotes_item_id_fkey`, PostgREST refuse de choisir. La même
+ * convention vit dans `quotes.ts` sous le nom `BY_ITEM`.
  */
 export async function getAllRequests(status?: RequestStatus) {
   const supabase = await createClient();
@@ -83,8 +90,7 @@ export async function getAllRequests(status?: RequestStatus) {
        status, respond_by, published_at, created_at,
        profiles:requester_id(full_name),
        organizations(brand_name, legal_name),
-       quote_request_items(id, categories(name)),
-       quotes(count)`,
+       quote_request_items(id, categories(name), quotes!quotes_item_id_fkey(count))`,
     )
     .order("created_at", { ascending: false })
     .limit(100);
@@ -112,7 +118,7 @@ export async function getRequestCounts() {
 
   return {
     // Rendu à l'appelant : comparer des échéances exige un instant de
-    // référence, et  est interdit dans le rendu d'un composant.
+    // référence, et `Date.now()` est interdit dans le rendu d'un composant.
     maintenant,
     total: data.length,
     open: data.filter((r) => r.status === "open").length,
