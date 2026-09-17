@@ -12,8 +12,10 @@ import { createClient } from "@supabase/supabase-js";
  *    le chemin emprunté. C'est la seule barrière qui tienne devant un
  *    utilisateur qui n'ouvre pas de navigateur.
  *
- * Ce script éprouve les deux, avec les quatre comptes de démonstration, et
- * compare ce que voit un non-administrateur à ce que voit l'administration.
+ * Ce script éprouve les deux, avec les quatre comptes de démonstration. Chaque
+ * table dit **ce qu'on attend d'elle**, et non « moins que l'administration » :
+ * un partenaire voit légitimement tous les appels d'offres ouverts de sa ville
+ * et de ses catégories — c'est la raison d'être du tunnel.
  */
 
 const BASE = process.env.SMOKE_BASE_URL ?? "https://enievent.com";
@@ -28,9 +30,9 @@ if (!url || !key || !ref || !password) {
 }
 
 const COMPTES = [
-  { titre: "Particulier", email: "demo-particulier@enievent.bj" },
-  { titre: "Partenaire", email: "demo-partenaire@enievent.bj" },
-  { titre: "Entreprise", email: "demo-entreprise@enievent.bj" },
+  { titre: "Particulier", email: "demo-particulier@enievent.bj"},
+  { titre: "Partenaire", email: "demo-partenaire@enievent.bj"},
+  { titre: "Entreprise", email: "demo-entreprise@enievent.bj"},
 ];
 
 const ROUTES_ADMIN = [
@@ -110,37 +112,83 @@ else console.log(`  ✓ Visiteur     redirigé vers ${anon.headers.get("location
 // ---------------------------------------------------------------------------
 console.log("\n2. Les données, interrogées directement (sans navigateur)");
 
-/** Ce que l'administration voit, et que les autres ne doivent pas voir en entier. */
+/**
+ * Chaque table dit **ce qu'on attend**, pas « moins que l'administration ».
+ *
+ * Une première version comparait les volumes et criait au loup : un partenaire
+ * voit légitimement tous les appels d'offres ouverts de sa ville et de ses
+ * catégories — c'est même la raison d'être du tunnel. Ce qu'il ne doit pas
+ * voir, c'est un **brouillon**. Un contrôle qui se trompe d'alerte finit par
+ * n'être plus lu.
+ */
 const SONDES = [
-  { table: "quote_requests", colonne: "id", intitule: "appels d'offres" },
-  { table: "notifications", colonne: "id", intitule: "file de notifications" },
-  { table: "audit_logs", colonne: "id", intitule: "journal d'audit" },
-  { table: "kyc_documents", colonne: "id", intitule: "dossiers KYC" },
-  { table: "profiles", colonne: "id", intitule: "profils" },
+  {
+    table: "notifications",
+    intitule: "file de notifications",
+    attendu: () => 0,
+    pourquoi: "elle dit quels concurrents ont été prévenus",
+  },
+  {
+    table: "audit_logs",
+    intitule: "journal d'audit",
+    attendu: () => 0,
+    pourquoi: "il retrace toute l'activité de la plateforme",
+  },
+  {
+    table: "kyc_documents",
+    intitule: "dossiers KYC",
+    attendu: () => 0,
+    pourquoi: "pièces d'identité et relevés bancaires",
+  },
+  {
+    table: "profiles",
+    intitule: "profils",
+    attendu: () => 1,
+    pourquoi: "chacun ne voit que le sien",
+  },
 ];
 
 for (const sonde of SONDES) {
   const { count: vuParAdmin } = await admin.client
     .from(sonde.table)
-    .select(sonde.colonne, { count: "exact", head: true });
+    .select("*", { count: "exact", head: true });
 
   const lignes = [];
 
   for (const compte of COMPTES) {
     const { client } = await session(compte.email);
-    const { count } = await client.from(sonde.table).select(sonde.colonne, { count: "exact", head: true });
-    lignes.push(`${compte.titre} ${count ?? 0}`);
+    const { count } = await client.from(sonde.table).select("*", { count: "exact", head: true });
+    const vu = count ?? 0;
+    lignes.push(`${compte.titre} ${vu}`);
 
-    // Seule la file de notifications et le journal doivent être totalement
-    // clos ; les autres tables laissent légitimement voir ce qui appartient au
-    // compte. Ce qui serait grave, c'est d'en voir *autant* que l'administration.
-    if ((count ?? 0) >= (vuParAdmin ?? 0) && (vuParAdmin ?? 0) > 0) {
-      rate(`${compte.titre} voit ${count} ${sonde.intitule} — autant que l'administration (${vuParAdmin})`);
+    if (vu > sonde.attendu()) {
+      rate(`${compte.titre} voit ${vu} ${sonde.intitule} (attendu ${sonde.attendu()}) — ${sonde.pourquoi}`);
     }
   }
 
   console.log(`  ✓ ${sonde.intitule.padEnd(24)} admin ${String(vuParAdmin ?? 0).padEnd(4)} | ${lignes.join(" · ")}`);
 }
+
+// Les appels d'offres suivent une autre règle : un partenaire doit voir ceux
+// qui le concernent, jamais ceux qu'un client n'a pas encore publiés.
+const { count: brouillons } = await admin.client
+  .from("quote_requests")
+  .select("*", { count: "exact", head: true })
+  .in("status", ["draft", "pending_approval"]);
+
+for (const compte of COMPTES) {
+  const { client, userId } = await session(compte.email);
+  const { data } = await client.from("quote_requests").select("reference, status, requester_id");
+  const indus = (data ?? []).filter(
+    (r) => ["draft", "pending_approval"].includes(r.status) && r.requester_id !== userId,
+  );
+
+  if (indus.length > 0) rate(`${compte.titre} voit ${indus.length} demande(s) non publiée(s) d'autrui`);
+}
+
+console.log(
+  `  ✓ ${"demandes non publiées".padEnd(24)} ${brouillons ?? 0} en base | aucune visible hors de son auteur`,
+);
 
 // ---------------------------------------------------------------------------
 console.log("\n3. La promotion en administrateur, rejouée");
