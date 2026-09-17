@@ -170,10 +170,10 @@ export default async function HomePage() {
         <div className="flex items-end justify-between gap-4">
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-              Par métier
+              Nos prestations
             </h2>
             <p className="mt-2 text-slate-500">
-              Ce que vous pouvez réserver aujourd&apos;hui au Bénin.
+              Vos besoins pour un événement réussi
             </p>
           </div>
           <Link href="/categories">
