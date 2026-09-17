@@ -186,7 +186,9 @@ export const adminNav: SpaceNav = {
     {
       title: "Activité",
       items: [
-        { label: "Projets", href: "/admin/projets", icon: FolderKanban },
+        // Pas d'entrée « Projets » : dans le modèle de données, un projet **est**
+        // une demande de devis — l'espace client l'appelle d'ailleurs `/projets`.
+        // Deux entrées auraient affiché deux fois le même tableau.
         { label: "Demandes", href: "/admin/demandes", icon: ClipboardList },
         { label: "Réservations", href: "/admin/reservations", icon: ShoppingBag },
       ],
