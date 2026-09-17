@@ -245,6 +245,13 @@ export type Database = {
             referencedRelation: "listings"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "availabilities_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings_bookable_now"
+            referencedColumns: ["id"]
+          },
         ]
       }
       cancellation_policies: {
@@ -572,6 +579,13 @@ export type Database = {
             referencedRelation: "listings"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "listing_amenities_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings_bookable_now"
+            referencedColumns: ["id"]
+          },
         ]
       }
       listing_media: {
@@ -615,6 +629,13 @@ export type Database = {
             columns: ["listing_id"]
             isOneToOne: false
             referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listing_media_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings_bookable_now"
             referencedColumns: ["id"]
           },
         ]
@@ -666,6 +687,13 @@ export type Database = {
             columns: ["listing_id"]
             isOneToOne: false
             referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listing_options_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings_bookable_now"
             referencedColumns: ["id"]
           },
         ]
@@ -1093,6 +1121,13 @@ export type Database = {
             referencedRelation: "listings"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "pricing_rules_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings_bookable_now"
+            referencedColumns: ["id"]
+          },
         ]
       }
       profiles: {
@@ -1242,6 +1277,13 @@ export type Database = {
             columns: ["listing_id"]
             isOneToOne: false
             referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_request_items_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings_bookable_now"
             referencedColumns: ["id"]
           },
           {
@@ -1438,6 +1480,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "quotes_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings_bookable_now"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "quotes_org_id_org_type_fkey"
             columns: ["org_id", "org_type"]
             isOneToOne: false
@@ -1496,6 +1545,13 @@ export type Database = {
             columns: ["listing_id"]
             isOneToOne: true
             referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_details_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: true
+            referencedRelation: "listings_bookable_now"
             referencedColumns: ["id"]
           },
         ]
@@ -1567,6 +1623,13 @@ export type Database = {
             referencedRelation: "listings"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "venue_details_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: true
+            referencedRelation: "listings_bookable_now"
+            referencedColumns: ["id"]
+          },
         ]
       }
       venue_spaces: {
@@ -1612,10 +1675,26 @@ export type Database = {
             referencedRelation: "listings"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "venue_spaces_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings_bookable_now"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
     Views: {
+      category_live_counts: {
+        Row: {
+          category_name: string | null
+          category_slug: string | null
+          family_slug: string | null
+          listings: number | null
+        }
+        Relationships: []
+      }
       company_budget_usage: {
         Row: {
           budget_amount: number | null
@@ -1671,6 +1750,49 @@ export type Database = {
           org_verified: boolean | null
           price_from: number | null
           price_from_unit: Database["public"]["Enums"]["price_unit"] | null
+          published_at: string | null
+          rating_avg: number | null
+          rating_count: number | null
+          search_text: string | null
+          slug: string | null
+          status: Database["public"]["Enums"]["listing_status"] | null
+          surface_m2: number | null
+          title: string | null
+        }
+        Relationships: []
+      }
+      listings_bookable_now: {
+        Row: {
+          amenity_slugs: string[] | null
+          booking_mode: Database["public"]["Enums"]["booking_mode"] | null
+          capacity_seated: number | null
+          capacity_standing: number | null
+          category_name: string | null
+          category_slug: string | null
+          city: string | null
+          cover_url: string | null
+          currency: string | null
+          dates_ouvertes: number | null
+          description: string | null
+          district: string | null
+          family_name: string | null
+          family_slug: string | null
+          id: string | null
+          is_paused: boolean | null
+          kind: Database["public"]["Enums"]["category_kind"] | null
+          latitude: number | null
+          longitude: number | null
+          max_capacity: number | null
+          min_guests: number | null
+          min_price: number | null
+          org_id: string | null
+          org_name: string | null
+          org_slug: string | null
+          org_status: Database["public"]["Enums"]["org_status"] | null
+          org_verified: boolean | null
+          price_from: number | null
+          price_from_unit: Database["public"]["Enums"]["price_unit"] | null
+          prochaine_date: string | null
           published_at: string | null
           rating_avg: number | null
           rating_count: number | null

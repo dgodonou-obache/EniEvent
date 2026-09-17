@@ -3,8 +3,9 @@ import Link from "next/link";
 import { ArrowRight, FileText, Zap } from "lucide-react";
 
 import { HeroSearch } from "@/components/marketplace/HeroSearch";
+import { ListingCard } from "@/components/marketplace/ListingCard";
 import { Button } from "@/components/ui/button";
-import { getFilterOptions } from "@/lib/listings";
+import { getFilterOptions, getHomeSections } from "@/lib/listings";
 
 /**
  * Visuel de fond du bandeau.
@@ -19,7 +20,10 @@ import { getFilterOptions } from "@/lib/listings";
 const HERO_IMAGE = "/images/hero-accueil.jpg";
 
 export default async function HomePage() {
-  const { cities, categoryGroups, amenities } = await getFilterOptions();
+  const [{ cities, categoryGroups, amenities }, { families, bookableNow }] = await Promise.all([
+    getFilterOptions(),
+    getHomeSections(),
+  ]);
 
   return (
     <main>
@@ -112,38 +116,114 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* ------------------------------------------------------------------
+          Réservez sans attendre.
+          Mise en avant fondée sur un fait vérifiable — le partenaire accepte la
+          réservation immédiate et a ouvert ses dates — et non sur une
+          popularité qu'aucune donnée ne soutient : il n'existe encore ni avis,
+          ni note, ni réservation. Le jour où ils existeront, une seconde
+          section « Les valeurs sûres » prendra place ici.
+         ------------------------------------------------------------------ */}
+      {bookableNow.length > 0 ? (
+        <section className="border-y border-slate-100 bg-white">
+          <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <p className="micro-label text-teal-600">Disponible maintenant</p>
+                <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
+                  Réservez sans attendre
+                </h2>
+                <p className="mt-2 max-w-xl text-slate-500">
+                  Ces prestataires ont ouvert leur calendrier : vous choisissez votre date,
+                  vous voyez le prix, vous réservez. Pas de devis, pas d&apos;attente.
+                </p>
+              </div>
+              {/* `reservation`, pas `mode` : c'est la clé que lit `search.ts`.
+                  Un lien avec la mauvaise clé n'échoue pas — il affiche
+                  simplement toute la recherche, sans filtre, sans rien dire. */}
+              <Link href="/recherche?reservation=instant" className="hidden sm:block">
+                <Button variant="ghost" size="sm">
+                  Tout voir
+                  <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                </Button>
+              </Link>
+            </div>
+
+            <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {bookableNow.map((listing) => (
+                <ListingCard key={listing.slug} listing={listing} />
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {/* ------------------------------------------------------------------
+          Les métiers.
+          Auparavant : 39 pastilles identiques, dont 27 sans la moindre annonce
+          — cliquer « Photographe » menait à une page blanche. On ne montre ici
+          que les familles réellement pourvues, avec leurs métiers les plus
+          fournis. Le référentiel complet reste sur /categories, où l'on vient
+          chercher précisément, pas découvrir.
+         ------------------------------------------------------------------ */}
       <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <div className="flex items-end justify-between gap-4">
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-            Tous les métiers de l&apos;événement
-          </h2>
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+              Par métier
+            </h2>
+            <p className="mt-2 text-slate-500">
+              Ce que vous pouvez réserver aujourd&apos;hui au Bénin.
+            </p>
+          </div>
           <Link href="/categories">
             <Button variant="ghost" size="sm">
-              Tout voir
+              Tous les métiers
               <ArrowRight className="h-3.5 w-3.5" aria-hidden />
             </Button>
           </Link>
         </div>
 
-        {/* Les catégories viennent de la base : plus de liste écrite en dur qui
-            se désynchronise du référentiel. */}
-        <div className="mt-6 space-y-6">
-          {categoryGroups.map((family) => (
-            <div key={family.slug}>
-              <p className="micro-label mb-2 text-slate-400">{family.name}</p>
-              <ul className="flex flex-wrap gap-2">
-                {family.children.map((child) => (
-                  <li key={child.slug}>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {families.map((family) => (
+            <article
+              key={family.slug}
+              className="rounded-2xl border border-slate-100 bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:border-orange-200"
+            >
+              <div className="flex items-baseline justify-between gap-3">
+                <h3 className="font-bold text-slate-900">{family.name}</h3>
+                <span className="micro-label shrink-0 text-slate-400">
+                  {family.listings} {family.listings > 1 ? "offres" : "offre"}
+                </span>
+              </div>
+
+              <ul className="mt-4 flex flex-wrap gap-2">
+                {family.pourvues.map((metier) => (
+                  <li key={metier.slug}>
                     <Link
-                      href={`/categories/${child.slug}`}
-                      className="block rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition-all duration-200 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600 active:scale-[0.98]"
+                      href={`/categories/${metier.slug}`}
+                      className="block rounded-full border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 transition-all duration-200 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600 active:scale-[0.98]"
                     >
-                      {child.name}
+                      {metier.name}
+                      <span className="ml-1.5 text-xs text-slate-400">{metier.listings}</span>
                     </Link>
                   </li>
                 ))}
               </ul>
-            </div>
+
+              {/* Dire ce qui n'est pas encore pourvu vaut mieux que de le
+                  masquer : un partenaire y lit une place à prendre. */}
+              {family.metiers > family.pourvues.length ? (
+                <Link
+                  href={`/categories/${family.slug}`}
+                  className="mt-4 block text-sm font-medium text-slate-400 transition-all duration-200 hover:text-orange-600"
+                >
+                  {family.metiers - family.pourvues.length} autre
+                  {family.metiers - family.pourvues.length > 1 ? "s" : ""} métier
+                  {family.metiers - family.pourvues.length > 1 ? "s" : ""} dans cette famille
+                </Link>
+              ) : null}
+            </article>
           ))}
         </div>
       </section>

@@ -363,3 +363,88 @@ export async function getFilterOptions() {
     amenities: amenities.data ?? [],
   };
 }
+
+/** Une famille de métiers, réduite à ce qu'on peut réellement y réserver. */
+export interface HomeFamily {
+  slug: string;
+  name: string;
+  kind: "venue" | "service";
+  /** Sous-catégories ayant au moins une annonce publiée, les plus fournies d'abord. */
+  pourvues: { slug: string; name: string; listings: number }[];
+  /** Annonces publiées dans toute la famille. */
+  listings: number;
+  /** Métiers déclarés dans la famille, pourvus ou non. */
+  metiers: number;
+}
+
+/**
+ * Les deux blocs de l'accueil.
+ *
+ * L'accueil affichait les 39 catégories en pastilles identiques, **dont 27
+ * vides** : un visiteur cliquait « Photographe » et tombait sur une page
+ * blanche. On ne met donc en avant que les métiers pourvus — le catalogue
+ * complet reste sur `/categories`, où l'on vient chercher, pas découvrir.
+ *
+ * `bookableNow` s'appuie sur un fait vérifiable — le partenaire accepte la
+ * réservation immédiate et a ouvert des dates — et non sur une popularité
+ * qu'aucune donnée ne soutient : il n'existe encore ni avis, ni note, ni
+ * réservation.
+ */
+export async function getHomeSections(limit = 6): Promise<{
+  families: HomeFamily[];
+  bookableNow: ListingSummary[];
+}> {
+  const supabase = await createClient();
+
+  const [{ data: categories }, { data: counts }, { data: bookable }] = await Promise.all([
+    supabase
+      .from("categories")
+      .select("id, slug, name, kind, parent_id")
+      .eq("is_active", true)
+      .order("sort_order"),
+    supabase.from("category_live_counts").select("category_slug, family_slug, listings"),
+    supabase
+      .from("listings_bookable_now")
+      .select(CARD_COLUMNS)
+      .eq("status", "approved")
+      .eq("is_paused", false)
+      // Le plus de dates ouvertes d'abord : c'est le partenaire chez qui le
+      // client a le plus de chances de trouver la sienne.
+      .order("dates_ouvertes", { ascending: false })
+      .limit(limit),
+  ]);
+
+  const rows = categories ?? [];
+  const parLieu = new Map((counts ?? []).map((c) => [c.category_slug, Number(c.listings ?? 0)]));
+
+  const families: HomeFamily[] = rows
+    .filter((c) => c.parent_id === null)
+    .map((family) => {
+      const enfants = rows.filter((child) => child.parent_id === family.id);
+      const pourvues = enfants
+        .map((child) => ({
+          slug: child.slug,
+          name: child.name,
+          listings: parLieu.get(child.slug) ?? 0,
+        }))
+        .filter((child) => child.listings > 0)
+        .sort((a, b) => b.listings - a.listings);
+
+      return {
+        slug: family.slug,
+        name: family.name,
+        kind: family.kind,
+        pourvues,
+        listings: pourvues.reduce((total, child) => total + child.listings, 0),
+        metiers: enfants.length,
+      };
+    })
+    // Une famille sans aucune annonce n'a rien à proposer aujourd'hui : elle
+    // reste visible sur /categories, pas sur l'accueil.
+    .filter((family) => family.listings > 0)
+    .sort((a, b) => b.listings - a.listings);
+
+  // Même conversion que `searchListings` : la liste de colonnes est construite
+  // à l'exécution, le typage généré ne peut donc pas la rapprocher de la vue.
+  return { families, bookableNow: (bookable ?? []) as unknown as ListingSummary[] };
+}
