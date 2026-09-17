@@ -25,6 +25,12 @@ export default async function PartnerSignInPage({
       
 
 
+      <p className="mt-4 text-sm text-slate-500">
+        <Link href="/pro/mot-de-passe-oublie" className="font-medium text-orange-600 hover:underline">
+          Mot de passe oublié ?
+        </Link>
+      </p>
+
       <div className="mt-6">
         <SignInForm defaultRedirect="/pro/dashboard" redirectTo={suivant} />
       </div>

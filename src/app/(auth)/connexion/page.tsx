@@ -29,6 +29,12 @@ export default async function SignInPage({
         <SignInForm defaultRedirect="/compte" redirectTo={suivant} />
       </div>
 
+      <p className="mt-4 text-sm text-slate-500">
+        <Link href="/mot-de-passe-oublie" className="font-medium text-orange-600 hover:underline">
+          Mot de passe oublié ?
+        </Link>
+      </p>
+
       <p className="mt-6 text-sm text-slate-500">
         Pas encore de compte ?{" "}
         <Link href="/inscription" className="font-medium text-orange-600 hover:underline">

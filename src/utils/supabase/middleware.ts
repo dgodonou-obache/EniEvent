@@ -38,6 +38,7 @@ const PUBLIC_EXCEPTIONS = [
   // L'administration a sa propre porte : la page grand public proposait de
   // créer un compte client ou partenaire, ce qui n'a aucun sens ici.
   "/admin/connexion",
+  "/admin/mot-de-passe-oublie",
   "/pro/connexion",
   "/pro/inscription",
   "/pro/mot-de-passe-oublie",

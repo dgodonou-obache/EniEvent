@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 
 import { SignInForm } from "@/components/auth/SignInForm";
@@ -49,6 +50,12 @@ export default async function AdminSignInPage({
             <SignInForm defaultRedirect="/admin" redirectTo={suivant} />
           </div>
         </div>
+
+        <p className="mt-4 text-center text-sm">
+          <Link href="/admin/mot-de-passe-oublie" className="font-medium text-slate-500 hover:text-orange-600">
+            Mot de passe oublié ?
+          </Link>
+        </p>
 
         <p className="mt-6 text-center text-xs text-slate-400">
           Un compte d&apos;administration ne se crée pas depuis cette page. Il est accordé

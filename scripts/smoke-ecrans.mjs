@@ -49,6 +49,11 @@ const PARCOURS = [
       "/pro/connexion",
       "/pro/inscription",
       "/demande-de-devis",
+      "/mot-de-passe-oublie",
+      "/pro/mot-de-passe-oublie",
+      "/admin/connexion",
+      "/admin/mot-de-passe-oublie",
+      "/nouveau-mot-de-passe",
     ],
   },
   {
@@ -104,6 +109,7 @@ const PARCOURS = [
       "/admin/demandes?etat=awarded",
       "/admin/partenaires",
       "/admin/utilisateurs",
+      "/admin/parametres",
     ],
   },
 ];
