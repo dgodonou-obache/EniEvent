@@ -49,6 +49,17 @@ export async function GET(request: Request) {
 
   const supabase = createServiceRoleClient();
 
+  // Les rappels d'échéance sont posés ici, et non par un déclencheur : rien ne
+  // se passe en base au moment où le temps s'écoule. La fonction est idempotente
+  // — la contrainte d'unicité de `notifications` refuse un second rappel pour la
+  // même demande — donc la tâche peut repasser toutes les quinze minutes.
+  const { data: rappels, error: erreurRappels } = await supabase.rpc("enqueue_deadline_reminders");
+
+  if (erreurRappels) {
+    // Un rappel manqué ne doit pas empêcher le reste de partir : on poursuit.
+    console.error("Rappels d'échéance impossibles :", erreurRappels.message);
+  }
+
   const { data: claimed, error } = await supabase.rpc("claim_notifications", { batch: BATCH });
 
   if (error) {
@@ -56,7 +67,12 @@ export async function GET(request: Request) {
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? publicEnv().supabaseUrl;
-  const report = { traitees: claimed?.length ?? 0, envoyees: 0, echouees: 0 };
+  const report = {
+    rappelsPoses: rappels ?? 0,
+    traitees: claimed?.length ?? 0,
+    envoyees: 0,
+    echouees: 0,
+  };
 
   for (const row of claimed ?? []) {
     const body = renderSms(row.kind, (row.payload ?? {}) as Record<string, unknown>, siteUrl);

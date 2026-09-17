@@ -1834,6 +1834,10 @@ export type Database = {
         Args: { p_approve: boolean; p_reason?: string; target: string }
         Returns: undefined
       }
+      enqueue_deadline_reminders: {
+        Args: { fenetre?: string }
+        Returns: number
+      }
       mark_notification: {
         Args: { delivered: boolean; detail?: string; target: string }
         Returns: undefined

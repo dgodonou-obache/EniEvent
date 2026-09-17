@@ -14,7 +14,13 @@ import { measureSms, toGsmSafe } from "@/lib/sms/segments";
  * que le cas moyen.
  */
 
-export const KINDS = ["quote_request.new", "quote.sent"] as const;
+export const KINDS = [
+  "quote_request.new",
+  "quote.sent",
+  "quote.accepted",
+  "quote.declined",
+  "request.deadline",
+] as const;
 export type NotificationKind = (typeof KINDS)[number];
 
 export function isKnownKind(value: string): value is NotificationKind {
@@ -73,6 +79,35 @@ export function renderSms(
       const lien = typeof payload.requestId === "string" ? `${base}/projets/${payload.requestId}` : base;
 
       return toGsmSafe(`ÉniEvent : ${auteur}. Comparez : ${lien}`);
+    }
+
+    case "quote.accepted": {
+      const city = short(payload.city, 20);
+      return toGsmSafe(
+        `ÉniEvent : votre devis a été accepté${city ? ` pour ${city}` : ""} ! ` +
+          `Détails sur ${base}/pro/devis`,
+      );
+    }
+
+    case "quote.declined": {
+      // Un refus se dit sans détour et sans reproche : le partenaire a travaillé,
+      // il mérite de savoir plutôt que d'attendre, et de rester engagé pour la
+      // prochaine demande.
+      const city = short(payload.city, 20);
+      return toGsmSafe(
+        `ÉniEvent : la demande${city ? ` à ${city}` : ""} a été attribuée à un autre ` +
+          `prestataire. Merci d'avoir répondu — d'autres suivront.`,
+      );
+    }
+
+    case "request.deadline": {
+      const offres = typeof payload.offres === "number" ? payload.offres : 0;
+      const lien = typeof payload.requestId === "string" ? `${base}/projets/${payload.requestId}` : base;
+
+      return toGsmSafe(
+        `ÉniEvent : votre demande se termine bientôt. ` +
+          `${offres > 1 ? `${offres} offres vous attendent` : "Une offre vous attend"} : ${lien}`,
+      );
     }
 
     default:

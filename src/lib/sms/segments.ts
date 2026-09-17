@@ -122,5 +122,23 @@ export function toGsmSafe(body: string): string {
   for (const [pattern, replacement] of REPLACEMENTS) {
     out = out.replace(pattern, replacement);
   }
-  return out;
+
+  // Dernier filet, et le plus utile : **tout** caractère absent de l'alphabet
+  // GSM est décomposé puis dépouillé de ses signes diacritiques.
+  //
+  // L'alphabet GSM est arbitraire au point d'en être piégeux : il contient `ò`
+  // mais pas `ô`, `ö` mais pas `ê`, `à` mais pas `â`. Aucune règle ne permet de
+  // deviner lesquels passent — « bientôt » a coûté trois segments au lieu d'un
+  // avant que cette ligne n'existe. Une liste tenue à la main aurait vieilli au
+  // premier libellé nouveau ; ceci vaut pour tous.
+  //
+  // Les accents qui appartiennent bien à l'alphabet (`é`, `è`, `à`, `ù`) ne
+  // sont pas touchés : la condition les laisse passer intacts.
+  return [...out]
+    .map((char) => {
+      if (BASIC.has(char) || EXTENDED.has(char)) return char;
+      const nu = char.normalize("NFD").replace(/\p{Diacritic}/gu, "");
+      return BASIC.has(nu) || EXTENDED.has(nu) ? nu : char;
+    })
+    .join("");
 }

@@ -75,6 +75,43 @@ describe("devis reçu par un client", () => {
   });
 });
 
+describe("décision transmise au partenaire", () => {
+  it("annonce un devis accepté sans détour", () => {
+    const sms = renderSms("quote.accepted", { city: "Cotonou" }, SITE);
+
+    expect(sms).toContain("accepté");
+    expect(sms).toContain("/pro/devis");
+    expect(segmentsOf(sms!)).toBe(1);
+  });
+
+  it("annonce un refus sans reproche, et rouvre la porte", () => {
+    // Le partenaire a travaillé pour rien : le lui dire vaut mieux que le
+    // laisser attendre, et le garder engagé vaut mieux que le perdre.
+    const sms = renderSms("quote.declined", { city: "Porto-Novo" }, SITE);
+
+    expect(sms).toContain("attribuée");
+    expect(sms).toMatch(/d'autres suivront/);
+    expect(segmentsOf(sms!)).toBe(1);
+  });
+});
+
+describe("échéance imminente", () => {
+  it("accorde le pluriel au nombre d'offres", () => {
+    const une = renderSms("request.deadline", { offres: 1, requestId: UUID }, SITE);
+    const plusieurs = renderSms("request.deadline", { offres: 4, requestId: UUID }, SITE);
+
+    expect(une).toContain("Une offre vous attend");
+    expect(plusieurs).toContain("4 offres vous attendent");
+  });
+
+  it("mène droit au comparateur, en un segment", () => {
+    const sms = renderSms("request.deadline", { offres: 3, requestId: UUID }, SITE);
+
+    expect(sms).toContain(`/projets/${UUID}`);
+    expect(segmentsOf(sms!)).toBe(1);
+  });
+});
+
 describe("garde-fous", () => {
   it("rend tous les types déclarés", () => {
     // Un `kind` posé en base sans texte associé resterait bloqué en file.

@@ -73,8 +73,19 @@ describe("remise en alphabet GSM", () => {
     expect(measureSms(toGsmSafe("25 000 XOF")).encoding).toBe("gsm-7");
   });
 
-  it("laisse intact un texte déjà compatible", () => {
-    expect(toGsmSafe("Bonjour, votre devis est prêt.")).toBe("Bonjour, votre devis est prêt.");
+  it("laisse intact ce qui appartient vraiment à l'alphabet GSM", () => {
+    // é, è, à, ù en font partie : les dépouiller appauvrirait le français sans
+    // rien économiser.
+    const texte = "Réservé à Cotonou, où l'on paie déjà";
+    expect(toGsmSafe(texte)).toBe(texte);
+  });
+
+  it("dépouille les accents absents de l'alphabet, eux", () => {
+    // L'alphabet GSM contient « ò » mais pas « ô », « ö » mais pas « ê ». Aucune
+    // règle ne permet de le deviner — d'où la normalisation systématique.
+    expect(toGsmSafe("votre devis est prêt bientôt")).toBe("votre devis est pret bientot");
+    expect(measureSms(toGsmSafe("prêt bientôt")).encoding).toBe("gsm-7");
+    expect(measureSms("prêt bientôt").encoding).toBe("ucs-2");
   });
 });
 
