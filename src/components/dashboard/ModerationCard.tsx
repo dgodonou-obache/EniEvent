@@ -7,7 +7,7 @@ import {
   approveListing,
   rejectListing,
   type ModerationState,
-} from "@/app/(admin)/admin/moderation/actions";
+} from "@/app/(admin)/admin/(dashboard)/moderation/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";

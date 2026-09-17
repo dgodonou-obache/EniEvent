@@ -32,7 +32,7 @@ Mot de passe commun : la valeur de `DEMO_PASSWORD` dans votre `.env.local`.
 | `demo-particulier@enievent.bj` | `/connexion` | `/compte` |
 | `demo-entreprise@enievent.bj` | `/connexion` | `/entreprise` |
 | `demo-partenaire@enievent.bj` | `/pro/connexion` | `/pro/dashboard` |
-| `demo-admin@enievent.bj` | `/connexion` | `/admin` |
+| `demo-admin@enievent.bj` | **`/admin/connexion`** | `/admin` |
 
 La confirmation d'e-mail est **active**. Une inscription n'ouvre donc pas de
 session : le formulaire affiche « Vérifiez votre boîte mail », et le compte ne

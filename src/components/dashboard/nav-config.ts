@@ -163,7 +163,7 @@ export const companyNav: SpaceNav = {
 export const adminNav: SpaceNav = {
   brand: "ÉniEvent Admin",
   home: "/admin",
-  signOutTo: "/connexion",
+  signOutTo: "/admin/connexion",
   sections: [
     {
       items: [{ label: "Vue d'ensemble", href: "/admin", icon: LayoutDashboard, exact: true }],

@@ -18,7 +18,10 @@ interface AccessDeniedProps {
  */
 export function AccessDenied({ reason, space }: AccessDeniedProps) {
   const { title, body } = denialMessage(reason, space);
-  const signOutTo = space === "partner" ? "/pro/connexion" : "/connexion";
+  // Chaque espace renvoie vers sa propre porte : sortir un administrateur sur la
+  // connexion grand public lui proposerait de créer un compte client.
+  const signOutTo =
+    space === "partner" ? "/pro/connexion" : space === "admin" ? "/admin/connexion" : "/connexion";
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-slate-50 px-4 py-12">

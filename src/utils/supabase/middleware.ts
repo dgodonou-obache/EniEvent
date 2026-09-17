@@ -15,18 +15,18 @@ import type { Database } from "@/types/database";
 /**
  * Espaces protégés et page de connexion associée.
  *
- * Le middleware ne vérifie **que l'authentification**. L'autorisation fine
- * (appartenance à une organisation, rôle dans cette organisation, statut admin)
- * est faite dans le layout serveur de chaque espace : elle demande des jointures
- * qui n'ont pas leur place à chaque requête en edge, et un refus doit afficher
- * une vraie page d'explication plutôt qu'une redirection muette.
+ * Le proxy vérifie l'authentification partout, et **l'autorisation pour le seul
+ * `/admin`**. Les autres espaces décident dans leur layout serveur : leurs
+ * contrôles demandent des jointures qui n'ont pas leur place à chaque requête.
+ * Le back-office fait exception parce qu'un layout n'empêche pas une page de
+ * s'exécuter — voir le bloc dédié plus bas.
  *
  * Règle d'isolation (héritée de la v1) : un espace ne redirige jamais vers la
  * page de connexion d'un autre. Un partenaire déconnecté atterrit sur
  * `/pro/connexion`, jamais sur `/connexion`.
  */
 const PROTECTED_SPACES = [
-  { prefix: "/admin", signIn: "/connexion" },
+  { prefix: "/admin", signIn: "/admin/connexion" },
   { prefix: "/pro", signIn: "/pro/connexion" },
   { prefix: "/entreprise", signIn: "/connexion" },
   { prefix: "/compte", signIn: "/connexion" },
@@ -35,6 +35,9 @@ const PROTECTED_SPACES = [
 
 /** Pages accessibles sans session à l'intérieur d'un espace protégé. */
 const PUBLIC_EXCEPTIONS = [
+  // L'administration a sa propre porte : la page grand public proposait de
+  // créer un compte client ou partenaire, ce qui n'a aucun sens ici.
+  "/admin/connexion",
   "/pro/connexion",
   "/pro/inscription",
   "/pro/mot-de-passe-oublie",
