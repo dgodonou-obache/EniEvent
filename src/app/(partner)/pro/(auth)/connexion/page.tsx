@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { SignInNotice } from "@/components/auth/SignInNotice";
 import { SignInForm } from "@/components/auth/SignInForm";
 
 export const metadata = { title: "Connexion partenaire" };
@@ -7,9 +8,9 @@ export const metadata = { title: "Connexion partenaire" };
 export default async function PartnerSignInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ suivant?: string }>;
+  searchParams: Promise<{ suivant?: string; raison?: string; erreur?: string }>;
 }) {
-  const { suivant } = await searchParams;
+  const { suivant, raison, erreur } = await searchParams;
 
   return (
     <>
@@ -17,6 +18,12 @@ export default async function PartnerSignInPage({
       <p className="mt-1 text-sm text-slate-500">
         Gérez vos annonces, votre planning, vos devis et vos versements.
       </p>
+
+      <SignInNotice raison={raison} erreur={erreur} />
+
+
+      
+
 
       <div className="mt-6">
         <SignInForm defaultRedirect="/pro/dashboard" redirectTo={suivant} />
