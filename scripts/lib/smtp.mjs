@@ -20,7 +20,8 @@ export async function envoyer({ host = "ssl0.ovh.net", port = 465, user, pass, f
 
     const fin = (erreur, valeur) => {
       try { socket.destroy(); } catch {}
-      erreur ? reject(erreur) : resolve(valeur);
+      if (erreur) reject(erreur);
+      else resolve(valeur);
     };
 
     socket.setTimeout(20000, () => fin(new Error("délai SMTP dépassé")));
