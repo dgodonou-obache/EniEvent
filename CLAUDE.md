@@ -108,6 +108,19 @@ dans `audit_logs`. Les transitions autorisées vivent dans `src/lib/states.ts`.
   ligne est invisible, la requête réussit en touchant 0 ligne. Toujours vérifier le
   nombre de lignes affectées, jamais seulement `if (error)`. Seule une clause
   `WITH CHECK` (INSERT, ou UPDATE sortant du périmètre) déclenche une vraie erreur.
+- ⚠️ **La RLS dit quelles _lignes_ on peut modifier, jamais quelles _colonnes_.** Une
+  politique `using (id = auth.uid())` laisse écrire tout ce que les droits de colonne
+  autorisent. Trois élévations de privilèges en découlaient, dont un simple utilisateur
+  se promouvant `admin` en un appel (migration 0021). Toute colonne qui **définit un
+  privilège** — `account_type`, `is_verified`, `status`, `role`, une commission — se
+  protège par un `grant` de colonne **et** un déclencheur de garde, jamais par la seule
+  RLS. Exception : un administrateur est lui aussi `authenticated`, donc un `grant` ne
+  sait pas l'en distinguer ; là où seul l'administrateur doit écrire (`kyc_documents`),
+  c'est la RLS qui tranche, pas les colonnes.
+- Les sessions expirent par inactivité : **14 jours**, et **1 heure sur `/admin`**
+  (`src/lib/auth/inactivity.ts`). Horodatage signé en HMAC, pas d'état en base — le
+  proxy s'exécute à chaque requête. Sans `SESSION_SECRET`, le délai est inactif : jamais
+  de signature vide, qui simulerait une protection.
 - `SUPABASE_SECRET_KEY` : webhooks et tâches planifiées uniquement. Jamais dans un
   composant, jamais dans une Server Action déclenchée par un utilisateur.
 - Les webhooks de paiement sont **idempotents** (contrainte unique sur
@@ -120,9 +133,19 @@ back-offices. Le middleware ne contrôle que l'authentification ; l'autorisation
 appartenance à une organisation) est faite dans le layout serveur de chaque espace.
 
 ### 5. Rédaction destinée aux utilisateurs
-Pas de jargon. Les politiques d'annulation et de paiement se disent en clair :
-« Non remboursable », pas « Annulation stricte » ; « Annulation gratuite jusqu'à 48 h
-avant », pas « Politique flexible ». Interface en français.
+- Pas de jargon. Les politiques d'annulation et de paiement se disent en clair :
+  « Non remboursable », pas « Annulation stricte » ; « Annulation gratuite jusqu'à 48 h
+  avant », pas « Politique flexible ». Interface en français.
+- **Aucune preuve sociale fabriquée.** Ni note, ni avis, ni « les plus demandés » tant
+  que la donnée n'existe pas : il n'y a aujourd'hui aucun avis en base, et inventer un
+  classement tromperait le client autant que le partenaire arbitrairement désigné comme
+  meilleur. Une mise en avant se fonde sur un **fait vérifiable ligne à ligne** — la
+  section « Réservez sans attendre » de l'accueil s'appuie sur des dates réellement
+  ouvertes, et se vide d'elle-même si elles se referment.
+- **Ne pas promettre ce qui n'existe pas.** L'accueil affichait 39 métiers dont 27 sans
+  la moindre annonce ; il ne montre plus que les familles pourvues, avec leurs comptes.
+  Un retour muet est du même ordre : une session expirée ou un lien périmé s'expliquent
+  (`SignInNotice`), ils ne renvoient pas silencieusement vers la connexion.
 
 ### 6. Interface
 - Suivre `.claude/rules/design-system.md` — orange pêche en primaire, teal par touches,
@@ -140,8 +163,13 @@ avant », pas « Politique flexible ». Interface en français.
 - Zones défilables : `overflow-y-auto no-scrollbar`.
 - ⚠️ Un `href` n'est qu'une chaîne : **rien ne le confronte à l'arborescence de
   `src/app`**. Le bouton « Devenir partenaire » a renvoyé un 404 en production sans
-  qu'aucun outil ne bronche. `tests/navigation.test.ts` garde l'en-tête et le pied de
-  page ; les nouveaux liens de menu y passent aussi.
+  qu'aucun outil ne bronche, et six des huit onglets de `/compte` faisaient de même.
+  `tests/navigation.test.ts` garde l'en-tête et le pied de page ;
+  `tests/roadmap.test.ts` garde les **quatre** menus d'espace. Un menu qui vit ailleurs
+  que dans `nav-config.ts` échappe aux deux — c'était le cas d'`AccountNav`.
+- Le site public connaît la session : `headerAccount()` alimente l'en-tête et le pied de
+  page, qui affichent l'espace du visiteur au lieu de « Connexion ». C'est **l'unique**
+  passage du public vers un espace ; l'inverse reste interdit (§4).
 - ⚠️ `backdrop-blur` et `drop-shadow` **créent un contexte d'empilement** : un menu
   déroulant enfermé dedans ne peut plus passer au-dessus du reste, quel que soit son
   `z-index`. Voir `tests/stacking.test.ts`.

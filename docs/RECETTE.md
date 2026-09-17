@@ -55,6 +55,18 @@ boîte d'abord, et dans les journaux d'authentification Supabase ensuite.
    porte les filtres choisis.
 5. Les liens de l'en-tête (Lieux, Prestataires, Catégories) mènent tous à une
    page réelle — aucun 404.
+6. **« Réservez sans attendre »** : des cartes d'annonces, pas des pastilles.
+   **Attendu** : uniquement des annonces acceptant la réservation immédiate
+   **et** ayant des dates ouvertes. Fermer tout le planning d'une de ces
+   annonces depuis `/pro/planning` la fait disparaître de la section — la mise
+   en avant suit un fait, elle n'est pas figée à la main.
+7. **« Nos prestations »** : des cartes par famille, avec le nombre d'offres.
+   **Attendu** : aucun métier à zéro annonce. Cliquer n'importe lequel donne des
+   résultats — c'est tout l'objet : l'accueil ne promet que ce qui existe.
+   Le référentiel complet, métiers vides compris, reste sur `/categories`.
+8. Se connecter, puis revenir sur `/`. **Attendu** : l'en-tête affiche votre
+   prénom et mène à **votre** espace ; ni « Connexion », ni « Inscription »,
+   ni dans l'en-tête ni dans le pied de page.
 
 ## 2. Recherche et filtres
 
@@ -298,10 +310,26 @@ boutons doivent rester atteignables sans remonter.
 
 ---
 
+## 13. Expiration des sessions
+
+1. Se connecter en administrateur, ouvrir `/admin`, puis laisser passer plus
+   d'une heure sans naviguer. **Attendu** : au retour, redirection vers
+   `/connexion` avec le message « Votre session a expiré ».
+2. La même session reste valable **quinze jours** ailleurs : c'est l'entrée
+   dans `/admin` qui impose l'heure, pas la session elle-même.
+3. Dans les outils du navigateur, modifier le cookie `ee-activity` pour en
+   repousser la date. **Attendu** : déconnexion immédiate — l'horodatage est
+   signé, une valeur bricolée est traitée comme invalide.
+
+> Sans `SESSION_SECRET`, ce chapitre ne s'applique pas : le délai est inactif,
+> et c'est voulu — mieux vaut aucune protection qu'une protection simulée.
+
+---
+
 ## Vérifications automatiques
 
 ```bash
-npm run verify           # typecheck + lint + 360 tests
+npm run verify           # typecheck + lint + 424 tests
 npm run db:verify        # migrations rejouées dans un Postgres jetable, RLS partout
 npm run smoke            # 13 contrôles contre le vrai Supabase, comptes purgés après
 npm run smoke:offre      # la boucle partenaire → modération → catalogue, en réel
@@ -309,6 +337,7 @@ npm run smoke:planning   # ouverture des dates, prix plancher, cloisonnement
 npm run smoke:devis      # appel d'offres : offres scellées, acceptation atomique
 npm run smoke:entreprise # seuil de validation, aval, imputation budgétaire
 npm run smoke:photos     # stockage réel : cloisonnement par dossier, URL publique
+npm run smoke:sms        # ENVOI RÉEL par Premux — consomme un crédit, exige SMS_TEST_TO
 ```
 
 ---
@@ -322,10 +351,11 @@ correspondantes affichent un écran nommant leur lot, pas un 404.
 |---|---|
 | Panier, paiement, réservation effective | Lot 2 |
 | Créneaux (matin, après-midi, soirée) — le planning ouvre à la journée | Lot 4 |
-| Notification par e-mail d'un nouveau devis (domaine Resend à vérifier) | Lot 4, suite |
+| Notification par e-mail (le SMS, lui, part déjà) | Lot 4, suite |
 | Entreprise : factures et rapports de dépenses | Lot 2, puis lot 5 |
 | Invitation d'un collègue dans l'espace entreprise | Lot 6 |
 | Avis, litiges, contrats, messagerie | Lot 6 |
+| Section « Les valeurs sûres » — classement par note réelle | Lot 6 |
 | Reste du back-office admin : KYC, finances, CMS, audit | Lot 7 |
 | Packs, pages éditoriales, blog, pages légales | Lots 4 et 8 |
 | Recadrage et compression des photos côté navigateur | Lot 8 |
