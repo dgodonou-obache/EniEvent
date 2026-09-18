@@ -50,6 +50,19 @@ function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+/**
+ * Tronque une valeur venue de la base pour l'objet du message.
+ *
+ * Un titre de demande n'a aucune borne à la saisie. Placé tel quel dans un
+ * objet, il chasse hors de l'aperçu la fin de la phrase — c'est-à-dire
+ * l'information. Contrairement au SMS, les points de suspension typographiques
+ * ne coûtent rien ici : l'objet n'est pas contraint à l'alphabet GSM.
+ */
+function short(value: unknown, max: number): string {
+  const raw = text(value);
+  return raw.length <= max ? raw : `${raw.slice(0, max - 1).trimEnd()}…`;
+}
+
 /** `2026-12-24` devient « 24 décembre 2026 ». Vide si la date est absente. */
 function longDate(value: unknown): string {
   const raw = text(value);
@@ -142,12 +155,21 @@ function shell(body: Body): EmailContent {
             ${rows}
           </table>`;
 
+  // Le bouton est centré par un `align="center"` sur une cellule, et non par
+  // `margin:auto` : Outlook ignore les marges automatiques sur un tableau, et
+  // le bouton y resterait collé à gauche sans que rien ne le signale.
   const button = body.cta
     ? `
-          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
             <tr>
-              <td style="border-radius:12px;background:${ORANGE};">
-                <a href="${esc(body.cta.href)}" style="display:inline-block;padding:14px 28px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;border-radius:12px;">${esc(body.cta.label)}</a>
+              <td align="center">
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="border-radius:12px;background:${ORANGE};">
+                      <a href="${esc(body.cta.href)}" style="display:inline-block;padding:14px 28px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;border-radius:12px;">${esc(body.cta.label)}</a>
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
           </table>`
@@ -161,7 +183,7 @@ function shell(body: Body): EmailContent {
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:24px;padding:40px 32px;">
         <tr>
           <td>
-            <p style="margin:0 0 28px;font-size:18px;font-weight:800;color:${SLATE_900};letter-spacing:-0.3px;">Éni<span style="color:${ORANGE};">Event</span></p>
+            <p style="margin:0 0 28px;font-size:18px;font-weight:800;color:${SLATE_900};letter-spacing:-0.3px;text-align:center;"><span style="color:${ORANGE};">Éni</span>Event</p>
             <h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;font-weight:700;color:${SLATE_900};">${esc(body.heading)}</h1>
             <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:${SLATE_500};">${esc(body.intro)}</p>
 ${table}${button}${body.outro ? `            <p style="margin:0;font-size:14px;line-height:1.6;color:${SLATE_500};">${esc(body.outro)}</p>` : ""}
@@ -207,12 +229,12 @@ export function renderEmail(
     case "quote_request.new": {
       const titre = text(payload.title);
       return shell({
-        subject: city ? `Nouvelle demande de devis à ${city}` : "Nouvelle demande de devis",
+        subject: "Vous avez une nouvelle demande de devis",
         preheader: titre || "Un client cherche un prestataire.",
         heading: "Une demande de devis vous attend",
         intro:
           "Un client vient de publier une demande qui correspond à vos annonces. " +
-          "Les premiers à répondre sont ceux qui décrochent le contrat.",
+          "Soyez le premier à répondre à cette demande pour décrocher le contrat.",
         details: [
           ["Demande", titre],
           ["Référence", text(payload.reference)],
@@ -250,9 +272,9 @@ export function renderEmail(
 
     case "quote.accepted": {
       return shell({
-        subject: "Votre devis a été accepté",
+        subject: "Vous avez un devis accepté",
         preheader: "Le client a retenu votre offre.",
-        heading: "Votre devis a été accepté",
+        heading: "Vous avez un devis accepté",
         intro:
           "Le client a retenu votre offre. Retrouvez le détail de la prestation " +
           "et les prochaines étapes dans votre espace.",
@@ -270,8 +292,19 @@ export function renderEmail(
       // Un refus se dit sans détour et sans reproche : le partenaire a
       // travaillé, il mérite de savoir plutôt que d'attendre, et de rester
       // engagé pour la demande suivante.
+      // L'objet désigne la demande qui tombe : un partenaire qui a répondu à
+      // trois appels d'offres cette semaine doit savoir lequel, sans ouvrir.
+      // La référence prime — c'est l'identifiant qu'il retrouve dans son
+      // espace et qu'il cite au téléphone. Le titre sert de repli : il est
+      // toujours renseigné en base (`reference` est `not null`), mais la charge
+      // utile vient d'un déclencheur et rien ne le garantit à l'exécution.
+      // Le titre, lui, n'a aucune borne à la saisie — d'où la troncature.
+      const nom = text(payload.reference) || short(payload.title, 26);
+
       return shell({
-        subject: "La demande a été attribuée à un autre prestataire",
+        subject: nom
+          ? `Oups ! La demande « ${nom} » n'est plus disponible`
+          : "Oups ! Cette demande n'est plus disponible",
         preheader: "Merci d'avoir pris le temps de répondre.",
         heading: "Cette fois, ce ne sera pas vous",
         intro:
@@ -286,11 +319,20 @@ export function renderEmail(
 
     case "request.deadline": {
       const offres = typeof payload.offres === "number" ? payload.offres : 0;
+
+      // La référence désigne la demande concernée, comme dans l'objet d'un
+      // refus : un client peut avoir plusieurs demandes ouvertes en même temps.
+      // Elle est `not null` en base, mais la charge utile vient d'une tâche
+      // planifiée — d'où la forme de repli.
+      const ref = text(payload.reference);
+
       return shell({
-        subject: "Votre demande se termine bientôt",
+        subject: ref
+          ? `Rappel : Votre demande « ${ref} » arrive bientôt à échéance !`
+          : "Rappel : Votre demande arrive bientôt à échéance !",
         preheader:
           offres > 1 ? `${offres} offres attendent votre décision.` : "Une offre attend votre décision.",
-        heading: "Votre demande se termine bientôt",
+        heading: "Plus que quelques temps pour comparer et valider un devis",
         intro:
           offres > 1
             ? `${offres} prestataires vous ont répondu. Passé l'échéance, la demande se ferme et les offres ne sont plus valables.`

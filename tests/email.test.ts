@@ -46,7 +46,8 @@ describe("demande de devis reçue par un partenaire", () => {
       SITE,
     )!;
 
-    expect(mail.subject).toContain("Cotonou");
+    expect(mail.subject).toBe("Vous avez une nouvelle demande de devis");
+    expect(mail.html).toContain("Cotonou");
     expect(mail.html).toContain("24 décembre 2026");
     expect(mail.html).toContain("250");
     expect(mail.html).toContain("DEM-2026-0042");
@@ -117,10 +118,53 @@ describe("décision transmise au partenaire", () => {
     expect(mail.html).toContain("/pro/demandes");
   });
 
+  it("désigne dans l'objet la demande qui tombe, par sa référence", () => {
+    // Un partenaire qui a répondu à trois appels d'offres cette semaine doit
+    // savoir lequel tombe, sans ouvrir le message. La référence prime sur le
+    // titre : c'est elle qu'il retrouve dans son espace et cite au téléphone.
+    const mail = renderEmail(
+      "quote.declined",
+      { city: "Porto-Novo", title: "Mariage à Fidjrossè", reference: "DEM-2026-0039" },
+      SITE,
+    )!;
+
+    expect(mail.subject).toBe("Oups ! La demande « DEM-2026-0039 » n'est plus disponible");
+  });
+
+  it("retombe sur le nom quand la référence manque", () => {
+    // `reference` est `not null` en base, mais la charge utile vient d'un
+    // déclencheur : rien ne garantit ses champs à l'exécution.
+    const mail = renderEmail("quote.declined", { title: "Mariage à Fidjrossè" }, SITE)!;
+
+    expect(mail.subject).toBe("Oups ! La demande « Mariage à Fidjrossè » n'est plus disponible");
+  });
+
+  it("reste lisible sans titre ni référence", () => {
+    // La charge utile vient d'un déclencheur : rien ne garantit ses champs à
+    // l'exécution. « La demande «  » n'est plus disponible » serait un bug visible.
+    expect(renderEmail("quote.declined", {}, SITE)!.subject).toBe(
+      "Oups ! Cette demande n'est plus disponible",
+    );
+  });
+
+  it("tronque un titre à rallonge plutôt que de noyer l'objet", () => {
+    // Rien ne borne le titre à la saisie ; sans troncature, la fin de la phrase
+    // — donc l'information — sort de l'aperçu de la boîte de réception.
+    const mail = renderEmail(
+      "quote.declined",
+      { title: "Mariage traditionnel et réception à la salle des fêtes de Fidjrossè" },
+      SITE,
+    )!;
+
+    expect(mail.subject).toContain("…");
+    expect(mail.subject.length).toBeLessThan(72);
+    expect(mail.subject).toContain("n'est plus disponible");
+  });
+
   it("mène un devis accepté vers l'espace partenaire", () => {
     const mail = renderEmail("quote.accepted", { city: "Cotonou", amount: 900_000 }, SITE)!;
 
-    expect(mail.subject).toBe("Votre devis a été accepté");
+    expect(mail.subject).toBe("Vous avez un devis accepté");
     expect(mail.html).toContain("/pro/devis");
   });
 });
@@ -132,6 +176,34 @@ describe("échéance imminente", () => {
 
     expect(une.html).toContain("Un prestataire vous a répondu");
     expect(plusieurs.html).toContain("4 prestataires vous ont répondu");
+  });
+
+  it("désigne la demande concernée dans l'objet", () => {
+    // Un client peut avoir plusieurs demandes ouvertes en même temps : sans la
+    // référence, le rappel ne dit pas laquelle arrive à échéance.
+    const mail = renderEmail(
+      "request.deadline",
+      { offres: 4, reference: "DEM-2026-0042", requestId: UUID },
+      SITE,
+    )!;
+
+    expect(mail.subject).toBe("Rappel : Votre demande « DEM-2026-0042 » arrive bientôt à échéance !");
+  });
+
+  it("reste lisible sans référence", () => {
+    const mail = renderEmail("request.deadline", { offres: 2, requestId: UUID }, SITE)!;
+
+    expect(mail.subject).toBe("Rappel : Votre demande arrive bientôt à échéance !");
+  });
+
+  it("appelle à l'action dans le titre du corps", () => {
+    // Le titre porte l'action attendue, là où l'objet porte l'alerte : répéter
+    // « votre demande se termine » aux deux endroits ne disait rien de plus.
+    const mail = renderEmail("request.deadline", { offres: 3, requestId: UUID }, SITE)!;
+
+    expect(mail.html).toContain("Plus que quelques temps pour comparer et valider un devis");
+    // Le corps texte reprend le titre : c'est sa première ligne.
+    expect(mail.text.startsWith("Plus que quelques temps")).toBe(true);
   });
 
   it("affiche l'échéance à l'heure du Bénin", () => {
@@ -157,6 +229,27 @@ describe("garde-fous de rédaction", () => {
 
   it("refuse un type inconnu plutôt que d'envoyer un message vide", () => {
     expect(renderEmail("paiement.recu", {}, SITE)).toBeNull();
+  });
+
+  it("porte le logo dans le bon sens, sur tous les modèles", () => {
+    // Dans l'application, `Éni` est orange et `Event` ardoise
+    // (`PublicHeader.tsx`). L'e-mail avait l'inverse. Rien ne relie ces deux
+    // endroits : seul ce test empêche la prochaine retouche de réinverser.
+    for (const kind of KINDS) {
+      const mail = renderEmail(kind, { city: "Cotonou", requestId: UUID }, SITE)!;
+
+      expect(mail.html, kind).toContain('<span style="color:#f97316;">Éni</span>Event');
+      expect(mail.html, kind).not.toContain('Éni<span style="color:#f97316;">Event</span>');
+    }
+  });
+
+  it("centre le logo et le bouton", () => {
+    const mail = renderEmail("quote.sent", { requestId: UUID }, SITE)!;
+
+    // Le bouton est centré par `align="center"` sur une cellule : Outlook
+    // ignore `margin:auto` sur un tableau, et le bouton y resterait à gauche.
+    expect(mail.html).toContain('letter-spacing:-0.3px;text-align:center;');
+    expect(mail.html).toContain('<td align="center">');
   });
 
   it("échappe ce qui vient de la base", () => {
