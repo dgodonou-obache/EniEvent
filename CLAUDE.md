@@ -50,6 +50,7 @@ Mise en ligne, variables à poser, lecture des pannes : `docs/DEPLOIEMENT.md`.
 | `npm run smoke` | Contrôles de bout en bout contre le vrai Supabase |
 | `npm run smoke:sms` | **Envoie un vrai SMS** via Premux — consomme un crédit, exige `SMS_TEST_TO` |
 | `npm run smoke:email` | **Envoie un vrai e-mail** via Resend — exige `EMAIL_TEST_TO` |
+| `npm run mails:auth` | Publie les gabarits d'authentification chez Supabase — simulation sans `-- --appliquer` |
 
 Les autres `smoke:*` (`offre`, `planning`, `devis`, `entreprise`, `photos`) jouent un
 parcours métier contre le vrai Supabase.
@@ -57,8 +58,10 @@ parcours métier contre le vrai Supabase.
 Recette manuelle : `docs/RECETTE.md`.
 
 > ⚠️ La **confirmation d'e-mail est active**. Une inscription n'ouvre pas de session :
-> le formulaire affiche « Vérifiez votre boîte mail ». Les envois passent par le SMTP
-> d'`contact@enievent.com` (OVH, `ssl0.ovh.net:465`), déclaré côté Supabase.
+> le formulaire affiche « Vérifiez votre boîte mail ». Ces envois partent de
+> **Supabase Auth**, pas de notre code — par le SMTP de Resend (`smtp.resend.com:465`,
+> utilisateur `resend`), expéditeur `ÉniEvent <contact@enievent.com>`. Leurs gabarits
+> vivent dans `src/lib/notify/auth-emails.ts` et se publient par `npm run mails:auth`.
 >
 > ⚠️ Le mot de passe des comptes de démonstration vit dans `DEMO_PASSWORD`
 > (`.env.local`), **jamais dans le dépôt** : `demo-admin` est de type `admin`, et le
@@ -232,6 +235,15 @@ qui appelle une réponse doit déclencher une notification.**
   injection — dans la boîte de réception d'un client. Styles en ligne et mise en page en
   tableaux (Outlook ignore les feuilles de style), et **une variante texte obligatoire**,
   faute de quoi le message est noté comme indésirable.
+- **Deux familles d'e-mails, une seule mise en page.** Les notifications partent de
+  notre code (`./emails.ts` → Resend) ; les e-mails d'authentification — confirmation
+  d'adresse, mot de passe oublié, lien de connexion — partent de **Supabase Auth**, qui
+  garde ses propres gabarits. Les deux passent par `src/lib/notify/shell.ts`, sans quoi
+  l'identité visuelle divergerait à la première retouche. Les gabarits Supabase vivent
+  dans `src/lib/notify/auth-emails.ts` : le dépôt reste la source de vérité,
+  `npm run mails:auth` republie, et `tests/auth-emails.test.ts` vérifie les marqueurs
+  (`{{ .ConfirmationURL }}`, `{{ .Token }}`) — un marqueur mal orthographié ne lève
+  aucune erreur, il envoie un bouton qui ne mène nulle part.
 - Resend est isolé dans `src/lib/mail/resend.ts` — seul fichier du dépôt à le connaître.
   Trois pièges y sont documentés : l'expéditeur exige un **domaine vérifié** (sinon 403,
   au libellé trompeur), le champ de réponse s'appelle **`reply_to`** et non `replyTo`

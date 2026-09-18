@@ -2,6 +2,8 @@ import { DEFAULT_CURRENCY, format, money, type CurrencyCode } from "@/lib/money"
 
 import type { EmailContent } from "@/lib/mail/resend";
 
+import { shell } from "./shell";
+
 /**
  * Rédaction des e-mails de notification.
  *
@@ -15,36 +17,14 @@ import type { EmailContent } from "@/lib/mail/resend";
  * le nombre de convives, le budget, l'échéance. **C'est là tout l'intérêt de
  * doubler le canal** : sans ce détail, l'e-mail ne serait qu'un SMS plus lent.
  *
- * Trois contraintes propres au courrier, invisibles à la relecture :
- *
- * - **Tout ce qui vient de la base est échappé.** Un nom d'enseigne est une
- *   chaîne saisie par un partenaire ; concaténée telle quelle dans du HTML,
- *   c'est une injection. `esc()` n'est pas une politesse.
- * - **Styles en ligne, mise en page en tableaux.** Outlook ignore les
- *   feuilles de style et `flex` ; une mise en page moderne s'y effondre.
- * - **Une variante texte obligatoire.** Un message sans corps texte est noté
- *   comme indésirable par la plupart des filtres.
+ * Ce module ne décide que **du texte**. La mise en page, l'échappement et la
+ * variante texte vivent dans `./shell.ts`, partagé avec les e-mails
+ * d'authentification — dont les gabarits sont gardés par Supabase.
  */
-
-/** Orange pêche et ardoise du système de conception, en valeurs littérales :
- *  un e-mail n'a pas accès aux jetons Tailwind. */
-const ORANGE = "#f97316";
-const SLATE_900 = "#0f172a";
-const SLATE_500 = "#64748b";
-const SLATE_100 = "#f1f5f9";
 
 /** Le Bénin est à UTC+1 toute l'année. Sans cela, une échéance de 9 h du matin
  *  s'annoncerait à 8 h — et le client manquerait sa fenêtre. */
 const TZ = "Africa/Porto-Novo";
-
-function esc(value: unknown): string {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
 function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -117,97 +97,6 @@ function amount(value: unknown, currency: unknown): string {
 
 function site(siteUrl: string): string {
   return siteUrl.replace(/\/+$/, "");
-}
-
-/** Une ligne du tableau récapitulatif. Les entrées vides sont écartées. */
-type Detail = readonly [label: string, value: string];
-
-interface Body {
-  subject: string;
-  /** Résumé affiché par la boîte de réception avant l'ouverture. */
-  preheader: string;
-  heading: string;
-  intro: string;
-  details?: readonly Detail[];
-  cta?: { label: string; href: string };
-  /** Dernière phrase, sous le bouton. Facultative. */
-  outro?: string;
-}
-
-function shell(body: Body): EmailContent {
-  const details = (body.details ?? []).filter(([, value]) => value !== "");
-
-  const rows = details
-    .map(
-      ([label, value]) => `
-            <tr>
-              <td style="padding:8px 0;color:${SLATE_500};font-size:14px;">${esc(label)}</td>
-              <td style="padding:8px 0;color:${SLATE_900};font-size:14px;font-weight:600;text-align:right;">${esc(value)}</td>
-            </tr>`,
-    )
-    .join("");
-
-  const table =
-    details.length === 0
-      ? ""
-      : `
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${SLATE_100};border-radius:16px;padding:16px 20px;margin:0 0 24px;">
-            ${rows}
-          </table>`;
-
-  // Le bouton est centré par un `align="center"` sur une cellule, et non par
-  // `margin:auto` : Outlook ignore les marges automatiques sur un tableau, et
-  // le bouton y resterait collé à gauche sans que rien ne le signale.
-  const button = body.cta
-    ? `
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
-            <tr>
-              <td align="center">
-                <table role="presentation" cellpadding="0" cellspacing="0">
-                  <tr>
-                    <td style="border-radius:12px;background:${ORANGE};">
-                      <a href="${esc(body.cta.href)}" style="display:inline-block;padding:14px 28px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;border-radius:12px;">${esc(body.cta.label)}</a>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>`
-    : "";
-
-  const html = `<!-- ${esc(body.preheader)} -->
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${esc(body.preheader)}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:32px 12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif;">
-  <tr>
-    <td align="center">
-      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:24px;padding:40px 32px;">
-        <tr>
-          <td>
-            <p style="margin:0 0 28px;font-size:18px;font-weight:800;color:${SLATE_900};letter-spacing:-0.3px;text-align:center;"><span style="color:${ORANGE};">Éni</span>Event</p>
-            <h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;font-weight:700;color:${SLATE_900};">${esc(body.heading)}</h1>
-            <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:${SLATE_500};">${esc(body.intro)}</p>
-${table}${button}${body.outro ? `            <p style="margin:0;font-size:14px;line-height:1.6;color:${SLATE_500};">${esc(body.outro)}</p>` : ""}
-          </td>
-        </tr>
-      </table>
-      <p style="margin:24px 0 0;font-size:12px;line-height:1.6;color:#94a3b8;">ÉniEvent — réservation événementielle au Bénin<br />Vous recevez cet e-mail parce que vous utilisez ÉniEvent.</p>
-    </td>
-  </tr>
-</table>`;
-
-  const plain = [
-    body.heading,
-    "",
-    body.intro,
-    ...(details.length > 0 ? ["", ...details.map(([label, value]) => `${label} : ${value}`)] : []),
-    ...(body.cta ? ["", `${body.cta.label} : ${body.cta.href}`] : []),
-    ...(body.outro ? ["", body.outro] : []),
-    "",
-    "--",
-    "ÉniEvent — réservation événementielle au Bénin",
-  ].join("\n");
-
-  return { subject: body.subject, html, text: plain };
 }
 
 /**

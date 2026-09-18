@@ -27,6 +27,7 @@
     "verify": "npm run typecheck && npm run lint && npm run test",
     "smoke:sms": "node --env-file=.env.local node_modules/vitest/vitest.mjs run tests/sms-reel.test.ts --reporter=verbose",
     "smoke:email": "node --env-file=.env.local node_modules/vitest/vitest.mjs run tests/email-reel.test.ts --reporter=verbose",
+    "mails:auth": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file=.env.local scripts/mails-auth.mjs",
     "smoke:ecrans": "node --env-file=.env.local scripts/smoke-ecrans.mjs",
     "smoke:cloisonnement": "node --env-file=.env.local scripts/smoke-cloisonnement.mjs",
     "admin:creer": "node --env-file=.env.local scripts/creer-admin.mjs"
