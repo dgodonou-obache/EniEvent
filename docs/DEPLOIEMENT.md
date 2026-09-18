@@ -21,6 +21,11 @@ Vercel → le projet → **Settings → Environment Variables**. Cocher **Produc
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_…` | Clé navigateur, bridée par la RLS |
 | `NEXT_PUBLIC_SITE_URL` | l'URL du déploiement | Liens absolus, retours d'authentification |
 | `SUPABASE_SECRET_KEY` | `sb_secret_…` | Webhooks et tâches planifiées **uniquement** |
+| `CRON_SECRET` | aléatoire | Protège `/api/cron/*` |
+| `PREMUX_API_KEY`, `PREMUX_DOMAIN`, `PREMUX_SENDER_ID` | voir `.env.example` | Notifications SMS |
+| `RESEND_API_KEY` | `re_…` | Notifications e-mail |
+| `EMAIL_FROM` | `ÉniEvent <bonjour@enievent.com>` | Expéditeur — **domaine vérifié obligatoire** |
+| `EMAIL_REPLY_TO` | `contact@enievent.com` | Boîte réellement relevée |
 
 Les valeurs se trouvent dans votre `.env.local`, et côté Supabase dans
 Settings → API Keys.
@@ -53,6 +58,58 @@ Tableau de bord Supabase → **Authentication → URL Configuration** :
 - **Site URL** : l'URL du déploiement
 - **Redirect URLs** : y ajouter `https://<domaine>/**`, sans retirer les entrées
   `http://localhost:*` qui font vivre le développement local
+
+## 3 bis. Vérifier le domaine chez Resend
+
+Les notifications par e-mail ne partent **que** depuis un domaine vérifié. Un
+expéditeur non vérifié donne un `HTTP 403` dont le libellé parle de domaine et
+non de clé — on cherche alors du côté de l'authentification, au mauvais endroit.
+
+Resend → **Domains → Add Domain** → `enievent.com`, région **eu-west-1**
+(Irlande : la plus proche du Bénin parmi celles proposées, et la même que le
+projet Supabase).
+
+Resend rend alors **quatre** enregistrements à créer dans la zone OVH :
+
+| Type | Nom | Valeur |
+|---|---|---|
+| `TXT` | `resend._domainkey` | la clé publique DKIM fournie (`p=…`) |
+| `MX` | `send` | `feedback-smtp.eu-west-1.amazonses.com.` (priorité 10) |
+| `TXT` | `send` | `v=spf1 include:amazonses.com ~all` |
+| `CNAME` | `rsend` | `send.forge.rmta.net.` |
+
+> ⚠️ **Le point final n'est pas décoratif.** Une cible d'hôte — `MX`, `CNAME` —
+> sans point final est traitée par OVH comme **relative à la zone** : elle est
+> publiée en `feedback-smtp.eu-west-1.amazonses.com.enievent.com`, un nom qui
+> n'existe pas. Rien ne le signale : l'enregistrement est créé sans erreur, la
+> vérification Resend reste simplement en attente sans dire pourquoi. Les `TXT`,
+> eux, sont des chaînes et non des noms : leur ajouter un point les corromprait.
+> Les enregistrements d'OVH se terminent tous par un point — c'est le repère.
+
+> ✅ **Aucun de ces trois n'entre en conflit avec la messagerie OVH.** Resend
+> place son MX et son SPF sous le sous-domaine `send.`, jamais sur l'apex : les
+> 4 `MX` d'OVH et le `SPF` `v=spf1 include:mx.ovh.com ~all` restent intacts, et
+> le sélecteur `resend._domainkey` est distinct de ceux d'OVH.
+>
+> ⚠️ **Ne jamais ajouter un second SPF sur l'apex.** Un domaine ne peut en
+> porter qu'un : deux enregistrements `v=spf1` invalident les deux, et *tout* le
+> courrier du domaine — y compris celui d'OVH — part en indésirable. Si un jour
+> les deux devaient cohabiter sur l'apex, il faudrait les **fusionner** en une
+> seule ligne, pas en ajouter une.
+>
+> ⚠️ Rappel de `CLAUDE.md` : la zone est chez OVH, pas chez Vercel. **Ne jamais
+> déplacer les serveurs de noms** — cela couperait les e-mails sans le moindre
+> message d'erreur.
+
+Une fois les enregistrements propagés (quelques minutes à quelques heures),
+**Verify DNS Records** dans Resend. Puis, pour éprouver la chaîne réelle :
+
+```bash
+npm run smoke:email     # exige EMAIL_TEST_TO dans .env.local
+```
+
+C'est le seul contrôle qui répond à la question qu'aucun test simulé ne tranche :
+la passerelle accepte-t-elle réellement notre expéditeur.
 
 ## 4. Vérifier la base
 

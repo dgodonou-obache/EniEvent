@@ -92,18 +92,41 @@ describe("remplissage de la file", () => {
     expect(rows[0].n).toBe(0);
   });
 
-  it("met en file les partenaires concernés à la publication", async () => {
+  it("met en file les partenaires concernés à la publication, sur les deux canaux", async () => {
     await db.query("update quote_requests set status = 'open' where id = $1", [requestId]);
 
     const { rows } = await db.query(
-      "select recipient, kind, status, target_org_id from notifications order by recipient",
+      // `order by channel` suivrait l'ordre de déclaration de l'énumération
+      // (`sms` puis `email`), pas l'alphabet : on trie sur le texte.
+      "select channel, recipient, kind, status, target_org_id from notifications order by channel::text",
+    );
+
+    // Un SMS pour alerter, un e-mail pour porter le détail. Les deux visent le
+    // même partenaire : jamais l'un sans l'autre quand les deux sont connus.
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.channel)).toEqual(["email", "sms"]);
+
+    for (const row of rows) {
+      expect(row.kind).toBe("quote_request.new");
+      expect(row.status).toBe("pending");
+      expect(row.target_org_id).toBe(orgTraiteur);
+    }
+
+    expect(rows[1].recipient).toBe("+2290197000001");
+  });
+
+  it("retombe sur l'adresse du propriétaire quand la facturation n'en porte pas", async () => {
+    // `billing_email` est renseignée à l'inscription, mais reste annulable : une
+    // organisation créée à la main n'en a pas. Sans ce repli, ces partenaires
+    // seraient injoignables par e-mail sans que rien ne le signale — la panne
+    // exacte qu'avaient connue les numéros avant la migration 0017.
+    const { rows } = await db.query(
+      "select recipient from notifications where channel = 'email' and target_org_id = $1",
+      [orgTraiteur],
     );
 
     expect(rows).toHaveLength(1);
-    expect(rows[0].recipient).toBe("+2290197000001");
-    expect(rows[0].kind).toBe("quote_request.new");
-    expect(rows[0].status).toBe("pending");
-    expect(rows[0].target_org_id).toBe(orgTraiteur);
+    expect(rows[0].recipient).toBe("chef@saveurs.bj");
   });
 
   it("épargne les partenaires d'une autre catégorie", async () => {
@@ -122,12 +145,19 @@ describe("remplissage de la file", () => {
     await db.query("update quote_requests set status = 'open' where id = $1", [requestId]);
 
     const { rows } = await db.query("select count(*)::int as n from notifications");
-    expect(rows[0].n).toBe(1);
+    expect(rows[0].n).toBe(2);
   });
 
   it("porte de quoi rédiger le message sans relire la demande", async () => {
+    // La charge sert les deux rédactions : le SMS ignore ce qu'il n'utilise
+    // pas, l'e-mail y puise le détail qui évite au partenaire de se connecter.
     const { rows } = await db.query("select payload from notifications limit 1");
-    expect(rows[0].payload).toMatchObject({ city: "Cotonou" });
+
+    expect(rows[0].payload).toMatchObject({
+      city: "Cotonou",
+      title: "Mariage a Cotonou",
+      currency: "XOF",
+    });
   });
 });
 
@@ -145,7 +175,7 @@ describe("secret de la file", () => {
 
   it("est lisible par l'administration", async () => {
     const rows = await actingAs(db, ADMIN, () => db.query("select * from notifications"));
-    expect(rows.rows).toHaveLength(1);
+    expect(rows.rows).toHaveLength(2);
   });
 
   it("ne se laisse pas marquer comme envoyée par un partenaire", async () => {

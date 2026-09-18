@@ -22,7 +22,7 @@ Cette V2 remplace l'app v1 située dans `..\ÉniEvent` (lecture seule, source de
 Next.js 16 (App Router, RSC, Server Actions) · React 19 · TypeScript strict ·
 Tailwind 3.4 · Supabase (Postgres, Auth, Storage, RLS) · Zod + react-hook-form ·
 **Premux** (SMS, branché) · CinetPay (Mobile Money, carte — à venir) ·
-Resend (e-mail — à venir) · Vitest.
+**Resend** (e-mail, branché) · Vitest.
 
 ## Production
 
@@ -49,6 +49,7 @@ Mise en ligne, variables à poser, lecture des pannes : `docs/DEPLOIEMENT.md`.
 | `npm run demo:reset` | Seed + comptes de démonstration + jeu entreprise |
 | `npm run smoke` | Contrôles de bout en bout contre le vrai Supabase |
 | `npm run smoke:sms` | **Envoie un vrai SMS** via Premux — consomme un crédit, exige `SMS_TEST_TO` |
+| `npm run smoke:email` | **Envoie un vrai e-mail** via Resend — exige `EMAIL_TEST_TO` |
 
 Les autres `smoke:*` (`offre`, `planning`, `devis`, `entreprise`, `photos`) jouent un
 parcours métier contre le vrai Supabase.
@@ -219,6 +220,28 @@ qui appelle une réponse doit déclencher une notification.**
 - **Plafond de 20 destinataires par demande.** Un brief « traiteur à Cotonou » concerne
   tous les traiteurs approuvés de la ville, et chaque SMS est facturé. Au-delà, la
   demande reste visible dans `/pro/demandes`.
+- **Deux canaux, deux usages — pas deux fois le même message.** Le SMS alerte : un
+  segment, 160 caractères, facturé à chaque envoi. L'e-mail raconte : ville, date,
+  convives, budget, échéance, de quoi décider **sans se connecter**. Les deux partagent
+  une seule charge utile (`renderSms` ignore ce qu'il n'utilise pas) ; c'est le détail
+  qui justifie de doubler, sans quoi l'e-mail ne serait qu'un SMS plus lent.
+  Le plafond de 20 borne l'envoi *payant* ; l'e-mail suit la même liste pour qu'un
+  partenaire ne soit jamais prévenu sur un seul canal au hasard.
+- **Tout ce qui vient de la base est échappé dans un e-mail.** Un nom d'enseigne est une
+  chaîne saisie par un partenaire ; concaténée telle quelle dans du HTML, c'est une
+  injection — dans la boîte de réception d'un client. Styles en ligne et mise en page en
+  tableaux (Outlook ignore les feuilles de style), et **une variante texte obligatoire**,
+  faute de quoi le message est noté comme indésirable.
+- Resend est isolé dans `src/lib/mail/resend.ts` — seul fichier du dépôt à le connaître.
+  Trois pièges y sont documentés : l'expéditeur exige un **domaine vérifié** (sinon 403,
+  au libellé trompeur), le champ de réponse s'appelle **`reply_to`** et non `replyTo`
+  (la forme chameau est ignorée sans erreur), et la limite est de **2 requêtes par
+  seconde** — le module s'auto-cadence, le drainage traitant 25 lignes d'affilée.
+- ⚠️ **Le DNS d'`enievent.com` ne tolère qu'un seul SPF.** Resend pose ses
+  enregistrements sous `send.enievent.com` et `resend._domainkey`, donc sans toucher aux
+  4 `MX` ni au `SPF` d'OVH. Ajouter un second `v=spf1` sur l'apex invaliderait les deux
+  et ferait partir **tout** le courrier du domaine en indésirable. Voir
+  `docs/DEPLOIEMENT.md` §3 bis.
 - **Un SMS français ne fait pas 160 caractères.** L'alphabet GSM 03.38 contient `é`, `è`,
   `à`, `Ç` — mais **ni `ç` minuscule, ni l'apostrophe typographique `’`, ni `« »`, ni
   `…`**. Un seul de ces caractères fait tomber la capacité à 70 et triple la facture.

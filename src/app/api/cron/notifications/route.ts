@@ -1,4 +1,6 @@
 import { publicEnv } from "@/lib/env";
+import { sendEmail } from "@/lib/mail/resend";
+import { renderEmail } from "@/lib/notify/emails";
 import { renderSms } from "@/lib/notify/messages";
 import { sendSms } from "@/lib/sms/premux";
 import { createServiceRoleClient } from "@/utils/supabase/server";
@@ -70,14 +72,22 @@ export async function GET(request: Request) {
   const report = {
     rappelsPoses: rappels ?? 0,
     traitees: claimed?.length ?? 0,
-    envoyees: 0,
+    sms: 0,
+    emails: 0,
     echouees: 0,
   };
 
   for (const row of claimed ?? []) {
-    const body = renderSms(row.kind, (row.payload ?? {}) as Record<string, unknown>, siteUrl);
+    const payload = (row.payload ?? {}) as Record<string, unknown>;
 
-    if (!body) {
+    // Les deux canaux partagent la charge utile et se distinguent par la seule
+    // rédaction : le SMS alerte en un segment, l'e-mail porte le détail.
+    const content =
+      row.channel === "sms"
+        ? renderSms(row.kind, payload, siteUrl)
+        : renderEmail(row.kind, payload, siteUrl);
+
+    if (!content) {
       // Un type inconnu ne doit pas bloquer la file ni partir vide : on le
       // marque en échec avec un motif lisible dans `last_error`.
       await supabase.rpc("mark_notification", {
@@ -90,9 +100,9 @@ export async function GET(request: Request) {
     }
 
     const outcome =
-      row.channel === "sms"
-        ? await sendSms(row.recipient, body)
-        : ({ ok: false, reason: "passerelle", message: "Canal e-mail pas encore branché" } as const);
+      typeof content === "string"
+        ? await sendSms(row.recipient, content)
+        : await sendEmail(row.recipient, content);
 
     await supabase.rpc("mark_notification", {
       target: row.id,
@@ -102,8 +112,9 @@ export async function GET(request: Request) {
       detail: outcome.ok ? undefined : outcome.message,
     });
 
-    if (outcome.ok) report.envoyees += 1;
-    else report.echouees += 1;
+    if (!outcome.ok) report.echouees += 1;
+    else if (row.channel === "sms") report.sms += 1;
+    else report.emails += 1;
   }
 
   return Response.json(report);
