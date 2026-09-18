@@ -201,9 +201,11 @@ describe("échéance imminente", () => {
     // « votre demande se termine » aux deux endroits ne disait rien de plus.
     const mail = renderEmail("request.deadline", { offres: 3, requestId: UUID }, SITE)!;
 
-    expect(mail.html).toContain("Plus que quelques temps pour comparer et valider un devis");
+    expect(mail.html).toContain("Plus que quelque temps pour comparer et valider un devis");
     // Le corps texte reprend le titre : c'est sa première ligne.
-    expect(mail.text.startsWith("Plus que quelques temps")).toBe(true);
+    expect(mail.text.startsWith("Plus que quelque temps")).toBe(true);
+    // « quelque temps » est invariable : le pluriel est une faute répandue.
+    expect(mail.html).not.toContain("quelques temps");
   });
 
   it("affiche l'échéance à l'heure du Bénin", () => {

@@ -332,7 +332,10 @@ export function renderEmail(
           : "Rappel : Votre demande arrive bientôt à échéance !",
         preheader:
           offres > 1 ? `${offres} offres attendent votre décision.` : "Une offre attend votre décision.",
-        heading: "Plus que quelques temps pour comparer et valider un devis",
+        // « quelque temps » est invariable dans cette expression : le pluriel
+        // « quelques temps » est une faute répandue, et celle-ci partirait
+        // dans de vrais e-mails clients.
+        heading: "Plus que quelque temps pour comparer et valider un devis",
         intro:
           offres > 1
             ? `${offres} prestataires vous ont répondu. Passé l'échéance, la demande se ferme et les offres ne sont plus valables.`
