@@ -881,14 +881,50 @@ export type Database = {
           },
         ]
       }
+      order_instalments: {
+        Row: {
+          amount: number
+          created_at: string
+          due_date: string | null
+          id: string
+          label: string
+          order_id: string
+          position: number
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          label: string
+          order_id: string
+          position: number
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          label?: string
+          order_id?: string
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_instalments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           client_id: string
           commission_rate: number
           created_at: string
           currency: string
-          deposit_amount: number
-          deposit_percent: number
           event_date: string | null
           id: string
           org_id: string
@@ -905,8 +941,6 @@ export type Database = {
           commission_rate: number
           created_at?: string
           currency?: string
-          deposit_amount: number
-          deposit_percent: number
           event_date?: string | null
           id?: string
           org_id: string
@@ -923,8 +957,6 @@ export type Database = {
           commission_rate?: number
           created_at?: string
           currency?: string
-          deposit_amount?: number
-          deposit_percent?: number
           event_date?: string | null
           id?: string
           org_id?: string
@@ -1102,7 +1134,6 @@ export type Database = {
           bio: string | null
           commission_rate_override: number | null
           created_at: string
-          deposit_percent: number
           is_verified: boolean
           org_id: string
           rating_avg: number | null
@@ -1119,7 +1150,6 @@ export type Database = {
           bio?: string | null
           commission_rate_override?: number | null
           created_at?: string
-          deposit_percent?: number
           is_verified?: boolean
           org_id: string
           rating_avg?: number | null
@@ -1136,7 +1166,6 @@ export type Database = {
           bio?: string | null
           commission_rate_override?: number | null
           created_at?: string
-          deposit_percent?: number
           is_verified?: boolean
           org_id?: string
           rating_avg?: number | null
@@ -1158,6 +1187,56 @@ export type Database = {
           },
         ]
       }
+      payment_schedules: {
+        Row: {
+          amount_kind: Database["public"]["Enums"]["schedule_amount"]
+          created_at: string
+          days_before: number | null
+          fixed_amount: number | null
+          id: string
+          label: string
+          org_id: string
+          percent: number | null
+          position: number
+          trigger: Database["public"]["Enums"]["schedule_trigger"]
+          updated_at: string
+        }
+        Insert: {
+          amount_kind: Database["public"]["Enums"]["schedule_amount"]
+          created_at?: string
+          days_before?: number | null
+          fixed_amount?: number | null
+          id?: string
+          label: string
+          org_id: string
+          percent?: number | null
+          position: number
+          trigger: Database["public"]["Enums"]["schedule_trigger"]
+          updated_at?: string
+        }
+        Update: {
+          amount_kind?: Database["public"]["Enums"]["schedule_amount"]
+          created_at?: string
+          days_before?: number | null
+          fixed_amount?: number | null
+          id?: string
+          label?: string
+          org_id?: string
+          percent?: number | null
+          position?: number
+          trigger?: Database["public"]["Enums"]["schedule_trigger"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_schedules_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount: number
@@ -1166,6 +1245,7 @@ export type Database = {
           currency: string
           id: string
           idempotency_key: string
+          instalment_id: string
           last_error: string | null
           order_id: string
           paid_at: string | null
@@ -1174,7 +1254,6 @@ export type Database = {
           provider: string
           provider_ref: string | null
           provider_status: string | null
-          purpose: Database["public"]["Enums"]["payment_purpose"]
           reference: string
           status: Database["public"]["Enums"]["payment_status"]
           updated_at: string
@@ -1186,6 +1265,7 @@ export type Database = {
           currency?: string
           id?: string
           idempotency_key: string
+          instalment_id: string
           last_error?: string | null
           order_id: string
           paid_at?: string | null
@@ -1194,7 +1274,6 @@ export type Database = {
           provider?: string
           provider_ref?: string | null
           provider_status?: string | null
-          purpose: Database["public"]["Enums"]["payment_purpose"]
           reference?: string
           status?: Database["public"]["Enums"]["payment_status"]
           updated_at?: string
@@ -1206,6 +1285,7 @@ export type Database = {
           currency?: string
           id?: string
           idempotency_key?: string
+          instalment_id?: string
           last_error?: string | null
           order_id?: string
           paid_at?: string | null
@@ -1214,12 +1294,18 @@ export type Database = {
           provider?: string
           provider_ref?: string | null
           provider_status?: string | null
-          purpose?: Database["public"]["Enums"]["payment_purpose"]
           reference?: string
           status?: Database["public"]["Enums"]["payment_status"]
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "payments_instalment_id_fkey"
+            columns: ["instalment_id"]
+            isOneToOne: false
+            referencedRelation: "order_instalments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "payments_order_id_fkey"
             columns: ["order_id"]
@@ -2012,6 +2098,28 @@ export type Database = {
         Returns: string
       }
       request_quote_approval: { Args: { target: string }; Returns: string }
+      save_payment_schedule: {
+        Args: { lignes: Json; org: string }
+        Returns: {
+          amount_kind: Database["public"]["Enums"]["schedule_amount"]
+          created_at: string
+          days_before: number | null
+          fixed_amount: number | null
+          id: string
+          label: string
+          org_id: string
+          percent: number | null
+          position: number
+          trigger: Database["public"]["Enums"]["schedule_trigger"]
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "payment_schedules"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       settle_payment: {
         Args: {
           cle: string
@@ -2028,6 +2136,7 @@ export type Database = {
           currency: string
           id: string
           idempotency_key: string
+          instalment_id: string
           last_error: string | null
           order_id: string
           paid_at: string | null
@@ -2036,7 +2145,6 @@ export type Database = {
           provider: string
           provider_ref: string | null
           provider_status: string | null
-          purpose: Database["public"]["Enums"]["payment_purpose"]
           reference: string
           status: Database["public"]["Enums"]["payment_status"]
           updated_at: string
@@ -2051,11 +2159,7 @@ export type Database = {
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       start_payment: {
-        Args: {
-          cle: string
-          nature: Database["public"]["Enums"]["payment_purpose"]
-          target: string
-        }
+        Args: { cle: string; echeance: string }
         Returns: {
           amount: number
           commission: number
@@ -2063,6 +2167,7 @@ export type Database = {
           currency: string
           id: string
           idempotency_key: string
+          instalment_id: string
           last_error: string | null
           order_id: string
           paid_at: string | null
@@ -2071,7 +2176,6 @@ export type Database = {
           provider: string
           provider_ref: string | null
           provider_status: string | null
-          purpose: Database["public"]["Enums"]["payment_purpose"]
           reference: string
           status: Database["public"]["Enums"]["payment_status"]
           updated_at: string
@@ -2132,7 +2236,6 @@ export type Database = {
         | "accountant"
       org_status: "pending" | "active" | "suspended"
       org_type: "company" | "partner"
-      payment_purpose: "deposit" | "balance" | "full"
       payment_status: "pending" | "paid" | "failed" | "cancelled" | "refunded"
       price_unit:
         | "day"
@@ -2157,6 +2260,8 @@ export type Database = {
         | "declined"
         | "withdrawn"
         | "expired"
+      schedule_amount: "percent" | "fixed" | "balance"
+      schedule_trigger: "booking" | "before_event"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2338,7 +2443,6 @@ export const Constants = {
       ],
       org_status: ["pending", "active", "suspended"],
       org_type: ["company", "partner"],
-      payment_purpose: ["deposit", "balance", "full"],
       payment_status: ["pending", "paid", "failed", "cancelled", "refunded"],
       price_unit: [
         "day",
@@ -2366,6 +2470,8 @@ export const Constants = {
         "withdrawn",
         "expired",
       ],
+      schedule_amount: ["percent", "fixed", "balance"],
+      schedule_trigger: ["booking", "before_event"],
     },
   },
 } as const

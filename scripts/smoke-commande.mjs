@@ -77,14 +77,12 @@ try {
     process.exit(0);
   }
 
-  const { data: profil } = await admin
-    .from("partner_profiles")
-    .select("deposit_percent")
+  // Les conditions du partenaire, telles qu'elles seront recopiées.
+  const { data: conditions } = await admin
+    .from("payment_schedules")
+    .select("position, label, amount_kind, percent, fixed_amount")
     .eq("org_id", attente.org_id)
-    .maybeSingle();
-
-  const pct = Number(profil?.deposit_percent ?? 30);
-  const acompteAttendu = Math.round((attente.subtotal * pct) / 100);
+    .order("position");
 
   const { error: acceptation } = await client.rpc("accept_quote", { target: attente.id });
   check("le client accepte son devis", !acceptation, acceptation?.message ?? "");
@@ -103,28 +101,66 @@ try {
     commande.total === attente.subtotal,
     `${commande.total} vs ${attente.subtotal}`,
   );
+
+  // --- 2. Les échéances recopiées -------------------------------------------
+  const { data: echeances } = await admin
+    .from("order_instalments")
+    .select("*")
+    .eq("order_id", commande.id)
+    .order("position");
+
   check(
-    `l'acompte suit le taux du partenaire (${pct} %)`,
-    commande.deposit_amount === acompteAttendu,
-    `${commande.deposit_amount} attendu ${acompteAttendu}`,
+    "l'échéancier du partenaire est recopié sur la commande",
+    (echeances ?? []).length === (conditions ?? []).length,
+    `${(echeances ?? []).length} échéance(s) pour ${(conditions ?? []).length} ligne(s)`,
   );
 
-  // --- 2. Cloisonnement ------------------------------------------------------
+  // Le contrôle qui compte : un échéancier qui ne retombe pas sur le total
+  // réclame trop ou trop peu, et rien ne le signale avant la comptabilité.
+  const sommeEcheances = (echeances ?? []).reduce((t, e) => t + e.amount, 0);
+  check(
+    "les échéances retombent exactement sur le total",
+    sommeEcheances === commande.total,
+    `${sommeEcheances} vs ${commande.total}`,
+  );
+
+  const premiere = (echeances ?? [])[0];
+  const derniere = (echeances ?? [])[(echeances ?? []).length - 1];
+  if (!premiere) throw new Error("aucune échéance");
+
+  console.log(
+    `        échéancier : ${(echeances ?? [])
+      .map((e) => `${e.label} ${e.amount}`)
+      .join(" · ")}`,
+  );
+
+  // --- 3. Cloisonnement ------------------------------------------------------
   const { data: vueIntrus } = await intrus.from("orders").select("id").eq("id", commande.id);
   check("un autre utilisateur ne voit pas cette commande", (vueIntrus ?? []).length === 0);
 
   const { error: refus } = await intrus.rpc("start_payment", {
-    target: commande.id,
-    nature: "deposit",
+    echeance: premiere.id,
     cle: `intrusion-${Date.now()}`,
   });
   check("un autre utilisateur ne peut pas la régler", Boolean(refus), refus?.message ?? "");
 
-  // --- 3. Ouverture du paiement ---------------------------------------------
+  // --- 4. L'ordre des échéances ---------------------------------------------
+  if (derniere && derniere.id !== premiere.id) {
+    const { error: horsOrdre } = await client.rpc("start_payment", {
+      echeance: derniere.id,
+      cle: `hors-ordre-${Date.now()}`,
+    });
+    check(
+      "on ne peut pas régler le solde avant l'acompte",
+      Boolean(horsOrdre),
+      horsOrdre?.message ?? "accepté à tort",
+    );
+  }
+
+  // --- 5. Ouverture du paiement ---------------------------------------------
   const cle = `smoke-${Date.now()}`;
   const { data: paiement, error: ouverture } = await client.rpc("start_payment", {
-    target: commande.id,
-    nature: "deposit",
+    echeance: premiere.id,
     cle,
   });
 
@@ -133,9 +169,9 @@ try {
   if (!ligne) throw new Error("pas de paiement ouvert");
 
   check(
-    "le montant est calculé en base, pas fourni",
-    ligne.amount === acompteAttendu,
-    `${ligne.amount} attendu ${acompteAttendu}`,
+    "le montant est celui de l'échéance, pas un montant fourni",
+    ligne.amount === premiere.amount,
+    `${ligne.amount} attendu ${premiere.amount}`,
   );
   check(
     "la ventilation retombe exactement sur le montant",
@@ -143,7 +179,7 @@ try {
     `${ligne.commission} + ${ligne.partner_due} = ${ligne.amount}`,
   );
 
-  // --- 4. Transaction réelle chez FedaPay ------------------------------------
+  // --- 6. Transaction réelle chez FedaPay ------------------------------------
   const creation = await fedapay("POST", "/transactions", {
     description: `Contrôle ÉniEvent — ${ligne.reference}`,
     amount: ligne.amount,
@@ -169,7 +205,7 @@ try {
   });
   check("la référence du prestataire est rattachée", !rattachement, rattachement?.message ?? "");
 
-  // --- 5. Le webhook de production -------------------------------------------
+  // --- 7. Le webhook de production -------------------------------------------
   // Corps volontairement mensonger : il annonce un paiement approuvé alors que
   // la transaction est en attente. Si le webhook croyait son corps, la commande
   // passerait à « payée » sans qu'un franc ait été versé.

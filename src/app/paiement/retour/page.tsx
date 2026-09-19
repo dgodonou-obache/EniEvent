@@ -3,7 +3,7 @@ import { CheckCircle2, Clock, XCircle } from "lucide-react";
 
 import { requireUser } from "@/lib/auth/session";
 import { format, money, type CurrencyCode } from "@/lib/money";
-import { getPaymentByKey, PURPOSE_LABELS } from "@/lib/orders";
+import { getPaymentByKey } from "@/lib/orders";
 
 /**
  * Retour du prestataire de paiement.
@@ -103,7 +103,7 @@ export default async function PaymentReturnPage({
 
         {paiement ? (
           <p className="mt-2 text-sm font-medium text-slate-500">
-            {PURPOSE_LABELS[paiement.purpose]} de {montant} · {paiement.reference}
+            {paiement.order_instalments?.label ?? "Règlement"} de {montant} · {paiement.reference}
           </p>
         ) : null}
 

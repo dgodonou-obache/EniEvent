@@ -9,23 +9,19 @@ import { money, type CurrencyCode } from "@/lib/money";
 import { paymentProvider } from "@/lib/payments/fedapay";
 import { createClient } from "@/utils/supabase/server";
 
-import type { Database } from "@/types/database";
 
 /**
  * Ouverture d'un paiement.
  *
- * **Le montant n'est pas transmis.** Seuls la commande et la nature du
- * règlement le sont ; `start_payment` déduit la somme de la commande, figée à
- * l'acceptation du devis. Revérifier un montant côté serveur n'aurait aucun
- * sens si le formulaire avait pu le choisir.
+ * **Le montant n'est pas transmis.** Le formulaire ne désigne qu'une échéance ;
+ * `start_payment` en tire la somme, figée à la commande. Revérifier un montant
+ * côté serveur n'aurait aucun sens si le formulaire avait pu le choisir.
  *
  * Cette action n'emploie **pas** la clé de service : elle est déclenchée par un
  * utilisateur, et le `CLAUDE.md` la réserve aux webhooks et aux tâches
  * planifiées. Toute l'autorisation est donc portée par les fonctions
  * `SECURITY DEFINER`, qui vérifient elles-mêmes l'appelant.
  */
-
-type PaymentPurpose = Database["public"]["Enums"]["payment_purpose"];
 
 export interface PaymentState {
   message?: string;
@@ -43,12 +39,11 @@ export async function payOrder(
 ): Promise<PaymentState> {
   const user = await requireUser();
 
-  const orderId = String(formData.get("orderId") ?? "");
-  const purpose = String(formData.get("purpose") ?? "") as PaymentPurpose;
+  const instalmentId = String(formData.get("instalmentId") ?? "");
   const requestId = String(formData.get("requestId") ?? "");
 
-  if (!orderId || !["deposit", "balance", "full"].includes(purpose)) {
-    return { message: "Paiement impossible : demande incomplète." };
+  if (!instalmentId) {
+    return { message: "Paiement impossible : échéance non désignée." };
   }
 
   const supabase = await createClient();
@@ -60,8 +55,7 @@ export async function payOrder(
   const { data: encours } = await supabase
     .from("payments")
     .select("payload, created_at")
-    .eq("order_id", orderId)
-    .eq("purpose", purpose)
+    .eq("instalment_id", instalmentId)
     .eq("status", "pending")
     .gte("created_at", depuis)
     .order("created_at", { ascending: false })
@@ -72,13 +66,18 @@ export async function payOrder(
   if (reprise) return { ok: true, url: reprise };
 
   // Une clé par tentative : deux clics rapides ouvrent deux lignes en attente,
-  // ce qui est sans danger — l'index partiel `payments_one_paid_per_purpose`
+  // ce qui est sans danger — l'index partiel `payments_one_paid_per_instalment`
   // interdit d'en encaisser deux.
   const cle = randomUUID();
 
+  const { data: echeance } = await supabase
+    .from("order_instalments")
+    .select("label")
+    .eq("id", instalmentId)
+    .maybeSingle();
+
   const { data: paiement, error } = await supabase.rpc("start_payment", {
-    target: orderId,
-    nature: purpose,
+    echeance: instalmentId,
     cle,
   });
 
@@ -100,7 +99,7 @@ export async function payOrder(
   const ouverture = await provider.checkout({
     reference: ligne.reference,
     amount: money(ligne.amount, (ligne.currency as CurrencyCode) ?? "XOF"),
-    description: `${libelle(purpose)} — commande ${ligne.reference}`,
+    description: `${echeance?.label ?? "Paiement"} — ${ligne.reference}`,
     customer: {
       firstName: prenom || "Client",
       lastName: reste.join(" ") || "ÉniEvent",
@@ -110,7 +109,7 @@ export async function payOrder(
     callbackUrl: `${siteUrl()}/paiement/retour?cle=${encodeURIComponent(cle)}`,
     // Recopiées chez le prestataire : c'est par elles que le webhook retrouve
     // le paiement, sans jamais croire ce que le navigateur renvoie.
-    metadata: { cle, orderId, purpose },
+    metadata: { cle, instalmentId },
   });
 
   if (!ouverture.ok) {
@@ -133,12 +132,6 @@ export async function payOrder(
   if (requestId) revalidatePath(`/projets/${requestId}`);
 
   return { ok: true, url: ouverture.url };
-}
-
-function libelle(purpose: PaymentPurpose): string {
-  if (purpose === "deposit") return "Acompte";
-  if (purpose === "balance") return "Solde";
-  return "Paiement";
 }
 
 function siteUrl(): string {

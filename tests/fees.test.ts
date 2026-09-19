@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hasBalance, paymentSchedule, splitPayment } from "@/lib/fees";
+import { resolveSchedule, scheduleTotal, splitPayment, type ScheduleRow } from "@/lib/fees";
 import { add, format, money, MoneyError } from "@/lib/money";
 
 /**
@@ -63,43 +63,137 @@ describe("partage entre la plateforme et le partenaire", () => {
   });
 });
 
-describe("acompte et solde", () => {
-  it("découpe selon le taux choisi par le partenaire", () => {
-    const e = paymentSchedule(XOF(1_500_000), 30);
+/** Raccourcis de composition, pour que les cas de test restent lisibles. */
+const pct = (label: string, percent: number, daysBefore: number | null = null): ScheduleRow => ({
+  label,
+  trigger: daysBefore === null ? "booking" : "before_event",
+  daysBefore,
+  amountKind: "percent",
+  percent,
+  fixedAmount: null,
+});
 
-    expect(e.deposit.amount).toBe(450_000);
-    expect(e.balance.amount).toBe(1_050_000);
+const fixe = (label: string, fixedAmount: number, daysBefore: number | null = null): ScheduleRow => ({
+  label,
+  trigger: daysBefore === null ? "booking" : "before_event",
+  daysBefore,
+  amountKind: "fixed",
+  percent: null,
+  fixedAmount,
+});
+
+const solde = (daysBefore = 7): ScheduleRow => ({
+  label: "Solde",
+  trigger: "before_event",
+  daysBefore,
+  amountKind: "balance",
+  percent: null,
+  fixedAmount: null,
+});
+
+describe("échéancier du partenaire", () => {
+  it("déroule un acompte en pourcentage suivi du solde", () => {
+    const e = resolveSchedule(XOF(1_500_000), [pct("Acompte", 30), solde()]);
+
+    expect(e).toHaveLength(2);
+    expect(e[0].amount.amount).toBe(450_000);
+    expect(e[1].amount.amount).toBe(1_050_000);
   });
 
-  it("retombe exactement sur le total", () => {
-    for (const total of [1, 999, 333_333, 1_234_567, 7_777_777]) {
-      for (const pct of [0, 10, 25, 30, 33.33, 50, 100]) {
-        const e = paymentSchedule(XOF(total), pct);
+  it("accepte un montant fixe pour bloquer la date", () => {
+    // Un traiteur qui demande 100 000 FCFA quel que soit le montant total.
+    const e = resolveSchedule(XOF(1_500_000), [fixe("Réservation", 100_000), solde(15)]);
 
-        expect(add(e.deposit, e.balance).amount, `${total} à ${pct} %`).toBe(total);
+    expect(e[0].amount.amount).toBe(100_000);
+    expect(e[1].amount.amount).toBe(1_400_000);
+  });
+
+  it("enchaîne plusieurs échéances", () => {
+    const e = resolveSchedule(XOF(2_000_000), [
+      fixe("Réservation", 150_000),
+      pct("Deuxième versement", 25, 60),
+      pct("Troisième versement", 25, 30),
+      solde(7),
+    ]);
+
+    expect(e.map((x) => x.amount.amount)).toEqual([150_000, 500_000, 500_000, 850_000]);
+  });
+
+  it("retombe exactement sur le total, quels que soient les arrondis", () => {
+    // Le test qui compte. Le solde n'est jamais calculé : il vaut le reste,
+    // ce qui rend l'égalité vraie par construction — encore faut-il le prouver.
+    const compositions: ScheduleRow[][] = [
+      [pct("A", 30), solde()],
+      [pct("A", 33.33), pct("B", 33.33, 30), solde()],
+      [fixe("A", 99_999), pct("B", 12.5, 30), solde()],
+      [pct("A", 1), pct("B", 7.5, 90), pct("C", 0.5, 60), solde(3)],
+    ];
+
+    for (const total of [1, 7, 999, 333_333, 1_234_567, 9_999_999]) {
+      for (const rows of compositions) {
+        const e = resolveSchedule(XOF(total), rows);
+
+        expect(scheduleTotal(e, "XOF").amount, `${total} / ${rows.length} lignes`).toBe(total);
       }
     }
   });
 
-  it("ne laisse aucun solde quand l'acompte vaut la totalité", () => {
-    const e = paymentSchedule(XOF(800_000), 100);
+  it("plafonne un montant fixe supérieur au total", () => {
+    // Sans cela, un échéancier réclamerait plus cher que la commande.
+    const e = resolveSchedule(XOF(80_000), [fixe("Réservation", 250_000), solde()]);
 
-    expect(e.deposit.amount).toBe(800_000);
-    expect(e.balance.amount).toBe(0);
-    // L'interface ne doit pas proposer de régler un solde nul.
-    expect(hasBalance(e)).toBe(false);
+    expect(e).toHaveLength(1);
+    expect(e[0].amount.amount).toBe(80_000);
   });
 
-  it("n'exige rien d'avance quand le partenaire ne demande pas d'acompte", () => {
-    const e = paymentSchedule(XOF(800_000), 0);
+  it("n'écrit jamais une échéance de zéro franc", () => {
+    // Proposer de régler zéro se lirait comme un défaut, pas comme une facilité.
+    const e = resolveSchedule(XOF(500_000), [pct("Acompte", 0), solde()]);
 
-    expect(e.deposit.amount).toBe(0);
-    expect(e.balance.amount).toBe(800_000);
+    expect(e).toHaveLength(1);
+    expect(e[0].label).toBe("Solde");
   });
 
-  it("refuse un acompte hors de portée", () => {
-    expect(() => paymentSchedule(XOF(1000), -5)).toThrow(MoneyError);
-    expect(() => paymentSchedule(XOF(1000), 120)).toThrow(MoneyError);
+  it("laisse une commande réglable même sans échéancier", () => {
+    const e = resolveSchedule(XOF(500_000), []);
+
+    expect(e).toHaveLength(1);
+    expect(e[0].amount.amount).toBe(500_000);
+    expect(e[0].label).toBe("Paiement intégral");
+  });
+
+  it("rattrape le reliquat d'un échéancier sans solde", () => {
+    // 30 % + 30 % laisse 40 % que rien ne réclamerait : le reste rejoint la
+    // dernière échéance plutôt que de disparaître.
+    const e = resolveSchedule(XOF(1_000_000), [pct("A", 30), pct("B", 30, 30)]);
+
+    expect(scheduleTotal(e, "XOF").amount).toBe(1_000_000);
+    expect(e[1].amount.amount).toBe(700_000);
+  });
+
+  it("date les échéances depuis l'événement", () => {
+    const e = resolveSchedule(XOF(1_000_000), [pct("Acompte", 30), solde(7)], {
+      eventDate: "2026-12-24",
+      bookingDate: "2026-09-19",
+    });
+
+    expect(e[0].dueDate).toBe("2026-09-19");
+    expect(e[1].dueDate).toBe("2026-12-17");
+  });
+
+  it("n'invente pas de date quand l'événement n'en a pas encore", () => {
+    // Une date souple est fréquente sur un mariage : afficher une échéance
+    // calculée depuis rien tromperait le client.
+    const e = resolveSchedule(XOF(1_000_000), [pct("Acompte", 30), solde(7)], {
+      bookingDate: "2026-09-19",
+    });
+
+    expect(e[0].dueDate).toBe("2026-09-19");
+    expect(e[1].dueDate).toBeNull();
+  });
+
+  it("refuse un pourcentage hors de portée", () => {
+    expect(() => resolveSchedule(XOF(1000), [pct("A", 140), solde()])).toThrow(MoneyError);
   });
 });
 
