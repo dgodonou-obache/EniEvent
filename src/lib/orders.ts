@@ -59,6 +59,10 @@ export interface OrderView {
   commissionRate: number;
   partnerName: string | null;
   eventDate: string | null;
+  /** Demande d'origine, pour une commande née d'un devis accepté. */
+  requestId: string | null;
+  /** Annonce d'origine, pour une réservation immédiate. */
+  listingId: string | null;
   instalments: InstalmentView[];
   /** Somme déjà encaissée. */
   paidAmount: number;
@@ -114,6 +118,8 @@ function toView(
     commissionRate: Number(order.commission_rate),
     partnerName: order.organizations?.brand_name ?? order.organizations?.legal_name ?? null,
     eventDate: order.event_date,
+    requestId: order.request_id,
+    listingId: order.listing_id,
     instalments: vues,
     paidAmount,
     next,
@@ -121,7 +127,7 @@ function toView(
 }
 
 const SELECT =
-  "id, reference, status, currency, total, commission_rate, event_date, quote_id, request_id, client_id, org_id, created_at, updated_at, paid_at, organizations(brand_name, legal_name)";
+  "id, reference, status, currency, total, commission_rate, event_date, start_date, end_date, quote_id, request_id, listing_id, client_id, org_id, created_at, updated_at, paid_at, organizations(brand_name, legal_name)";
 
 async function hydrate(orders: unknown[]): Promise<OrderView[]> {
   if (orders.length === 0) return [];
@@ -167,6 +173,147 @@ export async function getOrder(orderId: string): Promise<OrderView | null> {
   const [vue] = await hydrate([data]);
   return vue ?? null;
 }
+
+/** Commandes du client connecté. La RLS fait le filtrage. */
+export async function getMyOrders(): Promise<OrderView[]> {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("orders")
+    .select(SELECT)
+    .order("created_at", { ascending: false });
+
+  return hydrate(data ?? []);
+}
+
+/** Commandes reçues par un partenaire. */
+export async function getPartnerOrders(orgId: string): Promise<OrderView[]> {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("orders")
+    .select(SELECT)
+    .eq("org_id", orgId)
+    .order("created_at", { ascending: false });
+
+  return hydrate(data ?? []);
+}
+
+export interface MoneyLine {
+  id: string;
+  reference: string;
+  amount: number;
+  commission: number;
+  partnerDue: number;
+  currency: CurrencyCode;
+  status: PaymentRow["status"];
+  createdAt: string;
+  paidAt: string | null;
+  orderReference: string | null;
+  instalmentLabel: string | null;
+}
+
+type PaymentJoined = PaymentRow & {
+  orders: { reference: string } | null;
+  order_instalments: { label: string } | null;
+};
+
+function toMoneyLine(p: PaymentJoined): MoneyLine {
+  return {
+    id: p.id,
+    reference: p.reference,
+    amount: p.amount,
+    commission: p.commission,
+    partnerDue: p.partner_due,
+    currency: (p.currency as CurrencyCode) ?? "XOF",
+    status: p.status,
+    createdAt: p.created_at,
+    paidAt: p.paid_at,
+    orderReference: p.orders?.reference ?? null,
+    instalmentLabel: p.order_instalments?.label ?? null,
+  };
+}
+
+const PAYMENT_SELECT = "*, orders(reference), order_instalments(label)";
+
+export interface Takings {
+  /** Réellement encaissé. */
+  collected: number;
+  /** Ce qui revient au partenaire sur cet encaissement. */
+  partnerDue: number;
+  /** Ce que la plateforme a retenu. */
+  commission: number;
+  /** Ouvert mais pas encore confirmé. */
+  pending: number;
+  /** Échéances restant à régler sur les commandes en cours. */
+  expected: number;
+  currency: CurrencyCode;
+}
+
+/**
+ * Agrégats d'un partenaire.
+ *
+ * **`collected` ne compte que les paiements `paid`.** Additionner les
+ * échéances annoncerait un revenu que personne n'a versé — c'est le chiffre
+ * qu'un partenaire lira en premier, et celui qu'il ne faut pas gonfler.
+ */
+export async function getPartnerTakings(orgId: string): Promise<{
+  takings: Takings;
+  lines: MoneyLine[];
+}> {
+  const supabase = await createClient();
+
+  const [{ data: payments }, orders] = await Promise.all([
+    supabase
+      .from("payments")
+      .select(PAYMENT_SELECT)
+      .order("created_at", { ascending: false })
+      .limit(200),
+    getPartnerOrders(orgId),
+  ]);
+
+  const lines = ((payments ?? []) as PaymentJoined[]).map(toMoneyLine);
+  const regles = lines.filter((l) => l.status === "paid");
+
+  // Ce qui reste dû sur les commandes en cours : les échéances non réglées,
+  // hors commandes annulées ou remboursées.
+  const expected = orders
+    .filter((o) => o.status !== "cancelled" && o.status !== "refunded")
+    .reduce((total, o) => total + (o.total - o.paidAmount), 0);
+
+  return {
+    takings: {
+      collected: regles.reduce((t, l) => t + l.amount, 0),
+      partnerDue: regles.reduce((t, l) => t + l.partnerDue, 0),
+      commission: regles.reduce((t, l) => t + l.commission, 0),
+      pending: lines.filter((l) => l.status === "pending").reduce((t, l) => t + l.amount, 0),
+      expected,
+      currency: orders[0]?.currency ?? "XOF",
+    },
+    lines,
+  };
+}
+
+/** Paiements visibles par l'appelant. La RLS décide du périmètre. */
+export async function getPayments(limit = 200): Promise<MoneyLine[]> {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("payments")
+    .select(PAYMENT_SELECT)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  return ((data ?? []) as PaymentJoined[]).map(toMoneyLine);
+}
+
+export const PAYMENT_STATUS_LABELS: Record<PaymentRow["status"], string> = {
+  pending: "En attente",
+  paid: "Encaissé",
+  failed: "Échoué",
+  cancelled: "Annulé",
+  refunded: "Remboursé",
+};
 
 /** Retrouve un paiement par sa clé, pour la page de retour. */
 export async function getPaymentByKey(
