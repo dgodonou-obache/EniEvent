@@ -60,15 +60,15 @@ export default async function PaymentReturnPage({
       fond: "bg-slate-100",
       titre: "Paiement non abouti",
       texte:
-        "Aucun montant n'a été débité. Vous pouvez réessayer depuis votre projet, " +
-        "ou choisir un autre moyen de paiement.",
+        "Aucun montant n'a été débité. Votre réservation vous attend : " +
+        "réessayez depuis vos réservations, ou avec un autre moyen de paiement.",
     },
     cancelled: {
       Icone: XCircle,
       couleur: "text-slate-500",
       fond: "bg-slate-100",
       titre: "Paiement annulé",
-      texte: "Aucun montant n'a été débité. Votre commande vous attend toujours.",
+      texte: "Aucun montant n'a été débité. Votre réservation vous attend toujours.",
     },
     refunded: {
       Icone: XCircle,
@@ -111,10 +111,10 @@ export default async function PaymentReturnPage({
 
         <div className="mt-7 flex flex-col gap-2 sm:flex-row sm:justify-center">
           <Link
-            href="/projets"
+            href="/compte/reservations"
             className="rounded-xl bg-orange-500 px-5 py-3 text-sm font-bold text-white transition-all duration-200 hover:bg-orange-600 active:scale-[0.98]"
           >
-            Revenir à mes projets
+            Revenir à mes réservations
           </Link>
           <Link
             href="/compte"
