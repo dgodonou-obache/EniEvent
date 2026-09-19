@@ -925,13 +925,16 @@ export type Database = {
           commission_rate: number
           created_at: string
           currency: string
+          end_date: string | null
           event_date: string | null
           id: string
+          listing_id: string | null
           org_id: string
           paid_at: string | null
-          quote_id: string
+          quote_id: string | null
           reference: string
-          request_id: string
+          request_id: string | null
+          start_date: string | null
           status: Database["public"]["Enums"]["order_status"]
           total: number
           updated_at: string
@@ -941,13 +944,16 @@ export type Database = {
           commission_rate: number
           created_at?: string
           currency?: string
+          end_date?: string | null
           event_date?: string | null
           id?: string
+          listing_id?: string | null
           org_id: string
           paid_at?: string | null
-          quote_id: string
+          quote_id?: string | null
           reference?: string
-          request_id: string
+          request_id?: string | null
+          start_date?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           total: number
           updated_at?: string
@@ -957,13 +963,16 @@ export type Database = {
           commission_rate?: number
           created_at?: string
           currency?: string
+          end_date?: string | null
           event_date?: string | null
           id?: string
+          listing_id?: string | null
           org_id?: string
           paid_at?: string | null
-          quote_id?: string
+          quote_id?: string | null
           reference?: string
-          request_id?: string
+          request_id?: string | null
+          start_date?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           total?: number
           updated_at?: string
@@ -974,6 +983,27 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listing_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings_bookable_now"
             referencedColumns: ["id"]
           },
           {
@@ -2057,6 +2087,34 @@ export type Database = {
         Args: { adresse?: string; cle: string; ref: string }
         Returns: undefined
       }
+      book_listing: {
+        Args: { annonce: string; jours: string[] }
+        Returns: {
+          client_id: string
+          commission_rate: number
+          created_at: string
+          currency: string
+          end_date: string | null
+          event_date: string | null
+          id: string
+          listing_id: string | null
+          org_id: string
+          paid_at: string | null
+          quote_id: string | null
+          reference: string
+          request_id: string | null
+          start_date: string | null
+          status: Database["public"]["Enums"]["order_status"]
+          total: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       claim_notifications: {
         Args: { batch?: number }
         Returns: {
@@ -2093,6 +2151,7 @@ export type Database = {
         Returns: undefined
       }
       next_reference: { Args: { prefix: string }; Returns: string }
+      release_stale_orders: { Args: { delai?: string }; Returns: number }
       request_publication_approval: {
         Args: { target: string }
         Returns: string

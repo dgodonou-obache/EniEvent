@@ -46,6 +46,15 @@ export async function GET(request: Request) {
   const supabase = createServiceRoleClient();
   const maintenant = Date.now();
 
+  // Les dates d'une réservation immédiate sont retenues dès la commande, pour
+  // que deux clients ne se disputent pas le même samedi pendant la saisie. Sans
+  // cette libération, le premier panier abandonné condamnerait la date.
+  const { data: liberees, error: erreurLiberation } = await supabase.rpc("release_stale_orders");
+
+  if (erreurLiberation) {
+    console.error("Libération des dates impossible :", erreurLiberation.message);
+  }
+
   const { data: enAttente, error } = await supabase
     .from("payments")
     .select("idempotency_key, provider_ref, amount, created_at")
@@ -61,7 +70,13 @@ export async function GET(request: Request) {
   }
 
   const provider = paymentProvider();
-  const rapport = { examines: enAttente?.length ?? 0, encaisses: 0, echoues: 0, inchanges: 0 };
+  const rapport = {
+    datesLiberees: liberees ?? 0,
+    examines: enAttente?.length ?? 0,
+    encaisses: 0,
+    echoues: 0,
+    inchanges: 0,
+  };
 
   for (const paiement of enAttente ?? []) {
     const lecture = await provider.readTransaction(paiement.provider_ref!);

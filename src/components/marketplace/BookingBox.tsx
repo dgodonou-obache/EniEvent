@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { CalendarDays, FileText, Info, Zap } from "lucide-react";
+import { CalendarDays, FileText, Info, Loader2, Zap } from "lucide-react";
 
+import { bookAndPay, type BookingState } from "@/app/(marketplace)/reserver/actions";
 import { CustomDatePicker } from "@/components/shared/CustomDatePicker";
 import { Button } from "@/components/ui/button";
 import { toKey } from "@/lib/calendar";
@@ -12,6 +13,7 @@ import { quote, type AvailabilityRow, type DayRule } from "@/lib/pricing";
 import { UNIT_CATALOGUE_LABELS, type PriceUnit } from "@/lib/units";
 
 interface BookingBoxProps {
+  listingId: string;
   slug: string;
   title: string;
   bookingMode: string | null;
@@ -32,6 +34,7 @@ interface BookingBoxProps {
  * montrés dès ici — les découvrir au paiement serait une mauvaise surprise.
  */
 export function BookingBox({
+  listingId,
   slug,
   bookingMode,
   currency,
@@ -41,6 +44,13 @@ export function BookingBox({
   priceUnit,
 }: BookingBoxProps) {
   const [dates, setDates] = React.useState<Date[]>([]);
+  const [booking, reserver, pending] = React.useActionState<BookingState, FormData>(bookAndPay, {});
+
+  // Le prestataire présente sa propre page de paiement : on y envoie le client
+  // dès que la réservation est prise. Dans un effet, jamais pendant le rendu.
+  React.useEffect(() => {
+    if (booking.ok && booking.url) window.location.assign(booking.url);
+  }, [booking.ok, booking.url]);
 
   const openDates = React.useMemo(
     () => availabilities.filter((a) => a.status === "open").map((a) => a.date),
@@ -145,10 +155,39 @@ export function BookingBox({
 
       <div className="mt-5 space-y-2">
         {canBookInstantly ? (
-          <Button className="w-full" disabled={isDatedOffer && dates.length === 0}>
-            <Zap className="h-4 w-4" aria-hidden />
-            {isDatedOffer && dates.length === 0 ? "Choisissez vos dates" : "Réserver"}
-          </Button>
+          <form action={reserver}>
+            <input type="hidden" name="listingId" value={listingId} />
+            <input type="hidden" name="dates" value={dates.map(toKey).sort().join(",")} />
+
+            <Button
+              type="submit"
+              className="w-full"
+              // Le prix doit être connu avant d'engager : une estimation en
+              // erreur signifie une date fermée ou sans tarif, et la base
+              // refuserait de toute façon.
+              disabled={pending || (isDatedOffer && (dates.length === 0 || !estimate.ok))}
+            >
+              {pending ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              ) : (
+                <Zap className="h-4 w-4" aria-hidden />
+              )}
+              {pending
+                ? "Ouverture du paiement…"
+                : isDatedOffer && dates.length === 0
+                  ? "Choisissez vos dates"
+                  : "Réserver"}
+            </Button>
+          </form>
+        ) : null}
+
+        {booking.message ? (
+          <p
+            role="alert"
+            className="rounded-xl bg-slate-100 px-3 py-2 text-xs leading-relaxed text-slate-700"
+          >
+            {booking.message}
+          </p>
         ) : null}
 
         {canRequestQuote ? (

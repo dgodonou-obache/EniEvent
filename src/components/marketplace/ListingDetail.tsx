@@ -212,6 +212,7 @@ export function ListingDetail({ listing, availabilities, similar }: ListingDetai
 
         <aside className="lg:sticky lg:top-24 lg:self-start">
           <BookingBox
+            listingId={listing.id}
             slug={listing.slug}
             title={listing.title}
             bookingMode={listing.booking_mode}
