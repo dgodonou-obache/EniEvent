@@ -55,3 +55,9 @@ jobs:
           # signale que le webhook n'a pas fait son travail : il faut le voir.
           echo "$reponse" | grep -q '"encaisses":0' \
             || echo "::warning::Des paiements ont été rattrapés — le webhook n'a pas abouti"
+
+          # FedaPay désactive un point de terminaison qui échoue de façon
+          # répétée, et n'en informe que par courrier. Plus rien n'arrive alors,
+          # sans qu'aucun écran ne le montre : seul ce contrôle le dit.
+          echo "$reponse" | grep -q '"webhooksDesactives":0' \
+            || echo "::error::Un webhook FedaPay est DÉSACTIVÉ — les paiements ne remontent plus"

@@ -98,5 +98,18 @@ export async function GET(request: Request) {
     else rapport.echoues += 1;
   }
 
-  return Response.json(rapport);
+  // Un webhook éteint est la panne la plus sournoise du tunnel : FedaPay le
+  // désactive après quelques échecs, n'en informe que par courrier, et plus
+  // rien n'arrive sans qu'aucun écran ne le montre. On le vérifie ici, où le
+  // résultat remonte dans le résumé de la tâche planifiée.
+  const sante = await provider.webhookHealth();
+
+  if (sante && sante.disabled.length > 0) {
+    console.error(`Webhook FedaPay DÉSACTIVÉ : ${sante.disabled.join(", ")}`);
+  }
+
+  return Response.json({
+    ...rapport,
+    webhooksDesactives: sante?.disabled.length ?? 0,
+  });
 }

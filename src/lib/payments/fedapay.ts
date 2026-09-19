@@ -214,6 +214,24 @@ function createProvider(options: Options = {}): PaymentProvider {
       }
     },
 
+    async webhookHealth() {
+      if (!config) return null;
+
+      try {
+        const lecture = await call("GET", "/webhooks");
+        if (!lecture.ok) return null;
+
+        const liste = (lecture.data["v1/webhooks"] ?? []) as { url?: string; enabled?: boolean }[];
+
+        return {
+          total: liste.length,
+          disabled: liste.filter((w) => w.enabled === false).map((w) => w.url ?? "(sans adresse)"),
+        };
+      } catch {
+        return null;
+      }
+    },
+
     async readTransaction(providerRef: string): Promise<ReadResult> {
       if (!config) {
         return { ok: false, reason: "non-configure", message: "FEDAPAY_SECRET_KEY manquante" };

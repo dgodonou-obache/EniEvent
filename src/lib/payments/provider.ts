@@ -77,4 +77,14 @@ export interface PaymentProvider {
 
   /** Relit l'état chez le prestataire. Seule source de vérité. */
   readTransaction(providerRef: string): Promise<ReadResult>;
+
+  /**
+   * Les points de terminaison déclarés sont-ils encore actifs ?
+   *
+   * FedaPay **désactive** un webhook qui échoue de façon répétée, et ne nous en
+   * informe que par courrier. C'est arrivé : quelques minutes d'indisponibilité
+   * ont éteint le webhook, et plus rien n'arrivait sans qu'aucun écran ne le
+   * montre. La tâche planifiée pose donc la question à chaque passage.
+   */
+  webhookHealth(): Promise<{ total: number; disabled: string[] } | null>;
 }

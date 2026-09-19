@@ -1,5 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+import { after } from "next/server";
+
 import { paymentProvider } from "@/lib/payments/fedapay";
 import { createServiceRoleClient } from "@/utils/supabase/server";
 
@@ -7,16 +9,24 @@ import { createServiceRoleClient } from "@/utils/supabase/server";
  * Webhook FedaPay.
  *
  * **Le corps reçu n'est qu'un signal.** Il annonce qu'une transaction a bougé ;
- * il ne prouve rien. À réception, on **relit la transaction chez FedaPay** avec
- * notre clé secrète, et c'est cette lecture qui décide. Rien n'est encaissé sur
- * la foi d'une requête entrante.
+ * il ne prouve rien. La transaction est **relue chez FedaPay** avec notre clé
+ * secrète, et c'est cette lecture qui décide. Rien n'est encaissé sur la foi
+ * d'une requête entrante — FedaPay n'exposant pas le secret de signature par
+ * son API, le corps n'est pas authentifié tant que `FEDAPAY_WEBHOOK_SECRET`
+ * n'est pas renseigné.
  *
- * Ce n'est pas une précaution de façade : FedaPay **n'expose pas** le secret de
- * signature par son API — la création d'un webhook rend `id`, `url`, `enabled`,
- * jamais le secret. Tant que `FEDAPAY_WEBHOOK_SECRET` n'est pas renseigné, le
- * corps est donc strictement non authentifié. La relecture rend cette absence
- * sans conséquence ; la signature, quand elle sera là, n'ajoutera qu'une
- * couche — elle évitera le travail inutile, pas une fraude.
+ * **On accuse réception avant de vérifier**, et non l'inverse. La relecture
+ * coûte un aller-retour réseau : en la plaçant avant la réponse, une exécution
+ * à froid mettait 2,3 secondes, et le moindre incident chez nous — une clé
+ * absente, une API lente — se traduisait par un code d'erreur. FedaPay
+ * désactive un point de terminaison qui échoue de façon répétée, et l'a fait :
+ * le webhook s'est éteint sans que rien ne le signale de notre côté. C'est la
+ * panne la plus sournoise du tunnel, puisqu'elle est silencieuse.
+ *
+ * Le travail part donc dans `after()` : la réponse est rendue en quelques
+ * dizaines de millisecondes, et l'échec éventuel du traitement est rattrapé par
+ * `/api/cron/paiements`, qui relit les paiements restés en attente. Un webhook
+ * qu'on ne peut plus décevoir vaut mieux qu'un webhook qu'on croit fiable.
  *
  * C'est l'un des rares endroits où `SUPABASE_SECRET_KEY` est admise
  * (`CLAUDE.md` §3) : un webhook n'a pas d'utilisateur.
@@ -75,50 +85,25 @@ export function extractTransactionId(payload: unknown): string | null {
   return id === undefined || id === null ? null : String(id);
 }
 
-export async function POST(request: Request) {
-  const raw = await request.text();
-
-  const secret = process.env.FEDAPAY_WEBHOOK_SECRET;
-  if (secret) {
-    const motif = verifySignature(raw, request.headers.get("x-fedapay-signature"), secret);
-    if (motif) {
-      console.error("Webhook FedaPay rejeté :", motif);
-      return Response.json({ error: motif }, { status: 401 });
-    }
-  }
-
-  let payload: unknown = null;
-  try {
-    payload = JSON.parse(raw);
-  } catch {
-    return Response.json({ error: "corps illisible" }, { status: 400 });
-  }
-
-  const providerRef = extractTransactionId(payload);
-  if (!providerRef) {
-    return Response.json({ error: "transaction non identifiée" }, { status: 400 });
-  }
-
-  // La relecture, et elle seule, fait foi.
+/**
+ * Relecture puis dénouement. Exécuté **après** la réponse : tout échec ici est
+ * journalisé et rattrapé par la tâche planifiée, jamais renvoyé à FedaPay.
+ */
+async function verifierEtDenouer(providerRef: string): Promise<void> {
   const lecture = await paymentProvider().readTransaction(providerRef);
 
   if (!lecture.ok) {
-    // 500 plutôt que 200 : FedaPay réessaiera, ce qu'on veut si sa propre API
-    // était momentanément indisponible.
     console.error(`Relecture de ${providerRef} impossible :`, lecture.message);
-    return Response.json({ error: lecture.message }, { status: 502 });
+    return;
   }
 
   const tx = lecture.transaction;
 
-  // ⚠️ Un état non terminal ne se dénoue pas. Un webhook peut arriver pendant
-  // que le client est encore sur la page de l'opérateur — ou être appelé par
-  // n'importe qui, puisque le corps n'est pas authentifié. Conclure ici
-  // marquerait « échoué » un paiement en cours, et le client ne pourrait plus
-  // le terminer. On accuse réception, et la relecture suivante tranchera.
-  if (tx.state === "pending") {
-    return Response.json({ ok: true, ignore: "transaction encore en cours" });
-  }
+  // Un état non terminal ne se dénoue pas. Un webhook peut arriver pendant que
+  // le client est encore sur la page de l'opérateur — ou être appelé par
+  // n'importe qui, le corps n'étant pas authentifié. Conclure ici marquerait
+  // « échoué » un paiement en cours, que le client ne pourrait plus terminer.
+  if (tx.state === "pending") return;
 
   const supabase = createServiceRoleClient();
 
@@ -136,13 +121,11 @@ export async function POST(request: Request) {
   }
 
   if (!cle) {
-    // Rien à faire de cette transaction, mais elle n'est pas fautive : un 200
-    // évite que FedaPay ne la réessaie indéfiniment.
     console.warn(`Transaction ${providerRef} sans paiement correspondant.`);
-    return Response.json({ ignore: "paiement inconnu" });
+    return;
   }
 
-  const { data, error } = await supabase.rpc("settle_payment", {
+  const { error } = await supabase.rpc("settle_payment", {
     cle,
     ref_prestataire: tx.providerRef,
     etat_prestataire: tx.rawStatus,
@@ -153,13 +136,45 @@ export async function POST(request: Request) {
     detail: tx.state === "paid" ? undefined : `État ${tx.rawStatus}`,
   });
 
-  if (error) {
-    console.error("Dénouement impossible :", error.message);
-    return Response.json({ error: error.message }, { status: 500 });
+  if (error) console.error("Dénouement impossible :", error.message);
+}
+
+export async function POST(request: Request) {
+  const raw = await request.text();
+
+  const secret = process.env.FEDAPAY_WEBHOOK_SECRET;
+  if (secret) {
+    const motif = verifySignature(raw, request.headers.get("x-fedapay-signature"), secret);
+    if (motif) {
+      // Le seul refus légitime : une requête dont on sait qu'elle ne vient pas
+      // de FedaPay. La rejouer n'y changerait rien, d'où le 401.
+      console.error("Webhook FedaPay rejeté :", motif);
+      return Response.json({ error: motif }, { status: 401 });
+    }
   }
 
-  const ligne = Array.isArray(data) ? data[0] : data;
-  return Response.json({ ok: true, payment: ligne?.reference, status: ligne?.status });
+  let payload: unknown = null;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    console.error("Webhook FedaPay : corps illisible");
+    // 200 malgré tout : un corps que nous ne savons pas lire ne deviendra pas
+    // lisible à la tentative suivante, et un échec répété éteint le webhook.
+    return Response.json({ ignore: "corps illisible" });
+  }
+
+  const providerRef = extractTransactionId(payload);
+
+  if (!providerRef) {
+    console.error("Webhook FedaPay : transaction non identifiée");
+    return Response.json({ ignore: "transaction non identifiée" });
+  }
+
+  // Accusé de réception immédiat ; la vérification suit hors du chemin de
+  // réponse. Voir l'en-tête du module.
+  after(() => verifierEtDenouer(providerRef));
+
+  return Response.json({ ok: true, received: providerRef });
 }
 
 /** FedaPay vérifie parfois l'existence du point de terminaison en GET. */
