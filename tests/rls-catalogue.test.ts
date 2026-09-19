@@ -195,7 +195,26 @@ describe("garde-fous métier", () => {
           [listingApproved],
         ),
       ),
-    ).rejects.toThrow(/prix plancher/i);
+    ).rejects.toThrow(/trop bas/i);
+  });
+
+  it("refuse un tarif dérisoire même sans prix plancher déclaré", async () => {
+    // Le défaut trouvé à l'usage : `min_price` est facultatif, et la protection
+    // y était conditionnée. Un tarif de 10 francs passait sans un mot.
+    const { rows } = await db.query(
+      "insert into listings (org_id, category_id, kind, title, slug, city, price_from) " +
+        "values ($1, $2, 'venue', 'Sans plancher', 'sans-plancher', 'Cotonou', 100000) returning id",
+      [orgA, catSalle],
+    );
+
+    await expect(
+      actingAs(db, ALICE, async () =>
+        db.query(
+          "insert into availabilities (listing_id, date, price) values ($1, '2026-12-24', 10)",
+          [rows[0].id],
+        ),
+      ),
+    ).rejects.toThrow(/trop bas/i);
   });
 
   it("accepte un tarif au-dessus du prix plancher", async () => {

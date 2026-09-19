@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Info,
   Loader2,
+  X,
 } from "lucide-react";
 
 import {
@@ -19,7 +20,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { format as formatMoney, money, toMajor, type CurrencyCode, type Money } from "@/lib/money";
+import {
+  abbreviate,
+  format as formatMoney,
+  money,
+  toMajor,
+  type CurrencyCode,
+} from "@/lib/money";
 import {
   buildPlanningMonth,
   clampMonth,
@@ -86,6 +93,19 @@ export function PlanningBoard({
 
   const [month, setMonth] = React.useState(() => bounds.first);
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
+
+  // Échap annule la sélection. C'est le geste attendu de quiconque veut sortir
+  // d'un mode d'édition, et il ne demande pas de viser un bouton.
+  React.useEffect(() => {
+    if (selected.size === 0) return;
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelected(new Set());
+    };
+
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selected.size]);
   const [state, formAction, pending] = React.useActionState<PlanningState, FormData>(
     applyPlanning,
     {},
@@ -256,10 +276,25 @@ export function PlanningBoard({
           <input type="hidden" name="listingId" value={listingId} />
           <input type="hidden" name="dates" value={[...selected].sort().join(",")} />
 
-          <p className="text-sm font-bold text-slate-900">
-            {selected.size} date{selected.size > 1 ? "s" : ""} sélectionnée
-            {selected.size > 1 ? "s" : ""}
-          </p>
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-sm font-bold text-slate-900">
+              {selected.size} date{selected.size > 1 ? "s" : ""} sélectionnée
+              {selected.size > 1 ? "s" : ""}
+            </p>
+
+            {/* La sortie doit être **dans** ce panneau. « Tout désélectionner »
+                existe en haut de page, parmi les raccourcis — mais ce panneau
+                colle en bas de l'écran, et l'échappatoire se retrouvait donc
+                hors de vue au moment même où l'on saisit un tarif. */}
+            <button
+              type="button"
+              onClick={() => setSelected(new Set())}
+              className="flex shrink-0 items-center gap-1 rounded-xl px-2 py-1 text-xs font-semibold text-slate-500 transition-all duration-200 hover:bg-slate-100 hover:text-slate-900 active:scale-[0.97]"
+            >
+              <X className="h-3.5 w-3.5" aria-hidden />
+              Annuler
+            </button>
+          </div>
 
           <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="sm:w-56">
@@ -371,7 +406,7 @@ function DayCell({
     >
       <span className="text-sm font-bold">{day.date.getDate()}</span>
       {day.price && !day.isPast ? (
-        <span className="text-[10px] font-medium tabular-nums">{shortAmount(day.price)}</span>
+        <span className="text-[10px] font-medium tabular-nums">{abbreviate(day.price)}</span>
       ) : null}
     </button>
   );
@@ -445,11 +480,6 @@ function Note({ tone, children }: { tone: "info" | "warning"; children: React.Re
   );
 }
 
-/** « 150k » tient dans une case de calendrier ; « 150 000 FCFA » non. */
-function shortAmount(amount: Money): string {
-  const major = toMajor(amount);
-  return major >= 1000 ? `${Math.round(major / 1000)}k` : String(major);
-}
 
 function parseKey(key: string): Date {
   const [year, month, day] = key.split("-").map(Number);

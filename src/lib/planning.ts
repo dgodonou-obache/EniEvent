@@ -191,10 +191,67 @@ export interface BulkEditInput {
 export interface BulkEditGuard {
   /** Lignes déjà en base pour ces dates, pour repérer les réservations. */
   current: readonly AvailabilityRow[];
-  /** Prix plancher de l'annonce, en unité mineure. */
+  /** Prix plancher saisi par le partenaire, en unité mineure. Souvent absent. */
   minPrice?: number | null;
+  /** Tarif de référence de l'annonce : tarif de base, ou prix affiché. */
+  referencePrice?: number | null;
   currency?: CurrencyCode;
   today?: Date;
+}
+
+/**
+ * Bande de sécurité d'un tarif journalier.
+ *
+ * Le prix plancher `min_price` existait déjà — mais il est **facultatif**, et
+ * six annonces sur quinze le laissaient vide. La protection était donc
+ * conditionnée à un champ que personne ne remplit : elle n'a jamais empêché
+ * quoi que ce soit. Un tarif de 10 francs est passé sans un mot.
+ *
+ * La bande se déduit donc du tarif de l'annonce elle-même, sans rien demander
+ * au partenaire :
+ *
+ * - **plancher absolu** : aucune date ne se vend en dessous, même sans
+ *   référence connue ;
+ * - **plancher relatif** : un cinquième du tarif de référence, ce qui attrape
+ *   la faute de frappe classique — 15 000 saisi pour 150 000 ;
+ * - **plafond** : cinq fois le tarif de référence, qui attrape le zéro de trop.
+ *
+ * Un `min_price` explicitement saisi **prime** : le partenaire qui l'a réglé a
+ * pris une décision, et elle vaut mieux qu'une déduction.
+ */
+export const ABSOLUTE_FLOOR = 1_000;
+const RELATIVE_FLOOR = 0.2;
+const RELATIVE_CEILING = 5;
+
+export interface PriceBand {
+  floor: number;
+  ceiling: number | null;
+  /** Vrai quand le plancher vient d'un choix du partenaire, pas d'une déduction. */
+  explicitFloor: boolean;
+}
+
+export function priceBand(guard: Pick<BulkEditGuard, "minPrice" | "referencePrice">): PriceBand {
+  const reference = guard.referencePrice ?? null;
+
+  if (guard.minPrice != null) {
+    return {
+      floor: guard.minPrice,
+      ceiling: reference ? Math.round(reference * RELATIVE_CEILING) : null,
+      explicitFloor: true,
+    };
+  }
+
+  return {
+    // ⚠️ Le plancher absolu ne s'applique **que** faute de référence. Le
+    // combiner avec le plancher relatif condamnerait les annonces
+    // légitimement bon marché : « Décoration dot » se vend 344 FCFA l'unité,
+    // et un plancher de 1 000 l'aurait rendue impossible à planifier. La bande
+    // relative suffit dès qu'un tarif de référence existe — elle s'adapte au
+    // prix de l'annonce au lieu de lui imposer le nôtre.
+    floor: reference ? Math.round(reference * RELATIVE_FLOOR) : ABSOLUTE_FLOOR,
+    ceiling: reference ? Math.round(reference * RELATIVE_CEILING) : null,
+    explicitFloor: false,
+  };
 }
 
 export type BulkEditCheck = { ok: true; dates: string[] } | { ok: false; message: string };
@@ -255,14 +312,29 @@ export function validateBulkEdit(input: BulkEditInput, guard: BulkEditGuard): Bu
       return { ok: false, message: "Le tarif doit être un nombre entier de francs." };
     }
 
-    // Prix plancher, repris de la v1 : il protège le prestataire de sa propre
-    // faute de frappe — 15 000 saisi pour 150 000.
-    if (guard.minPrice != null && price < guard.minPrice) {
+    // Bande de sécurité : elle protège le prestataire de sa propre faute de
+    // frappe — 15 000 saisi pour 150 000, ou 10 pour 100 000.
+    const band = priceBand(guard);
+
+    if (price < band.floor) {
+      return {
+        ok: false,
+        message: band.explicitFloor
+          ? `Ce tarif est inférieur à votre prix plancher de ${formatMoney(money(band.floor, currency))}. ` +
+            `Abaissez le prix plancher dans l'annonce si vous voulez vraiment descendre en dessous.`
+          : `${formatMoney(money(price, currency))} paraît très bas pour cette annonce. ` +
+            `Le minimum accepté est ${formatMoney(money(band.floor, currency))}. ` +
+            `Si ce tarif est voulu, réglez un prix plancher dans votre annonce.`,
+      };
+    }
+
+    if (band.ceiling != null && price > band.ceiling) {
       return {
         ok: false,
         message:
-          `Ce tarif est inférieur à votre prix plancher de ${formatMoney(money(guard.minPrice, currency))}. ` +
-          `Abaissez le prix plancher dans l'annonce si vous voulez vraiment descendre en dessous.`,
+          `${formatMoney(money(price, currency))} paraît très élevé pour cette annonce. ` +
+          `Le maximum accepté est ${formatMoney(money(band.ceiling, currency))} — ` +
+          `vérifiez qu'il n'y a pas un zéro de trop.`,
       };
     }
   }

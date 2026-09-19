@@ -8,7 +8,7 @@ import { bookAndPay, type BookingState } from "@/app/(marketplace)/reserver/acti
 import { CustomDatePicker } from "@/components/shared/CustomDatePicker";
 import { Button } from "@/components/ui/button";
 import { toKey } from "@/lib/calendar";
-import { format, money, type CurrencyCode } from "@/lib/money";
+import { abbreviate, format, money, type CurrencyCode } from "@/lib/money";
 import { quote, type AvailabilityRow, type DayRule } from "@/lib/pricing";
 import { UNIT_CATALOGUE_LABELS, type PriceUnit } from "@/lib/units";
 
@@ -61,11 +61,13 @@ export function BookingBox({
     const map: Record<string, string> = {};
     for (const row of availabilities) {
       if (row.status !== "open" || row.price == null) continue;
-      // Abrégé en milliers : « 150k » tient dans une case de calendrier.
-      map[row.date] = `${Math.round(row.price / 1000)}k`;
+      // `abbreviate` plutôt qu'une division maison : `Math.round(10 / 1000)`
+      // valait `0`, et un tarif de 10 francs s'affichait « 0k » dans le
+      // calendrier — un prix qui ne veut rien dire, sur une date réservable.
+      map[row.date] = abbreviate(money(row.price, currency));
     }
     return map;
-  }, [availabilities]);
+  }, [availabilities, currency]);
 
   const estimate = React.useMemo(
     () => quote(dates.map(toKey), { availabilities, dayRule, currency }),

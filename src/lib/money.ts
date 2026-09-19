@@ -225,6 +225,32 @@ export function format(
 }
 
 /**
+ * Forme abrégée pour une case de calendrier : « 150k », « 1,2 M ».
+ *
+ * ⚠️ **Ne jamais abréger vers zéro.** `Math.round(10 / 1000)` vaut `0`, et un
+ * tarif de 10 francs s'affichait « 0k » dans le calendrier client — un prix qui
+ * ne veut rien dire, sur une date pourtant réservable. En dessous du millier,
+ * le montant s'écrit donc en entier : « 10 » est court, et vrai.
+ */
+export function abbreviate(m: Money): string {
+  const major = toMajor(m);
+  const abs = Math.abs(major);
+
+  if (abs >= 1_000_000) {
+    const millions = major / 1_000_000;
+    // Une décimale en dessous de dix millions : « 1,2 M » reste lisible,
+    // « 12,4 M » déborde d'une case.
+    return `${new Intl.NumberFormat("fr-FR", {
+      maximumFractionDigits: abs < 10_000_000 ? 1 : 0,
+    }).format(millions)} M`;
+  }
+
+  if (abs >= 1000) return `${Math.round(major / 1000)}k`;
+
+  return String(major);
+}
+
+/**
  * Arrondi au demi supérieur, symétrique autour de zéro.
  * `Math.round` arrondit vers +∞ (`Math.round(-0.5) === -0`), ce qui ferait
  * diverger un remboursement de son encaissement d'une unité.

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  abbreviate,
   MoneyError,
   add,
   allocate,
@@ -133,5 +134,31 @@ describe("formatage", () => {
 
   it("peut omettre la devise", () => {
     expect(format(zero(), { withCurrency: false })).toBe("0");
+  });
+});
+
+describe("abréviation pour un calendrier", () => {
+  it("n'abrège jamais vers zéro", () => {
+    // Le défaut vu à l'usage : `Math.round(10 / 1000)` vaut 0, et un tarif de
+    // 10 francs s'affichait « 0k » dans le calendrier client — un prix qui ne
+    // veut rien dire, sur une date pourtant réservable.
+    expect(abbreviate(money(10, "XOF"))).toBe("10");
+    expect(abbreviate(money(1, "XOF"))).toBe("1");
+    expect(abbreviate(money(999, "XOF"))).toBe("999");
+  });
+
+  it("abrège en milliers au-delà du millier", () => {
+    expect(abbreviate(money(1_000, "XOF"))).toBe("1k");
+    expect(abbreviate(money(150_000, "XOF"))).toBe("150k");
+    expect(abbreviate(money(999_000, "XOF"))).toBe("999k");
+  });
+
+  it("passe aux millions sans déborder d'une case", () => {
+    expect(abbreviate(money(1_200_000, "XOF"))).toMatch(/^1,2\s?M$/);
+    expect(abbreviate(money(12_400_000, "XOF"))).toMatch(/^12\s?M$/);
+  });
+
+  it("reste lisible à zéro", () => {
+    expect(abbreviate(money(0, "XOF"))).toBe("0");
   });
 });

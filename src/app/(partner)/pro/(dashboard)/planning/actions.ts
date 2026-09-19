@@ -57,7 +57,10 @@ export async function applyPlanning(
 
   const { data: listing } = await supabase
     .from("listings")
-    .select("id, min_price")
+    // `price_from` sert de tarif de référence quand aucun prix plancher n'est
+    // saisi : la bande de sécurité se déduit alors de l'annonce elle-même,
+    // sans rien demander au partenaire.
+    .select("id, min_price, price_from")
     .eq("id", listingId)
     .eq("org_id", orgId)
     .maybeSingle();
@@ -86,7 +89,7 @@ export async function applyPlanning(
 
   const check = validateBulkEdit(
     { action, dates, price },
-    { current: existing, minPrice: listing.min_price },
+    { current: existing, minPrice: listing.min_price, referencePrice: listing.price_from },
   );
 
   if (!check.ok) return { message: check.message };

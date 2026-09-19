@@ -242,11 +242,59 @@ describe("contrôle d'une modification en masse", () => {
     expect(check.ok).toBe(true);
   });
 
-  it("ne bloque rien quand aucun prix plancher n'est fixé", () => {
+  it("protège encore quand aucun prix plancher n'est fixé", () => {
+    // Le défaut trouvé à l'usage : `min_price` est facultatif, et six annonces
+    // sur quinze le laissaient vide. La protection était conditionnée à une
+    // saisie que personne ne fait — un tarif de 10 francs est passé sans un mot
+    // et s'est retrouvé dans le calendrier d'un client.
+    const sansPlancher = { current: rows, minPrice: null, referencePrice: 100_000, today: TODAY };
+
+    expect(
+      validateBulkEdit({ action: "open", dates: ["2026-09-19"], price: 10 }, sansPlancher).ok,
+    ).toBe(false);
+
+    // La faute de frappe classique : 15 000 saisi pour 150 000.
+    expect(
+      validateBulkEdit({ action: "open", dates: ["2026-09-19"], price: 15_000 }, sansPlancher).ok,
+    ).toBe(false);
+
+    // Un tarif plausible passe : la bande protège, elle n'enferme pas.
+    expect(
+      validateBulkEdit({ action: "open", dates: ["2026-09-19"], price: 60_000 }, sansPlancher).ok,
+    ).toBe(true);
+  });
+
+  it("refuse le zéro de trop", () => {
     const check = validateBulkEdit(
-      { action: "open", dates: ["2026-09-19"], price: 1_000 },
-      { current: rows, minPrice: null, today: TODAY },
+      { action: "open", dates: ["2026-09-19"], price: 1_000_000 },
+      { current: rows, minPrice: null, referencePrice: 100_000, today: TODAY },
     );
+
+    expect(check.ok).toBe(false);
+    if (check.ok) return;
+    expect(check.message).toContain("zéro de trop");
+  });
+
+  it("garde un plancher absolu même sans tarif de référence", () => {
+    // Une annonce sans prix affiché ne doit pas pour autant pouvoir vendre une
+    // journée un franc.
+    const check = validateBulkEdit(
+      { action: "open", dates: ["2026-09-19"], price: 1 },
+      { current: rows, minPrice: null, referencePrice: null, today: TODAY },
+    );
+
+    expect(check.ok).toBe(false);
+  });
+
+  it("laisse le prix plancher du partenaire primer sur la déduction", () => {
+    // Un partenaire qui a réglé son plancher a pris une décision : elle vaut
+    // mieux qu'une bande déduite. À 5 000 de plancher déclaré, 6 000 passe,
+    // alors que la déduction sur 100 000 l'aurait refusé.
+    const check = validateBulkEdit(
+      { action: "open", dates: ["2026-09-19"], price: 6_000 },
+      { current: rows, minPrice: 5_000, referencePrice: 100_000, today: TODAY },
+    );
+
     expect(check.ok).toBe(true);
   });
 
