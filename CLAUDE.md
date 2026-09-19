@@ -21,7 +21,7 @@ Cette V2 remplace l'app v1 située dans `..\ÉniEvent` (lecture seule, source de
 
 Next.js 16 (App Router, RSC, Server Actions) · React 19 · TypeScript strict ·
 Tailwind 3.4 · Supabase (Postgres, Auth, Storage, RLS) · Zod + react-hook-form ·
-**Premux** (SMS, branché) · CinetPay (Mobile Money, carte — à venir) ·
+**Premux** (SMS, branché) · **FedaPay** (Mobile Money, carte — bac à sable) ·
 **Resend** (e-mail, branché) · Vitest.
 
 ## Production
@@ -51,6 +51,7 @@ Mise en ligne, variables à poser, lecture des pannes : `docs/DEPLOIEMENT.md`.
 | `npm run smoke:sms` | **Envoie un vrai SMS** via Premux — consomme un crédit, exige `SMS_TEST_TO` |
 | `npm run smoke:email` | **Envoie un vrai e-mail** via Resend — exige `EMAIL_TEST_TO` |
 | `npm run mails:auth` | Publie les gabarits d'authentification chez Supabase — simulation sans `-- --appliquer` |
+| `npm run smoke:paiement` | **Ouvre un vrai paiement** chez FedaPay — refuse de tourner sur une clé de production |
 
 Les autres `smoke:*` (`offre`, `planning`, `devis`, `entreprise`, `photos`) jouent un
 parcours métier contre le vrai Supabase.
@@ -129,6 +130,15 @@ dans `audit_logs`. Les transitions autorisées vivent dans `src/lib/states.ts`.
   composant, jamais dans une Server Action déclenchée par un utilisateur.
 - Les webhooks de paiement sont **idempotents** (contrainte unique sur
   `payments.idempotency_key`) et revérifient le montant côté serveur.
+- ⚠️ **Un webhook est un signal, jamais une preuve.** FedaPay n'expose pas le secret de
+  signature par son API : le corps reçu n'est donc pas authentifié tant que
+  `FEDAPAY_WEBHOOK_SECRET` n'est pas renseigné. La règle est de toute façon la bonne —
+  à réception, on **relit la transaction** chez le prestataire avec notre clé secrète, et
+  c'est cette lecture qui fait foi. `settle_payment` refuse d'encaisser si le montant
+  constaté diffère de celui ouvert.
+- **Le client ne fournit jamais un montant.** `start_payment` le déduit de la commande,
+  elle-même figée à l'acceptation du devis. Revérifier un montant côté serveur n'a aucun
+  sens si l'on a laissé le navigateur le choisir au départ.
 
 ### 4. Isolation des espaces
 Les cinq espaces sont étanches. Un partenaire déconnecté est renvoyé sur

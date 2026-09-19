@@ -881,6 +881,92 @@ export type Database = {
           },
         ]
       }
+      orders: {
+        Row: {
+          client_id: string
+          commission_rate: number
+          created_at: string
+          currency: string
+          deposit_amount: number
+          deposit_percent: number
+          event_date: string | null
+          id: string
+          org_id: string
+          paid_at: string | null
+          quote_id: string
+          reference: string
+          request_id: string
+          status: Database["public"]["Enums"]["order_status"]
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          commission_rate: number
+          created_at?: string
+          currency?: string
+          deposit_amount: number
+          deposit_percent: number
+          event_date?: string | null
+          id?: string
+          org_id: string
+          paid_at?: string | null
+          quote_id: string
+          reference?: string
+          request_id: string
+          status?: Database["public"]["Enums"]["order_status"]
+          total: number
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          commission_rate?: number
+          created_at?: string
+          currency?: string
+          deposit_amount?: number
+          deposit_percent?: number
+          event_date?: string | null
+          id?: string
+          org_id?: string
+          paid_at?: string | null
+          quote_id?: string
+          reference?: string
+          request_id?: string
+          status?: Database["public"]["Enums"]["order_status"]
+          total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: true
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "quote_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_members: {
         Row: {
           created_at: string
@@ -1016,6 +1102,7 @@ export type Database = {
           bio: string | null
           commission_rate_override: number | null
           created_at: string
+          deposit_percent: number
           is_verified: boolean
           org_id: string
           rating_avg: number | null
@@ -1032,6 +1119,7 @@ export type Database = {
           bio?: string | null
           commission_rate_override?: number | null
           created_at?: string
+          deposit_percent?: number
           is_verified?: boolean
           org_id: string
           rating_avg?: number | null
@@ -1048,6 +1136,7 @@ export type Database = {
           bio?: string | null
           commission_rate_override?: number | null
           created_at?: string
+          deposit_percent?: number
           is_verified?: boolean
           org_id?: string
           rating_avg?: number | null
@@ -1065,6 +1154,77 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: true
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount: number
+          commission: number
+          created_at: string
+          currency: string
+          id: string
+          idempotency_key: string
+          last_error: string | null
+          order_id: string
+          paid_at: string | null
+          partner_due: number
+          payload: Json
+          provider: string
+          provider_ref: string | null
+          provider_status: string | null
+          purpose: Database["public"]["Enums"]["payment_purpose"]
+          reference: string
+          status: Database["public"]["Enums"]["payment_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          commission: number
+          created_at?: string
+          currency?: string
+          id?: string
+          idempotency_key: string
+          last_error?: string | null
+          order_id: string
+          paid_at?: string | null
+          partner_due: number
+          payload?: Json
+          provider?: string
+          provider_ref?: string | null
+          provider_status?: string | null
+          purpose: Database["public"]["Enums"]["payment_purpose"]
+          reference?: string
+          status?: Database["public"]["Enums"]["payment_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          commission?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          idempotency_key?: string
+          last_error?: string | null
+          order_id?: string
+          paid_at?: string | null
+          partner_due?: number
+          payload?: Json
+          provider?: string
+          provider_ref?: string | null
+          provider_status?: string | null
+          purpose?: Database["public"]["Enums"]["payment_purpose"]
+          reference?: string
+          status?: Database["public"]["Enums"]["payment_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
@@ -1848,8 +2008,77 @@ export type Database = {
         Returns: string
       }
       request_quote_approval: { Args: { target: string }; Returns: string }
+      settle_payment: {
+        Args: {
+          cle: string
+          detail?: string
+          encaisse: boolean
+          etat_prestataire: string
+          montant_constate?: number
+          ref_prestataire: string
+        }
+        Returns: {
+          amount: number
+          commission: number
+          created_at: string
+          currency: string
+          id: string
+          idempotency_key: string
+          last_error: string | null
+          order_id: string
+          paid_at: string | null
+          partner_due: number
+          payload: Json
+          provider: string
+          provider_ref: string | null
+          provider_status: string | null
+          purpose: Database["public"]["Enums"]["payment_purpose"]
+          reference: string
+          status: Database["public"]["Enums"]["payment_status"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      start_payment: {
+        Args: {
+          cle: string
+          nature: Database["public"]["Enums"]["payment_purpose"]
+          target: string
+        }
+        Returns: {
+          amount: number
+          commission: number
+          created_at: string
+          currency: string
+          id: string
+          idempotency_key: string
+          last_error: string | null
+          order_id: string
+          paid_at: string | null
+          partner_due: number
+          payload: Json
+          provider: string
+          provider_ref: string | null
+          provider_status: string | null
+          purpose: Database["public"]["Enums"]["payment_purpose"]
+          reference: string
+          status: Database["public"]["Enums"]["payment_status"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       account_type: "particulier" | "entreprise" | "partenaire" | "admin"
@@ -1881,6 +2110,12 @@ export type Database = {
       member_status: "invited" | "active" | "revoked"
       notification_channel: "sms" | "email"
       notification_status: "pending" | "sending" | "sent" | "failed"
+      order_status:
+        | "pending_payment"
+        | "deposit_paid"
+        | "paid"
+        | "cancelled"
+        | "refunded"
       org_role:
         | "owner"
         | "admin"
@@ -1893,6 +2128,8 @@ export type Database = {
         | "accountant"
       org_status: "pending" | "active" | "suspended"
       org_type: "company" | "partner"
+      payment_purpose: "deposit" | "balance" | "full"
+      payment_status: "pending" | "paid" | "failed" | "cancelled" | "refunded"
       price_unit:
         | "day"
         | "half_day"
@@ -2077,6 +2314,13 @@ export const Constants = {
       member_status: ["invited", "active", "revoked"],
       notification_channel: ["sms", "email"],
       notification_status: ["pending", "sending", "sent", "failed"],
+      order_status: [
+        "pending_payment",
+        "deposit_paid",
+        "paid",
+        "cancelled",
+        "refunded",
+      ],
       org_role: [
         "owner",
         "admin",
@@ -2090,6 +2334,8 @@ export const Constants = {
       ],
       org_status: ["pending", "active", "suspended"],
       org_type: ["company", "partner"],
+      payment_purpose: ["deposit", "balance", "full"],
+      payment_status: ["pending", "paid", "failed", "cancelled", "refunded"],
       price_unit: [
         "day",
         "half_day",
