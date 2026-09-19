@@ -31,7 +31,8 @@
     "smoke:ecrans": "node --env-file=.env.local scripts/smoke-ecrans.mjs",
     "smoke:cloisonnement": "node --env-file=.env.local scripts/smoke-cloisonnement.mjs",
     "admin:creer": "node --env-file=.env.local scripts/creer-admin.mjs",
-    "smoke:paiement": "node --env-file=.env.local node_modules/vitest/vitest.mjs run tests/paiement-reel.test.ts --reporter=verbose"
+    "smoke:paiement": "node --env-file=.env.local node_modules/vitest/vitest.mjs run tests/paiement-reel.test.ts --reporter=verbose",
+    "smoke:commande": "node --env-file=.env.local scripts/smoke-commande.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
