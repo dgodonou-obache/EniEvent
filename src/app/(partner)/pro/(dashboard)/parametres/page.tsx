@@ -1,7 +1,9 @@
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, Wallet } from "lucide-react";
 
+import { PayoutAccountForm } from "@/components/partner/PayoutAccountForm";
 import { ScheduleEditor } from "@/components/partner/ScheduleEditor";
 import { requireSpace } from "@/lib/auth/session";
+import { getPayoutAccount } from "@/lib/payouts";
 import { createClient } from "@/utils/supabase/server";
 
 /**
@@ -27,6 +29,8 @@ export default async function PartnerSettingsPage() {
     .select("*")
     .eq("org_id", orgId)
     .order("position");
+
+  const compte = await getPayoutAccount(orgId);
 
   const initial = (lignes ?? []).map((l) => ({
     cle: l.id,
@@ -63,6 +67,36 @@ export default async function PartnerSettingsPage() {
         </div>
 
         <ScheduleEditor orgId={orgId} initial={initial} />
+      </section>
+
+      <section className="mt-5 rounded-2xl border border-slate-100 bg-white p-5 sm:p-6">
+        <div className="mb-5 flex items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50">
+            <Wallet className="h-5 w-5 text-teal-600" aria-hidden />
+          </span>
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Où vous verser</h2>
+            <p className="mt-1 text-sm leading-relaxed text-slate-500">
+              Le compte sur lequel ÉniEvent vous reverse votre part, commission déduite.
+              Sans ces coordonnées, vos revenus restent en attente.
+            </p>
+          </div>
+        </div>
+
+        <PayoutAccountForm
+          orgId={orgId}
+          initial={
+            compte
+              ? {
+                  method: compte.method,
+                  phone: compte.phone ?? "",
+                  holderName: compte.holder_name,
+                  bankDetails: compte.bank_details ?? "",
+                  verified: compte.verified_at !== null,
+                }
+              : null
+          }
+        />
       </section>
     </div>
   );

@@ -1281,6 +1281,7 @@ export type Database = {
           paid_at: string | null
           partner_due: number
           payload: Json
+          payout_id: string | null
           provider: string
           provider_ref: string | null
           provider_status: string | null
@@ -1301,6 +1302,7 @@ export type Database = {
           paid_at?: string | null
           partner_due: number
           payload?: Json
+          payout_id?: string | null
           provider?: string
           provider_ref?: string | null
           provider_status?: string | null
@@ -1321,6 +1323,7 @@ export type Database = {
           paid_at?: string | null
           partner_due?: number
           payload?: Json
+          payout_id?: string | null
           provider?: string
           provider_ref?: string | null
           provider_status?: string | null
@@ -1341,6 +1344,113 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_payout_id_fkey"
+            columns: ["payout_id"]
+            isOneToOne: false
+            referencedRelation: "payouts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payout_accounts: {
+        Row: {
+          bank_details: string | null
+          created_at: string
+          holder_name: string
+          method: Database["public"]["Enums"]["payout_method"]
+          org_id: string
+          phone: string | null
+          updated_at: string
+          verified_at: string | null
+        }
+        Insert: {
+          bank_details?: string | null
+          created_at?: string
+          holder_name: string
+          method?: Database["public"]["Enums"]["payout_method"]
+          org_id: string
+          phone?: string | null
+          updated_at?: string
+          verified_at?: string | null
+        }
+        Update: {
+          bank_details?: string | null
+          created_at?: string
+          holder_name?: string
+          method?: Database["public"]["Enums"]["payout_method"]
+          org_id?: string
+          phone?: string | null
+          updated_at?: string
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payout_accounts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payouts: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          holder_name: string
+          id: string
+          method: Database["public"]["Enums"]["payout_method"]
+          note: string | null
+          org_id: string
+          phone: string | null
+          provider_ref: string | null
+          reference: string
+          sent_at: string | null
+          status: Database["public"]["Enums"]["payout_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          holder_name: string
+          id?: string
+          method: Database["public"]["Enums"]["payout_method"]
+          note?: string | null
+          org_id: string
+          phone?: string | null
+          provider_ref?: string | null
+          reference?: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["payout_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          holder_name?: string
+          id?: string
+          method?: Database["public"]["Enums"]["payout_method"]
+          note?: string | null
+          org_id?: string
+          phone?: string | null
+          provider_ref?: string | null
+          reference?: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["payout_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payouts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -2115,6 +2225,31 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      cancel_payout: {
+        Args: { cible: string; motif?: string }
+        Returns: {
+          amount: number
+          created_at: string
+          currency: string
+          holder_name: string
+          id: string
+          method: Database["public"]["Enums"]["payout_method"]
+          note: string | null
+          org_id: string
+          phone: string | null
+          provider_ref: string | null
+          reference: string
+          sent_at: string | null
+          status: Database["public"]["Enums"]["payout_status"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payouts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       claim_notifications: {
         Args: { batch?: number }
         Returns: {
@@ -2138,6 +2273,31 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      create_payout: {
+        Args: { org: string }
+        Returns: {
+          amount: number
+          created_at: string
+          currency: string
+          holder_name: string
+          id: string
+          method: Database["public"]["Enums"]["payout_method"]
+          note: string | null
+          org_id: string
+          phone: string | null
+          provider_ref: string | null
+          reference: string
+          sent_at: string | null
+          status: Database["public"]["Enums"]["payout_status"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payouts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       decide_approval: {
         Args: { p_approve: boolean; p_reason?: string; target: string }
         Returns: undefined
@@ -2149,6 +2309,31 @@ export type Database = {
       mark_notification: {
         Args: { delivered: boolean; detail?: string; target: string }
         Returns: undefined
+      }
+      mark_payout_sent: {
+        Args: { cible: string; commentaire?: string; ref: string }
+        Returns: {
+          amount: number
+          created_at: string
+          currency: string
+          holder_name: string
+          id: string
+          method: Database["public"]["Enums"]["payout_method"]
+          note: string | null
+          org_id: string
+          phone: string | null
+          provider_ref: string | null
+          reference: string
+          sent_at: string | null
+          status: Database["public"]["Enums"]["payout_status"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payouts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       next_reference: { Args: { prefix: string }; Returns: string }
       release_stale_orders: { Args: { delai?: string }; Returns: number }
@@ -2179,6 +2364,31 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      save_payout_account: {
+        Args: {
+          banque?: string
+          moyen: Database["public"]["Enums"]["payout_method"]
+          numero: string
+          org: string
+          titulaire: string
+        }
+        Returns: {
+          bank_details: string | null
+          created_at: string
+          holder_name: string
+          method: Database["public"]["Enums"]["payout_method"]
+          org_id: string
+          phone: string | null
+          updated_at: string
+          verified_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payout_accounts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       settle_payment: {
         Args: {
           cle: string
@@ -2201,6 +2411,7 @@ export type Database = {
           paid_at: string | null
           partner_due: number
           payload: Json
+          payout_id: string | null
           provider: string
           provider_ref: string | null
           provider_status: string | null
@@ -2232,6 +2443,7 @@ export type Database = {
           paid_at: string | null
           partner_due: number
           payload: Json
+          payout_id: string | null
           provider: string
           provider_ref: string | null
           provider_status: string | null
@@ -2296,6 +2508,8 @@ export type Database = {
       org_status: "pending" | "active" | "suspended"
       org_type: "company" | "partner"
       payment_status: "pending" | "paid" | "failed" | "cancelled" | "refunded"
+      payout_method: "mtn" | "moov" | "celtiis" | "virement"
+      payout_status: "pending" | "sent" | "failed" | "cancelled"
       price_unit:
         | "day"
         | "half_day"
@@ -2503,6 +2717,8 @@ export const Constants = {
       org_status: ["pending", "active", "suspended"],
       org_type: ["company", "partner"],
       payment_status: ["pending", "paid", "failed", "cancelled", "refunded"],
+      payout_method: ["mtn", "moov", "celtiis", "virement"],
+      payout_status: ["pending", "sent", "failed", "cancelled"],
       price_unit: [
         "day",
         "half_day",
