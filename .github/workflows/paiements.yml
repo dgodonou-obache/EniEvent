@@ -1,0 +1,57 @@
+name: Rattrapage des paiements en attente
+
+# Filet de sécurité, et non chemin principal.
+#
+# Le chemin normal est le webhook : FedaPay appelle
+# `/api/webhooks/fedapay` dès qu'une transaction bouge, et la commande est à
+# jour en quelques secondes. Ce passage régulier rattrape ce que le webhook a pu
+# manquer — déploiement en cours, coupure réseau, point de terminaison
+# momentanément en erreur, FedaPay renonçant après ses propres tentatives.
+#
+# **C'est la panne la plus coûteuse du tunnel.** Un client qui a payé et dont la
+# commande reste marquée impayée ne s'en aperçoit pas tout de suite, nous non
+# plus, et cela se termine en réclamation. Cinq minutes de retard valent mieux
+# qu'un paiement perdu.
+#
+# La route relit la transaction chez FedaPay avant de conclure : elle ne croit
+# jamais son propre état en base, et ne peut donc pas encaisser deux fois.
+#
+# Prérequis : le secret `CRON_SECRET` du dépôt doit valoir celui posé sur
+# Vercel. Sans lui, la route répond 401 et l'exécution échoue bruyamment.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+# Deux exécutions simultanées se disputeraient les mêmes lignes.
+concurrency:
+  group: paiements
+  cancel-in-progress: false
+
+jobs:
+  rattraper:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Appeler la route de rattrapage
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Le secret CRON_SECRET n'est pas défini sur le dépôt."
+            exit 1
+          fi
+
+          # L'adresse Vercel plutôt que le domaine : cet appel ne doit dépendre
+          # d'aucun DNS que nous ne maîtrisons pas de bout en bout.
+          reponse=$(curl --silent --show-error --fail-with-body \
+            --max-time 120 \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            https://eni-event.vercel.app/api/cron/paiements)
+
+          echo "$reponse"
+
+          # Un encaissement rattrapé n'est pas une anomalie en soi, mais il
+          # signale que le webhook n'a pas fait son travail : il faut le voir.
+          echo "$reponse" | grep -q '"encaisses":0' \
+            || echo "::warning::Des paiements ont été rattrapés — le webhook n'a pas abouti"

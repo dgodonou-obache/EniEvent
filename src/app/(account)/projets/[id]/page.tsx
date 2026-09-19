@@ -2,10 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarDays, MapPin, Users, Wallet } from "lucide-react";
 
+import { OrderPayment } from "@/components/account/OrderPayment";
 import { QuoteComparator } from "@/components/account/QuoteComparator";
 import { requireUser } from "@/lib/auth/session";
 import { getCompanySettings, getPendingQuoteApprovals } from "@/lib/company";
 import { format, money, type CurrencyCode } from "@/lib/money";
+import { getOrdersForRequest } from "@/lib/orders";
+import { paymentProvider } from "@/lib/payments/fedapay";
 import { getRequestDetail } from "@/lib/quotes";
 import {
   REQUEST_STATUS_LABELS,
@@ -33,6 +36,11 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   const stillOpen = acceptsNewQuotes(status, request.respond_by);
 
   const received = items.reduce((total, item) => total + (item.quotes?.length ?? 0), 0);
+
+  // Les commandes naissent d'un déclencheur à l'acceptation d'un devis : elles
+  // n'existent que si le client a déjà retenu quelqu'un.
+  const orders = await getOrdersForRequest(request.id);
+  const sandbox = paymentProvider().sandbox;
 
   // Demande portée par une entreprise : le seuil décide si retenir une offre
   // passe par un valideur. Un particulier n'a ni seuil ni valideur.
@@ -109,6 +117,30 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           </p>
         ) : null}
       </div>
+
+      {orders.length > 0 ? (
+        <section className="mt-6">
+          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-lg font-bold text-slate-900">
+              {orders.length > 1 ? "Vos prestations retenues" : "Votre prestation retenue"}
+            </h2>
+            <p className="text-sm text-slate-500">
+              Chaque prestataire fixe son propre acompte.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {orders.map((order) => (
+              <OrderPayment
+                key={order.id}
+                order={order}
+                requestId={request.id}
+                sandbox={sandbox}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <div className="mt-6 mb-4 flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-lg font-bold text-slate-900">

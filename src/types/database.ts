@@ -1967,6 +1967,10 @@ export type Database = {
     }
     Functions: {
       accept_quote: { Args: { target: string }; Returns: undefined }
+      attach_payment_reference: {
+        Args: { adresse?: string; cle: string; ref: string }
+        Returns: undefined
+      }
       claim_notifications: {
         Args: { batch?: number }
         Returns: {
