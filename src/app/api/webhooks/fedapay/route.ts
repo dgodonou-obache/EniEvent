@@ -110,6 +110,16 @@ export async function POST(request: Request) {
   }
 
   const tx = lecture.transaction;
+
+  // ⚠️ Un état non terminal ne se dénoue pas. Un webhook peut arriver pendant
+  // que le client est encore sur la page de l'opérateur — ou être appelé par
+  // n'importe qui, puisque le corps n'est pas authentifié. Conclure ici
+  // marquerait « échoué » un paiement en cours, et le client ne pourrait plus
+  // le terminer. On accuse réception, et la relecture suivante tranchera.
+  if (tx.state === "pending") {
+    return Response.json({ ok: true, ignore: "transaction encore en cours" });
+  }
+
   const supabase = createServiceRoleClient();
 
   // La clé recopiée dans les métadonnées à l'ouverture. Le repli par

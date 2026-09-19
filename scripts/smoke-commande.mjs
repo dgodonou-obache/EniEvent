@@ -183,9 +183,12 @@ try {
 
   const { data: apres } = await admin.from("payments").select("*").eq("idempotency_key", cle).maybeSingle();
 
+  // Le paiement doit rester **en attente**, et non passer en échec : un webhook
+  // arrivé pendant que le client est encore sur la page de l'opérateur ne doit
+  // pas tuer un paiement en cours.
   check(
     "il ne croit pas un corps qui annonce « approuvé »",
-    apres?.status === "pending" || apres?.status === "failed",
+    apres?.status === "pending",
     `état ${apres?.status} (la transaction est réellement ${tx.status})`,
   );
 
