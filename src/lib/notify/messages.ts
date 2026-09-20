@@ -20,6 +20,7 @@ export const KINDS = [
   "quote.accepted",
   "quote.declined",
   "request.deadline",
+  "order.cancelled",
 ] as const;
 export type NotificationKind = (typeof KINDS)[number];
 
@@ -107,6 +108,24 @@ export function renderSms(
       return toGsmSafe(
         `ÉniEvent : votre demande se termine bientôt. ` +
           `${offres > 1 ? `${offres} offres vous attendent` : "Une offre vous attend"} : ${lien}`,
+      );
+    }
+
+    case "order.cancelled": {
+      // Le destinataire est **l'autre partie** : celui qui annule le sait déjà.
+      // Un partenaire prévenu la veille en consultant son planning a déjà
+      // refusé d'autres clients pour cette date — d'où l'alerte immédiate.
+      const pour = payload.pour === "partner" ? "partner" : "client";
+      const ref = short(payload.reference, 20);
+      const date = shortDate(payload.eventDate);
+      const quand = date ? ` du ${date}` : "";
+
+      return toGsmSafe(
+        pour === "partner"
+          ? `ÉniEvent : la réservation ${ref}${quand} a été annulée par le client. ` +
+              `Détails : ${base}/pro/reservations`
+          : `ÉniEvent : votre réservation ${ref}${quand} a été annulée par le prestataire. ` +
+              `Détails : ${base}/compte/reservations`,
       );
     }
 

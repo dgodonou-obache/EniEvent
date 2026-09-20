@@ -31,7 +31,7 @@ interface ListingEditorProps {
   listing: PartnerListingDetail;
   categoryGroups: { slug: string; name: string; kind: string; children: Option[] }[];
   cities: { slug: string; name: string }[];
-  policies: { id: string; name: string; summary: string }[];
+  policies: { id: string; slug: string; name: string; summary: string }[];
 }
 
 
@@ -173,12 +173,20 @@ export function ListingEditor({ listing, categoryGroups, cities, policies }: Lis
 
             <div>
               <Label htmlFor="cancellationPolicyId">Politique d&apos;annulation</Label>
+              {/* Plus d'option vide : une annonce sans conditions verrait
+                  s'appliquer, au moment d'un remboursement, un barème que le
+                  client n'a jamais lu sur la fiche. À défaut de choix, c'est
+                  « Modérée » qui s'inscrit — et qui s'affiche. */}
               <Select
                 id="cancellationPolicyId"
                 name="cancellationPolicyId"
-                defaultValue={listing.cancellation_policies?.id ?? ""}
+                required
+                defaultValue={
+                  listing.cancellation_policies?.id ??
+                  policies.find((p) => p.slug === "moderee")?.id ??
+                  ""
+                }
               >
-                <option value="">Aucune politique choisie</option>
                 {policies.map((policy) => (
                   <option key={policy.id} value={policy.id}>
                     {policy.name}

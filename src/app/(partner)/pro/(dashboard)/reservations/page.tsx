@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { CalendarCheck } from "lucide-react";
 
+import { CancelBooking } from "@/components/account/CancelBooking";
 import { OrderRow } from "@/components/money/OrderRow";
 import { StatTile } from "@/components/money/StatTile";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { requireSpace } from "@/lib/auth/session";
+import type { CurrencyCode } from "@/lib/money";
 import { getPartnerOrders } from "@/lib/orders";
 
 /**
@@ -79,6 +81,17 @@ export default async function PartnerBookingsPage() {
             {orders.map((order) => (
               <li key={order.id}>
                 <OrderRow order={order} perspective="partner" />
+                {/* Le désistement est offert sans être mis en avant : il
+                    rembourse le client intégralement, et le composant le dit
+                    avant de confirmer. */}
+                {order.cancellable ? (
+                  <CancelBooking
+                    orderId={order.id}
+                    currency={order.currency as CurrencyCode}
+                    preview={null}
+                    perspective="partner"
+                  />
+                ) : null}
               </li>
             ))}
           </ul>

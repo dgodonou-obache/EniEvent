@@ -25,11 +25,12 @@ export default async function AdminPayoutsPage() {
   const [candidates, payouts] = await Promise.all([getPayoutCandidates(), getPayouts(200)]);
 
   const devise = candidates[0]?.currency ?? payouts[0]?.currency ?? "XOF";
-  const aVerser = candidates.reduce((t, c) => t + c.amount, 0);
+  const aVerser = candidates.reduce((t, c) => t + c.payable, 0);
+  const retenu = candidates.reduce((t, c) => t + c.held, 0);
   const prepares = payouts.filter((p) => p.status === "pending");
   const envoyes = payouts.filter((p) => p.status === "sent");
 
-  const sansCoordonnees = candidates.filter((c) => c.account === null);
+  const sansCoordonnees = candidates.filter((c) => c.account === null && c.payable > 0);
 
   return (
     <div>
@@ -40,13 +41,19 @@ export default async function AdminPayoutsPage() {
         </p>
       </div>
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-3">
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile
           label="À verser"
           amount={aVerser}
           currency={devise}
           tone="attente"
           hint={`${candidates.length} partenaire${candidates.length > 1 ? "s" : ""} concerné${candidates.length > 1 ? "s" : ""}`}
+        />
+        <StatTile
+          label="Retenu"
+          amount={retenu}
+          currency={devise}
+          hint="Encaissé, versable après la prestation"
         />
         <StatTile
           label="Préparés"
@@ -71,6 +78,15 @@ export default async function AdminPayoutsPage() {
         {sansCoordonnees.length > 0
           ? ` ${sansCoordonnees.length} partenaire${sansCoordonnees.length > 1 ? "s n'ont" : " n'a"} pas renseigné ses coordonnées.`
           : ""}
+      </p>
+
+      {/* La retenue est la règle la moins évidente de tout l'écran : sans un
+          mot, un montant encaissé qui ne part pas se lit comme une panne. */}
+      <p className="mb-6 rounded-2xl bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-600">
+        <strong>Un encaissement n&apos;est versable qu&apos;après la prestation.</strong> Tant que
+        la date n&apos;est pas passée, le client peut encore annuler et se faire rembourser selon
+        le barème de l&apos;annonce — verser plus tôt reviendrait à redemander l&apos;argent au
+        partenaire. Une réservation annulée, elle, libère immédiatement ce qui lui reste acquis.
       </p>
 
       <PayoutQueue candidates={candidates} payouts={payouts} />

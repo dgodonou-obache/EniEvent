@@ -112,6 +112,32 @@ describe("échéance imminente", () => {
   });
 });
 
+describe("annulation d'une réservation", () => {
+  it("tient en un segment, référence et date comprises", () => {
+    // Pire cas réaliste : une référence complète et une date d'événement. Le
+    // destinataire est l'autre partie — celui qui annule le sait déjà.
+    const charge = { reference: "CMD-202609-000062", eventDate: "2026-12-19", pour: "partner" };
+    const sms = renderSms("order.cancelled", charge, SITE)!;
+
+    expect(sms).toContain("CMD-202609-000062");
+    expect(sms).toContain("19/12");
+    expect(sms).toContain("/pro/reservations");
+    expect(segmentsOf(sms)).toBe(1);
+  });
+
+  it("ne renvoie pas le client vers l'espace partenaire", () => {
+    const sms = renderSms(
+      "order.cancelled",
+      { reference: "CMD-202609-000062", eventDate: "2026-12-19", pour: "client" },
+      SITE,
+    )!;
+
+    expect(sms).toContain("/compte/reservations");
+    expect(sms).not.toContain("/pro/");
+    expect(segmentsOf(sms)).toBe(1);
+  });
+});
+
 describe("garde-fous", () => {
   it("rend tous les types déclarés", () => {
     // Un `kind` posé en base sans texte associé resterait bloqué en file.

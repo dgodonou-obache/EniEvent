@@ -114,6 +114,7 @@ const PARCOURS = [
       "/admin/utilisateurs",
       "/admin/paiements",
       "/admin/versements",
+      "/admin/remboursements",
       "/admin/parametres",
     ],
   },

@@ -52,6 +52,7 @@ Mise en ligne, variables à poser, lecture des pannes : `docs/DEPLOIEMENT.md`.
 | `npm run smoke:email` | **Envoie un vrai e-mail** via Resend — exige `EMAIL_TEST_TO` |
 | `npm run mails:auth` | Publie les gabarits d'authentification chez Supabase — simulation sans `-- --appliquer` |
 | `npm run smoke:paiement` | **Ouvre un vrai paiement** chez FedaPay — refuse de tourner sur une clé de production |
+| `npm run smoke:annulation` | Réserve, encaisse, annule et rembourse contre le vrai Supabase — nettoie derrière lui |
 
 Les autres `smoke:*` (`offre`, `planning`, `devis`, `entreprise`, `photos`) jouent un
 parcours métier contre le vrai Supabase.
@@ -96,6 +97,29 @@ supabase/migrations/    schéma, une migration par domaine
   à ligne perd des francs.
 - Les modules à risque financier (`pricing`, `fees`, `promo`, `cancellation`, `escrow`)
   sont couverts par des tests unitaires. Une modification sans test est un refus de revue.
+- ⚠️ **On ne verse au partenaire qu'après la prestation, et on n'annule qu'avant.** Les
+  deux règles sont complémentaires : elles rendent impossible de rembourser un client
+  avec de l'argent déjà parti. `payments.payout_id` empêchait de payer *deux fois* ;
+  rien n'empêchait de payer *trop tôt*, et un acompte réglé trois mois avant un mariage
+  était versable le jour même. `app.order_payout_ready` tranche (migration 0032) ; une
+  commande annulée devient versable **immédiatement**, l'annulation étant définitive.
+- **Le barème d'annulation porte sur le total, le remboursement sur ce qui a été payé.**
+  « La moitié du montant reste due » décrit ce que le partenaire garde. On retient donc
+  `total × (100 − taux)`, **plafonné à l'encaissé**, et on rend le reste : la plateforme
+  n'émet aucune créance sur un client, n'ayant aucun moyen de la recouvrer. Un partenaire
+  qui se désiste rembourse en revanche **intégralement** — le barème le protège du
+  changement d'avis du client, pas de sa propre défaillance.
+- Le barème est **figé sur la commande** (`orders.cancellation_policy_id`), comme
+  `commission_rate` : les conditions du partenaire peuvent changer, celles d'une
+  réservation déjà passée non. Et une annonce en porte **toujours** un (migration 0033) :
+  sans cela, un remboursement appliquait des conditions jamais affichées au client.
+- `src/lib/cancellation.ts` double `app.refund_percent` pour que l'écran annonce la somme
+  **avant** confirmation ; `tests/rls-remboursements.test.ts` compare les deux barèmes
+  jour par jour sur leurs bornes. Une divergence, c'est un litige.
+- ⚠️ **FedaPay refuse `/payouts` (403) et `/refunds` (401)** sur ce compte, avec la clé
+  même qui obtient 200 sur `/transactions` : virements et remboursements demandent un
+  compte marchand validé. Les deux sont donc des **registres** — `mark_payout_sent` et
+  `mark_refund_sent` sont les seules fonctions à remplacer le jour où le droit s'ouvre.
 
 ### 2. Changements d'état
 Aucune transition d'état (réservation, devis, paiement, séquestre) ne se décide côté

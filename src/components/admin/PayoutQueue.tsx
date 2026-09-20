@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, Check, Loader2, Send, X } from "lucide-react";
+import { AlertTriangle, Check, Clock, Loader2, Send, X } from "lucide-react";
 
 import {
   cancelPayout,
@@ -42,7 +42,8 @@ export function PayoutQueue({ candidates, payouts }: Props) {
 
         {candidates.length === 0 ? (
           <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-            Rien à verser : tous les encaissements sont déjà rattachés à un versement.
+            Rien à verser : tous les encaissements sont déjà rattachés à un versement, ou retenus
+            jusqu&apos;à la prestation.
           </p>
         ) : (
           <ul className="space-y-3">
@@ -123,19 +124,41 @@ function CandidateRow({ candidate }: { candidate: PayoutCandidate }) {
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="font-bold tabular-nums text-slate-900">
-            {format(money(candidate.amount, candidate.currency as CurrencyCode))}
-          </span>
+          <div className="text-right">
+            <span className="block font-bold tabular-nums text-slate-900">
+              {format(money(candidate.payable, candidate.currency as CurrencyCode))}
+            </span>
+            {candidate.held > 0 ? (
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                +{format(money(candidate.held, candidate.currency as CurrencyCode))} retenus
+              </span>
+            ) : null}
+          </div>
 
           <form action={action}>
             <input type="hidden" name="orgId" value={candidate.orgId} />
-            <Button type="submit" size="sm" disabled={pending || sansCoordonnees}>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={pending || sansCoordonnees || candidate.payable <= 0}
+            >
               {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
               Préparer
             </Button>
           </form>
         </div>
       </div>
+
+      {/* Un montant retenu s'explique, sinon il se lit comme un oubli : la
+          somme est encaissée, le partenaire la voit dans son espace, et rien
+          ne dirait pourquoi elle ne part pas. */}
+      {candidate.held > 0 ? (
+        <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
+          <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          Retenu jusqu&apos;à la prestation : tant que la date n&apos;est pas passée, le client
+          peut encore annuler et se faire rembourser.
+        </p>
+      ) : null}
 
       {state.message ? (
         <p role="status" className="mt-2 text-xs text-slate-600">

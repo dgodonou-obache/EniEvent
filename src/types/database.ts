@@ -702,7 +702,7 @@ export type Database = {
         Row: {
           address: string | null
           booking_mode: Database["public"]["Enums"]["booking_mode"]
-          cancellation_policy_id: string | null
+          cancellation_policy_id: string
           category_id: string
           city: string
           cover_url: string | null
@@ -737,7 +737,7 @@ export type Database = {
         Insert: {
           address?: string | null
           booking_mode?: Database["public"]["Enums"]["booking_mode"]
-          cancellation_policy_id?: string | null
+          cancellation_policy_id: string
           category_id: string
           city: string
           cover_url?: string | null
@@ -772,7 +772,7 @@ export type Database = {
         Update: {
           address?: string | null
           booking_mode?: Database["public"]["Enums"]["booking_mode"]
-          cancellation_policy_id?: string | null
+          cancellation_policy_id?: string
           category_id?: string
           city?: string
           cover_url?: string | null
@@ -921,6 +921,10 @@ export type Database = {
       }
       orders: {
         Row: {
+          cancel_reason: string | null
+          cancellation_policy_id: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           client_id: string
           commission_rate: number
           created_at: string
@@ -940,6 +944,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cancel_reason?: string | null
+          cancellation_policy_id?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           client_id: string
           commission_rate: number
           created_at?: string
@@ -959,6 +967,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cancel_reason?: string | null
+          cancellation_policy_id?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           client_id?: string
           commission_rate?: number
           created_at?: string
@@ -978,6 +990,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "orders_cancellation_policy_id_fkey"
+            columns: ["cancellation_policy_id"]
+            isOneToOne: false
+            referencedRelation: "cancellation_policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "orders_client_id_fkey"
             columns: ["client_id"]
@@ -1881,6 +1907,153 @@ export type Database = {
           },
         ]
       }
+      refund_lines: {
+        Row: {
+          amount: number
+          commission: number
+          created_at: string
+          id: string
+          partner_due: number
+          payment_id: string
+          refund_id: string
+          was_paid_out: boolean
+        }
+        Insert: {
+          amount: number
+          commission: number
+          created_at?: string
+          id?: string
+          partner_due: number
+          payment_id: string
+          refund_id: string
+          was_paid_out?: boolean
+        }
+        Update: {
+          amount?: number
+          commission?: number
+          created_at?: string
+          id?: string
+          partner_due?: number
+          payment_id?: string
+          refund_id?: string
+          was_paid_out?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refund_lines_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refund_lines_refund_id_fkey"
+            columns: ["refund_id"]
+            isOneToOne: false
+            referencedRelation: "refunds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      refunds: {
+        Row: {
+          amount: number
+          client_id: string
+          created_at: string
+          currency: string
+          id: string
+          needs_recovery: boolean
+          note: string | null
+          order_id: string
+          org_id: string
+          policy_id: string | null
+          provider_ref: string | null
+          reason: string | null
+          reference: string
+          refund_percent: number
+          requested_by: string | null
+          sent_at: string | null
+          status: Database["public"]["Enums"]["refund_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          client_id: string
+          created_at?: string
+          currency?: string
+          id?: string
+          needs_recovery?: boolean
+          note?: string | null
+          order_id: string
+          org_id: string
+          policy_id?: string | null
+          provider_ref?: string | null
+          reason?: string | null
+          reference?: string
+          refund_percent: number
+          requested_by?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["refund_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          client_id?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          needs_recovery?: boolean
+          note?: string | null
+          order_id?: string
+          org_id?: string
+          policy_id?: string | null
+          provider_ref?: string | null
+          reason?: string | null
+          reference?: string
+          refund_percent?: number
+          requested_by?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["refund_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refunds_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refunds_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refunds_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refunds_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "cancellation_policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refunds_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_details: {
         Row: {
           attributes: Json
@@ -2200,6 +2373,10 @@ export type Database = {
       book_listing: {
         Args: { annonce: string; jours: string[] }
         Returns: {
+          cancel_reason: string | null
+          cancellation_policy_id: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           client_id: string
           commission_rate: number
           created_at: string
@@ -2221,6 +2398,16 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      cancel_order: {
+        Args: { cible: string; motif?: string }
+        Returns: Database["public"]["CompositeTypes"]["cancellation_outcome"]
+        SetofOptions: {
+          from: "*"
+          to: "cancellation_outcome"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -2335,7 +2522,53 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      mark_refund_sent: {
+        Args: { cible: string; commentaire?: string; ref: string }
+        Returns: {
+          amount: number
+          client_id: string
+          created_at: string
+          currency: string
+          id: string
+          needs_recovery: boolean
+          note: string | null
+          order_id: string
+          org_id: string
+          policy_id: string | null
+          provider_ref: string | null
+          reason: string | null
+          reference: string
+          refund_percent: number
+          requested_by: string | null
+          sent_at: string | null
+          status: Database["public"]["Enums"]["refund_status"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "refunds"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       next_reference: { Args: { prefix: string }; Returns: string }
+      payout_candidates: {
+        Args: never
+        Returns: {
+          currency: string
+          held: number
+          org_id: string
+          org_name: string
+          payable: number
+        }[]
+      }
+      pending_payout_amount: {
+        Args: { org: string }
+        Returns: {
+          held: number
+          payable: number
+        }[]
+      }
       release_stale_orders: { Args: { delai?: string }; Returns: number }
       request_publication_approval: {
         Args: { target: string }
@@ -2533,11 +2766,21 @@ export type Database = {
         | "declined"
         | "withdrawn"
         | "expired"
+      refund_status: "pending" | "sent" | "failed" | "cancelled"
       schedule_amount: "percent" | "fixed" | "balance"
       schedule_trigger: "booking" | "before_event"
     }
     CompositeTypes: {
-      [_ in never]: never
+      cancellation_outcome: {
+        order_id: string | null
+        status: Database["public"]["Enums"]["order_status"] | null
+        refund_percent: number | null
+        paid: number | null
+        retained: number | null
+        refunded: number | null
+        refund_id: string | null
+        needs_recovery: boolean | null
+      }
     }
   }
 }
@@ -2745,6 +2988,7 @@ export const Constants = {
         "withdrawn",
         "expired",
       ],
+      refund_status: ["pending", "sent", "failed", "cancelled"],
       schedule_amount: ["percent", "fixed", "balance"],
       schedule_trigger: ["booking", "before_event"],
     },

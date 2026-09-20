@@ -95,6 +95,19 @@ export async function createListing(
     };
   }
 
+  // Toute annonce naît avec des conditions d'annulation (migration 0033) : une
+  // fiche sans barème verrait s'appliquer, au remboursement, des conditions que
+  // le client n'a jamais lues. Le partenaire les change ensuite s'il le veut.
+  const { data: barème } = await supabase
+    .from("cancellation_policies")
+    .select("id")
+    .eq("slug", "moderee")
+    .maybeSingle();
+
+  if (!barème) {
+    return { message: "Les conditions d'annulation par défaut sont introuvables." };
+  }
+
   const { data, error } = await supabase
     .from("listings")
     .insert({
@@ -106,6 +119,7 @@ export async function createListing(
       city: parsed.data.city,
       district: parsed.data.district || null,
       booking_mode: parsed.data.bookingMode,
+      cancellation_policy_id: barème.id,
       // Toute annonce naît en brouillon. Le déclencheur de modération refuse
       // d'ailleurs qu'un utilisateur crée directement une annonce validée.
       status: "draft",
@@ -161,7 +175,10 @@ export async function updateListing(
       description: details.data.description ?? null,
       address: details.data.address ?? null,
       payment_terms: details.data.paymentTerms ?? null,
-      cancellation_policy_id: details.data.cancellationPolicyId || null,
+      // `undefined` et non `null` : la colonne est obligatoire, et une valeur
+      // absente doit laisser en place celle déjà enregistrée plutôt que
+      // d'effacer les conditions affichées sur la fiche.
+      cancellation_policy_id: details.data.cancellationPolicyId || undefined,
       min_price: details.data.minPrice ?? null,
       min_notice_days: details.data.minNoticeDays ?? 0,
     })

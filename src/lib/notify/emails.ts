@@ -238,6 +238,48 @@ export function renderEmail(
       });
     }
 
+    case "order.cancelled": {
+      // Le destinataire est **l'autre partie** : celui qui annule le sait déjà.
+      const pour = payload.pour === "partner" ? "partner" : "client";
+      const ref = text(payload.reference);
+      const partenaire = text(payload.partner);
+
+      const details: [string, string][] = [
+        ["Référence", ref],
+        ["Date de l'événement", longDate(payload.eventDate)],
+        ["Montant de la réservation", amount(payload.total, payload.currency)],
+      ];
+
+      if (pour === "partner") {
+        return shell({
+          subject: ref ? `Annulation de la réservation ${ref}` : "Une réservation a été annulée",
+          preheader: "La date redevient disponible dans votre planning.",
+          heading: "Le client a annulé sa réservation",
+          intro:
+            "La date est automatiquement remise en ligne dans votre planning : un autre " +
+            "client peut désormais la réserver. Le détail du règlement, et ce qui vous " +
+            "reste acquis selon votre barème, figure dans votre espace.",
+          details,
+          cta: { label: "Voir mes réservations", href: `${base}/pro/reservations` },
+        });
+      }
+
+      return shell({
+        subject: ref ? `Votre réservation ${ref} a été annulée` : "Votre réservation a été annulée",
+        preheader: "Le prestataire s'est désisté — vous êtes intégralement remboursé.",
+        heading: "Le prestataire s'est désisté",
+        intro:
+          "Nous en sommes désolés. Comme l'annulation ne vient pas de vous, " +
+          "l'intégralité des sommes versées vous est remboursée — le barème d'annulation " +
+          "ne s'applique pas. Le virement part sous quelques jours ouvrés.",
+        details: [...details, ["Prestataire", partenaire]],
+        cta: { label: "Voir mes réservations", href: `${base}/compte/reservations` },
+        outro:
+          "Votre événement tient toujours : relancez une recherche, ou publiez une demande " +
+          "de devis pour recevoir plusieurs propositions d'un coup.",
+      });
+    }
+
     default:
       return null;
   }

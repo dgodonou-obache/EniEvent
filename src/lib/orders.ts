@@ -1,5 +1,6 @@
 import "server-only";
 
+import { canCancel } from "@/lib/cancellation";
 import { splitPayment } from "@/lib/fees";
 import { money, type CurrencyCode } from "@/lib/money";
 import { createClient } from "@/utils/supabase/server";
@@ -68,6 +69,15 @@ export interface OrderView {
   paidAmount: number;
   /** Première échéance non réglée — les échéances se règlent dans l'ordre. */
   next: InstalmentView | null;
+  /** Dernier jour de la prestation : c'est lui qui dit si elle est passée. */
+  endDate: string | null;
+  cancelledAt: string | null;
+  cancelReason: string | null;
+  /**
+   * Annulable aujourd'hui. Double de la garde de `cancel_order` : proposer un
+   * bouton que la base refusera ensuite fait passer un produit pour cassé.
+   */
+  cancellable: boolean;
 }
 
 function toView(
@@ -123,11 +133,18 @@ function toView(
     instalments: vues,
     paidAmount,
     next,
+    endDate: order.end_date,
+    cancelledAt: order.cancelled_at,
+    cancelReason: order.cancel_reason,
+    cancellable: canCancel({
+      status: order.status,
+      eventEnd: order.end_date ?? order.event_date,
+    }).ok,
   };
 }
 
 const SELECT =
-  "id, reference, status, currency, total, commission_rate, event_date, start_date, end_date, quote_id, request_id, listing_id, client_id, org_id, created_at, updated_at, paid_at, organizations(brand_name, legal_name)";
+  "id, reference, status, currency, total, commission_rate, event_date, start_date, end_date, quote_id, request_id, listing_id, client_id, org_id, created_at, updated_at, paid_at, cancelled_at, cancel_reason, organizations(brand_name, legal_name)";
 
 async function hydrate(orders: unknown[]): Promise<OrderView[]> {
   if (orders.length === 0) return [];

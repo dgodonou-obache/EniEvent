@@ -68,10 +68,16 @@ export default async function PartnerPayoutsPage() {
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
         <StatTile
           label="En attente de versement"
-          amount={attente}
+          amount={attente.payable}
           currency={devise}
           tone="attente"
-          hint="Votre part sur les règlements déjà encaissés"
+          hint="Votre part, prête à partir"
+        />
+        <StatTile
+          label="Retenu jusqu'à la prestation"
+          amount={attente.held}
+          currency={devise}
+          hint="Encaissé, versable une fois la date passée"
         />
         <StatTile
           label="Déjà versé"
@@ -80,13 +86,19 @@ export default async function PartnerPayoutsPage() {
           tone="encaisse"
           hint={`${envoyes.length} versement${envoyes.length > 1 ? "s" : ""}`}
         />
-        <StatTile
-          label="En préparation"
-          amount={payouts.filter((p) => p.status === "pending").reduce((t, p) => t + p.amount, 0)}
-          currency={devise}
-          hint="Montants réunis, en attente d'envoi"
-        />
       </div>
+
+      {/* Sans cette explication, un partenaire voit sa part encaissée rester
+          immobile pendant des semaines et croit à une erreur — ou à une
+          retenue arbitraire. La raison est simple, elle se dit. */}
+      {attente.held > 0 ? (
+        <p className="mb-6 rounded-2xl border border-slate-100 bg-white px-4 py-3 text-sm leading-relaxed text-slate-600">
+          <strong>Pourquoi une part est retenue.</strong> Tant que la prestation n&apos;a pas eu
+          lieu, le client peut encore annuler et se faire rembourser selon votre barème. Votre
+          part part donc le lendemain de l&apos;événement — ou tout de suite si la réservation
+          est annulée, ce qui vous reste acquis vous étant alors dû sans attendre.
+        </p>
+      ) : null}
 
       <p className="mb-6 rounded-2xl bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-600">
         Les versements sont préparés et envoyés <strong>manuellement</strong> pour l&apos;instant.

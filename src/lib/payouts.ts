@@ -104,33 +104,36 @@ export async function getPayoutAccount(orgId: string): Promise<PayoutAccount | n
   return (data as PayoutAccount | null) ?? null;
 }
 
+export interface PayoutBalance {
+  /** Versable maintenant : plus aucun remboursement ne peut reprendre cet argent. */
+  payable: number;
+  /** Encaissé, mais retenu jusqu'à la prestation. */
+  held: number;
+}
+
 /**
  * Ce qui attend d'être versé à un partenaire.
  *
- * Lit `payments` filtré sur `payout_id is null` — la base répond, on ne
- * recalcule rien.
+ * **La règle de retenue n'est écrite qu'en SQL** (`pending_payout_amount`,
+ * migration 0032), et c'est délibéré : c'est la même écriture qui sert à
+ * `create_payout`. La rejouer ici ouvrirait la porte à deux réponses
+ * différentes pour la même question — l'écran annoncerait une somme, le bouton
+ * en verserait une autre.
  */
-export async function getPendingPayoutAmount(orgId: string): Promise<number> {
+export async function getPendingPayoutAmount(orgId: string): Promise<PayoutBalance> {
   const supabase = await createClient();
 
-  const { data: orders } = await supabase.from("orders").select("id").eq("org_id", orgId);
-  const ids = (orders ?? []).map((o) => o.id);
-  if (ids.length === 0) return 0;
+  const { data } = await supabase.rpc("pending_payout_amount", { org: orgId });
+  const ligne = Array.isArray(data) ? data[0] : data;
 
-  const { data } = await supabase
-    .from("payments")
-    .select("partner_due")
-    .in("order_id", ids)
-    .eq("status", "paid")
-    .is("payout_id", null);
-
-  return (data ?? []).reduce((total, p) => total + p.partner_due, 0);
+  return { payable: ligne?.payable ?? 0, held: ligne?.held ?? 0 };
 }
 
 export interface PayoutCandidate {
   orgId: string;
   orgName: string;
-  amount: number;
+  payable: number;
+  held: number;
   currency: CurrencyCode;
   account: PayoutAccount | null;
 }
@@ -140,52 +143,38 @@ export interface PayoutCandidate {
  *
  * Ceux qui n'ont pas renseigné leurs coordonnées y figurent aussi, avec
  * `account: null` : les taire donnerait l'illusion qu'on ne leur doit rien.
+ * Ceux dont tout est encore retenu y figurent également — un montant à zéro
+ * assorti d'une date se comprend, une ligne absente se lit comme un oubli.
  */
 export async function getPayoutCandidates(): Promise<PayoutCandidate[]> {
   const supabase = await createClient();
 
-  const { data: payments } = await supabase
-    .from("payments")
-    .select("partner_due, currency, orders(org_id, organizations(brand_name, legal_name))")
-    .eq("status", "paid")
-    .is("payout_id", null);
+  const { data } = await supabase.rpc("payout_candidates");
+  const lignes = (data ?? []) as {
+    org_id: string;
+    org_name: string | null;
+    currency: string | null;
+    payable: number;
+    held: number;
+  }[];
 
-  const parOrg = new Map<string, PayoutCandidate>();
-
-  for (const p of (payments ?? []) as unknown as {
-    partner_due: number;
-    currency: string;
-    orders: { org_id: string; organizations: { brand_name: string | null; legal_name: string } | null } | null;
-  }[]) {
-    const org = p.orders?.org_id;
-    if (!org) continue;
-
-    const existant = parOrg.get(org);
-    if (existant) {
-      existant.amount += p.partner_due;
-      continue;
-    }
-
-    parOrg.set(org, {
-      orgId: org,
-      orgName: p.orders?.organizations?.brand_name ?? p.orders?.organizations?.legal_name ?? "Partenaire",
-      amount: p.partner_due,
-      currency: (p.currency as CurrencyCode) ?? "XOF",
-      account: null,
-    });
-  }
-
-  if (parOrg.size === 0) return [];
+  if (lignes.length === 0) return [];
 
   const { data: comptes } = await supabase
     .from("payout_accounts")
     .select("*")
-    .in("org_id", [...parOrg.keys()]);
+    .in("org_id", lignes.map((l) => l.org_id));
 
-  for (const compte of (comptes ?? []) as PayoutAccount[]) {
-    const candidat = parOrg.get(compte.org_id);
-    if (candidat) candidat.account = compte;
-  }
+  const parOrg = new Map((comptes ?? []).map((c) => [c.org_id, c as PayoutAccount]));
 
-  return [...parOrg.values()].sort((a, b) => b.amount - a.amount);
+  return lignes
+    .map((l) => ({
+      orgId: l.org_id,
+      orgName: l.org_name ?? "Partenaire",
+      payable: l.payable,
+      held: l.held,
+      currency: (l.currency as CurrencyCode) ?? "XOF",
+      account: parOrg.get(l.org_id) ?? null,
+    }))
+    .sort((a, b) => b.payable - a.payable || b.held - a.held);
 }
