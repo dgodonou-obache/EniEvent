@@ -1,8 +1,6 @@
 import { publicEnv } from "@/lib/env";
 import { sendEmail } from "@/lib/mail/resend";
 import { renderEmail } from "@/lib/notify/emails";
-import { renderSms } from "@/lib/notify/messages";
-import { sendSms } from "@/lib/sms/premux";
 import { createServiceRoleClient } from "@/utils/supabase/server";
 
 /**
@@ -72,7 +70,6 @@ export async function GET(request: Request) {
   const report = {
     rappelsPoses: rappels ?? 0,
     traitees: claimed?.length ?? 0,
-    sms: 0,
     emails: 0,
     echouees: 0,
   };
@@ -80,12 +77,23 @@ export async function GET(request: Request) {
   for (const row of claimed ?? []) {
     const payload = (row.payload ?? {}) as Record<string, unknown>;
 
-    // Les deux canaux partagent la charge utile et se distinguent par la seule
-    // rédaction : le SMS alerte en un segment, l'e-mail porte le détail.
-    const content =
-      row.channel === "sms"
-        ? renderSms(row.kind, payload, siteUrl)
-        : renderEmail(row.kind, payload, siteUrl);
+    // ⚠️ **Le canal SMS est débranché** (migration 0035) : il coûtait cher pour
+    // un résumé de 160 caractères, quand l'e-mail porte le détail complet.
+    // Plus aucune ligne `sms` n'est mise en file ; si l'une surgissait d'un
+    // ancien déclencheur, elle est marquée en échec avec un motif lisible
+    // plutôt que partie en silence — une notification qui disparaît sans trace
+    // est pire qu'une notification en erreur.
+    if (row.channel === "sms") {
+      await supabase.rpc("mark_notification", {
+        target: row.id,
+        delivered: false,
+        detail: "Canal SMS débranché : cette notification devait partir par courriel.",
+      });
+      report.echouees += 1;
+      continue;
+    }
+
+    const content = renderEmail(row.kind, payload, siteUrl);
 
     if (!content) {
       // Un type inconnu ne doit pas bloquer la file ni partir vide : on le
@@ -99,10 +107,7 @@ export async function GET(request: Request) {
       continue;
     }
 
-    const outcome =
-      typeof content === "string"
-        ? await sendSms(row.recipient, content)
-        : await sendEmail(row.recipient, content);
+    const outcome = await sendEmail(row.recipient, content);
 
     await supabase.rpc("mark_notification", {
       target: row.id,
@@ -113,7 +118,6 @@ export async function GET(request: Request) {
     });
 
     if (!outcome.ok) report.echouees += 1;
-    else if (row.channel === "sms") report.sms += 1;
     else report.emails += 1;
   }
 

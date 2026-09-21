@@ -21,7 +21,7 @@ Cette V2 remplace l'app v1 située dans `..\ÉniEvent` (lecture seule, source de
 
 Next.js 16 (App Router, RSC, Server Actions) · React 19 · TypeScript strict ·
 Tailwind 3.4 · Supabase (Postgres, Auth, Storage, RLS) · Zod + react-hook-form ·
-**Premux** (SMS, branché) · **FedaPay** (Mobile Money, carte — bac à sable) ·
+**FedaPay** (Mobile Money, carte — bac à sable) · **Premux** (SMS, **débranché**) ·
 **Resend** (e-mail, branché) · Vitest.
 
 ## Production
@@ -48,7 +48,7 @@ Mise en ligne, variables à poser, lecture des pannes : `docs/DEPLOIEMENT.md`.
 | `npm run db:seed` | Applique `supabase/seed.sql` (rejouable) |
 | `npm run demo:reset` | Seed + comptes de démonstration + jeu entreprise |
 | `npm run smoke` | Contrôles de bout en bout contre le vrai Supabase |
-| `npm run smoke:sms` | **Envoie un vrai SMS** via Premux — consomme un crédit, exige `SMS_TEST_TO` |
+| `npm run smoke:sms` | **Envoie un vrai SMS** via Premux — canal débranché (0035), ne sert qu'à un éventuel retour en arrière |
 | `npm run smoke:email` | **Envoie un vrai e-mail** via Resend — exige `EMAIL_TEST_TO` |
 | `npm run mails:auth` | Publie les gabarits d'authentification chez Supabase — simulation sans `-- --appliquer` |
 | `npm run smoke:paiement` | **Ouvre un vrai paiement** chez FedaPay — refuse de tourner sur une clé de production |
@@ -268,16 +268,23 @@ qui appelle une réponse doit déclencher une notification.**
 - **La file est secrète** : elle dit qui a été prévenu, donc qui sont les concurrents en
   lice. Lecture réservée à l'administration ; `claim_notifications` et
   `mark_notification` sont retirées à `authenticated`.
-- **Plafond de 20 destinataires par demande.** Un brief « traiteur à Cotonou » concerne
-  tous les traiteurs approuvés de la ville, et chaque SMS est facturé. Au-delà, la
-  demande reste visible dans `/pro/demandes`.
-- **Deux canaux, deux usages — pas deux fois le même message.** Le SMS alerte : un
-  segment, 160 caractères, facturé à chaque envoi. L'e-mail raconte : ville, date,
-  convives, budget, échéance, de quoi décider **sans se connecter**. Les deux partagent
-  une seule charge utile (`renderSms` ignore ce qu'il n'utilise pas) ; c'est le détail
-  qui justifie de doubler, sans quoi l'e-mail ne serait qu'un SMS plus lent.
-  Le plafond de 20 borne l'envoi *payant* ; l'e-mail suit la même liste pour qu'un
-  partenaire ne soit jamais prévenu sur un seul canal au hasard.
+- ⚠️ **Le SMS est débranché — tout part par courriel** (migration 0035). Décision
+  d'exploitation : trop cher pour un résumé de 160 caractères, quand l'e-mail porte
+  ville, date, convives, budget et échéance, de quoi décider **sans se connecter**.
+  Le constat de terrain l'a confirmée : Premux répondait `QUOTA_EXCEEDED` sur *tous*
+  les envois depuis des semaines sans que rien ne l'affiche.
+  Conséquence à ne pas manquer : `app.request_recipients` exige désormais une
+  **adresse** et non plus « un numéro *ou* une adresse » — sans quoi un partenaire sans
+  adresse consommerait une place du plafond pour un envoi qui n'aurait pas lieu.
+  `premux.ts`, `renderSms` et le canal `sms` de l'énumération sont **conservés** :
+  débrancher n'est pas détruire, et les lignes déjà envoyées y font référence. Le
+  drainage refuse explicitement ce canal plutôt que de l'ignorer — une notification qui
+  disparaît sans trace est pire qu'une notification en erreur.
+- **Plafond de 20 destinataires par demande.** Il bornait l'envoi *payant* ; depuis le
+  passage au courriel, il borne la **pertinence** — au-delà, on sollicite des
+  prestataires que la demande ne concerne qu'à la marge — et protège la réputation
+  d'expéditeur. Il est désormais remontable sans risque financier. Au-delà, la demande
+  reste visible dans `/pro/demandes`.
 - **Tout ce qui vient de la base est échappé dans un e-mail.** Un nom d'enseigne est une
   chaîne saisie par un partenaire ; concaténée telle quelle dans du HTML, c'est une
   injection — dans la boîte de réception d'un client. Styles en ligne et mise en page en
