@@ -2460,6 +2460,19 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      commission_settings: {
+        Args: never
+        Returns: {
+          city: string
+          effective_rate: number
+          is_verified: boolean
+          listings_count: number
+          org_id: string
+          org_name: string
+          rate_override: number
+          status: Database["public"]["Enums"]["org_status"]
+        }[]
+      }
       create_payout: {
         Args: { org: string }
         Returns: {
@@ -2489,6 +2502,7 @@ export type Database = {
         Args: { p_approve: boolean; p_reason?: string; target: string }
         Returns: undefined
       }
+      default_commission_rate: { Args: never; Returns: number }
       enqueue_deadline_reminders: {
         Args: { fenetre?: string }
         Returns: number
@@ -2622,6 +2636,32 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      set_commission_rate: {
+        Args: { org: string; taux?: number }
+        Returns: {
+          acceptance_rate: number | null
+          bio: string | null
+          commission_rate_override: number | null
+          created_at: string
+          is_verified: boolean
+          org_id: string
+          rating_avg: number | null
+          rating_count: number
+          response_time_avg_h: number | null
+          service_cities: string[]
+          travel_radius_km: number | null
+          updated_at: string
+          verified_at: string | null
+          years_experience: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "partner_profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_default_commission_rate: { Args: { taux: number }; Returns: number }
       settle_payment: {
         Args: {
           cle: string

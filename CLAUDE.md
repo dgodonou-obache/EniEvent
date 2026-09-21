@@ -97,6 +97,20 @@ supabase/migrations/    schéma, une migration par domaine
   à ligne perd des francs.
 - Les modules à risque financier (`pricing`, `fees`, `promo`, `cancellation`, `escrow`)
   sont couverts par des tests unitaires. Une modification sans test est un refus de revue.
+- ⚠️ **Le client paie le prix affiché. Aucun frais, jamais.** La plateforme se rémunère
+  uniquement sur la **commission du partenaire**, prélevée sur sa part à l'encaissement
+  et donc invisible côté client. Les frais acheteur de la migration 0029 ont été
+  **retirés** (0034), pas ramenés à zéro : un réglage qu'on peut rouvrir est un piège —
+  le jour où quelqu'un le remonte, le client paie une somme que `BookingBox` ne lui a
+  jamais montrée. `quote()` rend donc `total === subtotal`, et un test l'exige.
+- **La commission se décide partenaire par partenaire**, depuis `/admin/partenaires`.
+  `partner_profiles.commission_rate_override` l'emporte sur `commission_rate_default`
+  (`app.commission_rate`). ⚠️ L'écriture passe **obligatoirement** par
+  `set_commission_rate` : la migration 0021 a retiré cette colonne du `grant update` de
+  `authenticated`, et un administrateur est lui aussi `authenticated` — un droit de
+  colonne ne sait pas les distinguer, seul `app.is_admin()` le peut. Un `update` direct
+  ne lèverait rien et toucherait zéro ligne. Un champ vide n'est pas un taux de zéro :
+  l'un suit le barème général, l'autre est une décision.
 - ⚠️ **On ne verse au partenaire qu'après la prestation, et on n'annule qu'avant.** Les
   deux règles sont complémentaires : elles rendent impossible de rembourser un client
   avec de l'argent déjà parti. `payments.payout_id` empêchait de payer *deux fois* ;

@@ -130,3 +130,54 @@ export async function getRequestCounts() {
     ).length,
   };
 }
+
+export interface CommissionRow {
+  orgId: string;
+  orgName: string;
+  city: string | null;
+  status: Database["public"]["Enums"]["org_status"];
+  isVerified: boolean;
+  listingsCount: number;
+  /** Taux propre à ce partenaire, ou `null` s'il suit le barème général. */
+  override: number | null;
+  /** Ce qui s'appliquera réellement à sa prochaine commande. */
+  effective: number;
+}
+
+export interface CommissionSettings {
+  /** Barème appliqué aux partenaires sans taux propre. */
+  defaultRate: number;
+  partners: CommissionRow[];
+}
+
+/**
+ * Barèmes de commission, pour l'administration.
+ *
+ * **Le taux propre et le taux effectif sont rendus séparément**, et c'est le
+ * point de l'écran : « 12 % » sans son origine se lit comme un réglage qu'on a
+ * fait soi-même, alors qu'il peut être hérité du barème général. Les deux
+ * valeurs viennent de `commission_settings()` (migration 0034), qui refuse de
+ * répondre à qui n'est pas administrateur.
+ */
+export async function getCommissionSettings(): Promise<CommissionSettings> {
+  const supabase = await createClient();
+
+  const [{ data: rows }, { data: parDefaut }] = await Promise.all([
+    supabase.rpc("commission_settings"),
+    supabase.rpc("default_commission_rate"),
+  ]);
+
+  return {
+    defaultRate: Number(parDefaut ?? 10),
+    partners: (rows ?? []).map((r) => ({
+      orgId: r.org_id,
+      orgName: r.org_name ?? "Partenaire",
+      city: r.city,
+      status: r.status,
+      isVerified: r.is_verified,
+      listingsCount: r.listings_count,
+      override: r.rate_override === null ? null : Number(r.rate_override),
+      effective: Number(r.effective_rate),
+    })),
+  };
+}

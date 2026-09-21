@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import { format } from "@/lib/money";
 import {
-  SERVICE_FEE_RATE,
   cheapestOpenDay,
   isWeekend,
   optionsTotal,
@@ -106,7 +105,7 @@ describe("tarif d'une journée", () => {
 });
 
 describe("devis", () => {
-  it("additionne les jours et ajoute les frais de service", () => {
+  it("additionne les jours, et n'ajoute rien", () => {
     const result = quote(["2026-09-11", "2026-09-12"], context());
 
     expect(result.ok).toBe(true);
@@ -114,8 +113,12 @@ describe("devis", () => {
 
     // 150 000 (vendredi) + 195 000 (samedi majoré) = 345 000
     expect(result.subtotal.amount).toBe(345_000);
-    expect(result.serviceFee.amount).toBe(34_500);
-    expect(result.total.amount).toBe(379_500);
+
+    // Le contrôle qui compte : **aucun frais acheteur**. Le client paie le prix
+    // affiché, la plateforme se rémunère sur la commission du prestataire
+    // (migration 0034). Un écart ici, et le client découvre un supplément au
+    // moment de payer.
+    expect(result.total.amount).toBe(345_000);
   });
 
   it("trie les dates, quel que soit l'ordre de sélection", () => {
@@ -173,23 +176,21 @@ describe("devis", () => {
     expect(quote([], context())).toEqual({ ok: false, reason: "aucune-date" });
   });
 
-  it("garde des frais de service exacts sur un montant impair", () => {
-    const result = quote(
-      ["2026-09-11"],
-      context({ availabilities: [{ date: "2026-09-11", status: "open", price: 100_005 }] }),
-    );
+  it("rend un total rigoureusement égal à la somme des jours", () => {
+    // Montants choisis pour tomber mal : un arrondi glissé entre le sous-total
+    // et le total serait exactement le supplément qu'on s'interdit.
+    for (const prix of [1, 7, 100_005, 333_333, 999_999]) {
+      const result = quote(
+        ["2026-09-11"],
+        context({ availabilities: [{ date: "2026-09-11", status: "open", price: prix }] }),
+      );
 
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
+      expect(result.ok, `${prix}`).toBe(true);
+      if (!result.ok) return;
 
-    // 10 % de 100 005 = 10 000,5 → arrondi au demi supérieur
-    expect(result.serviceFee.amount).toBe(10_001);
-    expect(result.total.amount).toBe(110_006);
-    expect(result.subtotal.amount + result.serviceFee.amount).toBe(result.total.amount);
-  });
-
-  it("annonce le taux de frais appliqué", () => {
-    expect(SERVICE_FEE_RATE).toBe(0.1);
+      expect(result.subtotal.amount, `${prix}`).toBe(prix);
+      expect(result.total.amount, `${prix}`).toBe(prix);
+    }
   });
 
   it("formate un total lisible pour le marché béninois", () => {
@@ -197,7 +198,7 @@ describe("devis", () => {
     if (!result.ok) throw new Error("devis inattendu");
     // `Intl` sépare les milliers par une espace insécable étroite (U+202F),
     // pas par une espace ordinaire — invisible à l'œil, décisif à l'égalité.
-    expect(format(result.total)).toBe(`379${"\u202f"}500 FCFA`);
+    expect(format(result.total)).toBe(`345${"\u202f"}000 FCFA`);
   });
 });
 

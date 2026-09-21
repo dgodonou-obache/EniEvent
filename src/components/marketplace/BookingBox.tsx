@@ -30,8 +30,12 @@ interface BookingBoxProps {
  * Encart de réservation.
  *
  * Le prix affiché vient de `pricing.ts` : tarif du jour saisi par le
- * prestataire, ou tarif de base majoré le week-end. Les frais de service sont
- * montrés dès ici — les découvrir au paiement serait une mauvaise surprise.
+ * prestataire, ou tarif de base majoré le week-end.
+ *
+ * **Le total affiché est celui qui sera débité.** Aucun frais acheteur n'est
+ * ajouté nulle part (migration 0034) : la plateforme se rémunère sur la
+ * commission du prestataire. Découvrir un supplément au paiement serait la
+ * mauvaise surprise que `CLAUDE.md` §5 interdit.
  */
 export function BookingBox({
   listingId,
@@ -127,15 +131,17 @@ export function BookingBox({
                 </div>
               ))}
 
-              <div className="flex justify-between gap-3 border-t border-slate-100 pt-2 text-slate-500">
-                <dt>Frais de service</dt>
-                <dd className="tabular-nums">{format(estimate.serviceFee)}</dd>
-              </div>
-
-              <div className="flex justify-between gap-3 pt-1 text-base font-bold text-slate-900">
+              {/* Aucune ligne de frais : le client paie le prix affiché, et le
+                  total est la simple somme des jours. La plateforme se
+                  rémunère sur la commission du prestataire (migration 0034). */}
+              <div className="flex justify-between gap-3 border-t border-slate-100 pt-2 text-base font-bold text-slate-900">
                 <dt>Total</dt>
                 <dd className="tabular-nums">{format(estimate.total)}</dd>
               </div>
+
+              <p className="pt-1 text-xs text-slate-400">
+                Prix final, sans frais de dossier ni supplément.
+              </p>
             </dl>
           ) : null}
 

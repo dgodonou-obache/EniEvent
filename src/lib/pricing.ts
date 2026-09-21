@@ -24,10 +24,14 @@ import {
  * Tout passe par `money.ts` : entiers en unité mineure, jamais de flottant.
  * Le taux de majoration week-end est le seul flottant toléré, et son résultat
  * est immédiatement ramené à l'entier.
+ *
+ * ⚠️ **Le total est le prix du prestataire, et rien d'autre.** Aucun frais
+ * acheteur n'est ajouté ici, ni nulle part ailleurs (migration 0034) : la
+ * plateforme se rémunère sur la commission, prélevée sur la part du partenaire
+ * et donc invisible au client. Le chiffre calculé ici est exactement celui que
+ * `book_listing` inscrira sur la commande — la seule façon de garantir qu'un
+ * client ne découvre pas une autre somme au moment de payer.
  */
-
-/** Frais de service acheteur. Provisoire : le barème réel arrive au lot 2. */
-export const SERVICE_FEE_RATE = 0.1;
 
 export type PriceSource = "planning" | "tarif-de-base";
 
@@ -59,7 +63,10 @@ export interface DayPrice {
 }
 
 export type QuoteResult =
-  | { ok: true; days: DayPrice[]; subtotal: Money; serviceFee: Money; total: Money }
+  // `subtotal` et `total` sont volontairement égaux : le champ reste pour que
+  // les appelants qui somment les jours et ceux qui lisent le total parlent de
+  // la même chose, sans qu'aucun ne puisse réintroduire un écart.
+  | { ok: true; days: DayPrice[]; subtotal: Money; total: Money }
   | {
       ok: false;
       reason: "aucune-date" | "date-non-ouverte" | "date-indisponible" | "tarif-inconnu";
@@ -139,9 +146,7 @@ export function quote(dates: readonly string[], context: PricingContext): QuoteR
     days.map((d) => d.amount),
     currency,
   );
-  const serviceFee = applyRate(subtotal, SERVICE_FEE_RATE);
-
-  return { ok: true, days, subtotal, serviceFee, total: add(subtotal, serviceFee) };
+  return { ok: true, days, subtotal, total: subtotal };
 }
 
 /**
