@@ -16,6 +16,8 @@ import { DEFAULT_CURRENCY, format, money, type CurrencyCode } from "@/lib/money"
 import type { ListingDetail as Listing, ListingSummary } from "@/lib/listings";
 import type { AvailabilityRow } from "@/lib/pricing";
 
+import { AskQuestionButton } from "@/components/messaging/AskQuestionButton";
+
 import { BookingBox } from "./BookingBox";
 import { ListingCard } from "./ListingCard";
 import { ListingGallery } from "./ListingGallery";
@@ -229,6 +231,21 @@ export function ListingDetail({ listing, availabilities, similar }: ListingDetai
             }
             priceUnit={mainRule?.unit ?? null}
           />
+
+          {/* Sous l'encart, et non dedans : c'est le recours quand on hésite,
+              pas une étape de la réservation. Une question posée avant de
+              réserver est souvent ce qui fait basculer l'hésitation en vente. */}
+          <div className="mt-3">
+            <AskQuestionButton
+              orgId={listing.org_id}
+              listingId={listing.id}
+              base="/compte/messages"
+              label="Poser une question au prestataire"
+            />
+            <p className="mt-2 text-center text-xs text-slate-400">
+              Réponse par message, sans engagement.
+            </p>
+          </div>
         </aside>
       </div>
 

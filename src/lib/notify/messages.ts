@@ -21,6 +21,7 @@ export const KINDS = [
   "quote.declined",
   "request.deadline",
   "order.cancelled",
+  "message.new",
 ] as const;
 export type NotificationKind = (typeof KINDS)[number];
 
@@ -126,6 +127,18 @@ export function renderSms(
               `Détails : ${base}/pro/reservations`
           : `ÉniEvent : votre réservation ${ref}${quand} a été annulée par le prestataire. ` +
               `Détails : ${base}/compte/reservations`,
+      );
+    }
+
+    case "message.new": {
+      // ⚠️ Jamais le contenu du message. Le masquage des coordonnées vit dans
+      // `read_conversation` ; un extrait ici le contournerait entièrement.
+      const pour = payload.pour === "partner" ? "partner" : "client";
+      const qui = short(payload.sender, 22);
+
+      return toGsmSafe(
+        `ÉniEvent : ${qui || "Un message"} vous a écrit. ` +
+          `Répondez sur ${base}${pour === "partner" ? "/pro" : "/compte"}/messages`,
       );
     }
 

@@ -33,7 +33,8 @@
     "admin:creer": "node --env-file=.env.local scripts/creer-admin.mjs",
     "smoke:paiement": "node --env-file=.env.local node_modules/vitest/vitest.mjs run tests/paiement-reel.test.ts --reporter=verbose",
     "smoke:commande": "node --env-file=.env.local scripts/smoke-commande.mjs",
-    "smoke:annulation": "node --env-file=.env.local scripts/smoke-annulation.mjs"
+    "smoke:annulation": "node --env-file=.env.local scripts/smoke-annulation.mjs",
+    "smoke:messagerie": "node --env-file=.env.local scripts/smoke-messagerie.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

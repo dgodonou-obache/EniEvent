@@ -162,7 +162,7 @@ export type Database = {
           action: string
           actor_id: string | null
           created_at: string
-          entity_id: string
+          entity_id: string | null
           entity_type: string
           from_state: string | null
           id: string
@@ -173,7 +173,7 @@ export type Database = {
           action: string
           actor_id?: string | null
           created_at?: string
-          entity_id: string
+          entity_id?: string | null
           entity_type: string
           from_state?: string | null
           id?: string
@@ -184,7 +184,7 @@ export type Database = {
           action?: string
           actor_id?: string | null
           created_at?: string
-          entity_id?: string
+          entity_id?: string | null
           entity_type?: string
           from_state?: string | null
           id?: string
@@ -436,6 +436,128 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: true
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_reads: {
+        Row: {
+          conversation_id: string
+          last_read_at: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          last_read_at?: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          last_read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_reads_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_reads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          client_id: string
+          client_org_id: string | null
+          created_at: string
+          id: string
+          last_message_at: string | null
+          listing_id: string | null
+          org_id: string
+          reference: string
+          request_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          client_org_id?: string | null
+          created_at?: string
+          id?: string
+          last_message_at?: string | null
+          listing_id?: string | null
+          org_id: string
+          reference?: string
+          request_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          client_org_id?: string | null
+          created_at?: string
+          id?: string
+          last_message_at?: string | null
+          listing_id?: string | null
+          org_id?: string
+          reference?: string
+          request_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_client_org_id_fkey"
+            columns: ["client_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listing_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings_bookable_now"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "quote_requests"
             referencedColumns: ["id"]
           },
         ]
@@ -825,6 +947,48 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id", "type"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          body: string
+          conversation_id: string
+          created_at: string
+          id: string
+          sender_id: string
+          sender_side: Database["public"]["Enums"]["message_side"]
+        }
+        Insert: {
+          body: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          sender_id: string
+          sender_side: Database["public"]["Enums"]["message_side"]
+        }
+        Update: {
+          body?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          sender_id?: string
+          sender_side?: Database["public"]["Enums"]["message_side"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2565,7 +2729,74 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      my_conversations: {
+        Args: never
+        Returns: {
+          counterpart: string
+          id: string
+          last_message_at: string
+          listing_id: string
+          listing_title: string
+          reference: string
+          request_id: string
+          request_reference: string
+          side: Database["public"]["Enums"]["message_side"]
+          unmasked: boolean
+          unread: number
+        }[]
+      }
       next_reference: { Args: { prefix: string }; Returns: string }
+      open_conversation: {
+        Args: { annonce?: string; demande?: string; org: string }
+        Returns: {
+          client_id: string
+          client_org_id: string | null
+          created_at: string
+          id: string
+          last_message_at: string | null
+          listing_id: string | null
+          org_id: string
+          reference: string
+          request_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "conversations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      open_conversation_for_request: {
+        Args: { demande: string; mon_org: string }
+        Returns: {
+          client_id: string
+          client_org_id: string | null
+          created_at: string
+          id: string
+          last_message_at: string | null
+          listing_id: string | null
+          org_id: string
+          reference: string
+          request_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "conversations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      org_contact: {
+        Args: { org: string }
+        Returns: {
+          billing_email: string
+          ifu: string
+          phone: string
+          rccm: string
+        }[]
+      }
       payout_candidates: {
         Args: never
         Returns: {
@@ -2581,6 +2812,16 @@ export type Database = {
         Returns: {
           held: number
           payable: number
+        }[]
+      }
+      read_conversation: {
+        Args: { conversation: string }
+        Returns: {
+          body: string
+          created_at: string
+          id: string
+          mine: boolean
+          sender_side: Database["public"]["Enums"]["message_side"]
         }[]
       }
       release_stale_orders: { Args: { delai?: string }; Returns: number }
@@ -2632,6 +2873,23 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "payout_accounts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      send_message: {
+        Args: { conversation: string; corps: string }
+        Returns: {
+          body: string
+          conversation_id: string
+          created_at: string
+          id: string
+          sender_id: string
+          sender_side: Database["public"]["Enums"]["message_side"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "messages"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -2760,6 +3018,7 @@ export type Database = {
       listing_status: "draft" | "pending" | "approved" | "rejected" | "archived"
       media_type: "image" | "video"
       member_status: "invited" | "active" | "revoked"
+      message_side: "client" | "partner"
       notification_channel: "sms" | "email"
       notification_status: "pending" | "sending" | "sent" | "failed"
       order_status:
@@ -2977,6 +3236,7 @@ export const Constants = {
       listing_status: ["draft", "pending", "approved", "rejected", "archived"],
       media_type: ["image", "video"],
       member_status: ["invited", "active", "revoked"],
+      message_side: ["client", "partner"],
       notification_channel: ["sms", "email"],
       notification_status: ["pending", "sending", "sent", "failed"],
       order_status: [

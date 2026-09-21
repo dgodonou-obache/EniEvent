@@ -255,11 +255,11 @@ export async function getListingBySlug(slug: string) {
     .from("listings")
     .select(
       `
-      id, slug, title, description, highlights, city, district, address,
+      id, org_id, slug, title, description, highlights, city, district, address,
       latitude, longitude, cover_url, currency, booking_mode, min_notice_days,
       min_price, price_from, payment_terms, rating_avg, rating_count, kind,
       categories(slug, name),
-      organizations(slug, brand_name, legal_name, city, phone),
+      organizations(slug, brand_name, legal_name, city),
       partner_profiles:organizations(partner_profiles(bio, is_verified, years_experience, response_time_avg_h, rating_avg, rating_count)),
       cancellation_policies(slug, name, summary),
       venue_details(*),

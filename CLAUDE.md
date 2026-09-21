@@ -52,6 +52,7 @@ Mise en ligne, variables à poser, lecture des pannes : `docs/DEPLOIEMENT.md`.
 | `npm run smoke:email` | **Envoie un vrai e-mail** via Resend — exige `EMAIL_TEST_TO` |
 | `npm run mails:auth` | Publie les gabarits d'authentification chez Supabase — simulation sans `-- --appliquer` |
 | `npm run smoke:paiement` | **Ouvre un vrai paiement** chez FedaPay — refuse de tourner sur une clé de production |
+| `npm run smoke:messagerie` | Ouvre un fil, écrit des deux côtés, vérifie le masquage — **seul endroit où se teste l'absence de droit direct** |
 | `npm run smoke:annulation` | Réserve, encaisse, annule et rembourse contre le vrai Supabase — nettoie derrière lui |
 
 Les autres `smoke:*` (`offre`, `planning`, `devis`, `entreprise`, `photos`) jouent un
@@ -141,6 +142,14 @@ client. Server Actions ou fonctions Postgres `SECURITY DEFINER` uniquement, jour
 dans `audit_logs`. Les transitions autorisées vivent dans `src/lib/states.ts`.
 
 ### 3. Sécurité
+- ⚠️ **PGlite ne reproduit pas les droits par défaut de Supabase.** Sur le vrai projet,
+  un `alter default privileges` accorde `INSERT, SELECT, UPDATE, DELETE` à `anon` et
+  `authenticated` sur **chaque table neuve** de `public`. Un test « cette table n'est pas
+  lisible » passe donc en local sans rien prouver — constaté sur `messages` (migration
+  0038), où le corps brut était servi malgré un commentaire affirmant l'inverse. La RLS
+  sauvait la mise, mais une garantie qui tient par un seul fil n'en est pas une. Toute
+  table qui ne doit **pas** être lue directement porte un `revoke` explicite, et le
+  contrôle se fait dans un `smoke:*`, jamais dans un test PGlite.
 - **RLS activée sur toutes les tables**, sans exception. `npm run db:verify` échoue si
   une table de `public` n'a pas la RLS, ou l'a sans aucune politique.
 - Toute politique nouvelle ou modifiée s'accompagne d'un test dans `tests/rls-*.test.ts`.
@@ -314,6 +323,15 @@ qui appelle une réponse doit déclencher une notification.**
   `…`**. Un seul de ces caractères fait tomber la capacité à 70 et triple la facture.
   Les textes vivent dans `src/lib/notify/messages.ts`, passent par `toGsmSafe`, et sont
   testés **au pire cas** (nom d'enseigne long, identifiant de 36 caractères).
+- ⚠️ **Le corps d'un message ne circule jamais par courriel** (`message.new`). Le
+  masquage des coordonnées vit dans `read_conversation` ; un extrait dans la charge utile
+  le contournerait entièrement — il suffirait d'écrire son numéro pour qu'il parte en
+  clair dans une boîte de réception. C'est la seule charge utile du dépôt qui ne
+  transporte volontairement aucun texte libre.
+- **Une notification par salve, pas par message.** `send_message` n'alimente la file que
+  si le message précédent venait de l'autre partie : dix allers-retours font un seul
+  courriel, et la réponse d'en face rouvre le droit d'alerter. Règle sans état, donc sans
+  dérive. Ne pas la remplacer par un compteur de non-lus, plus fragile.
 - Premux est isolé dans `src/lib/sms/premux.ts` — seul fichier du dépôt à le connaître.
   `X-Premux-Domain` attend **le domaine de la clé** (`enievent.com`), pas `premux.bj`
   comme le montre leur documentation.

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CalendarDays, ClipboardList, MapPin, Users, Wallet } from "lucide-react";
 
 import { RespondButton } from "@/components/dashboard/RespondButton";
+import { AskQuestionButton } from "@/components/messaging/AskQuestionButton";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { requireSpace } from "@/lib/auth/session";
@@ -22,7 +23,10 @@ export default async function PartnerRequestsPage() {
   const { decision } = await requireSpace("partner", "/pro/connexion");
   if (!decision.granted || !decision.org) return null;
 
-  const opportunities = await getPartnerOpportunities(decision.org.orgId);
+  // Extrait avant le rendu : le rétrécissement de type se perd à l'intérieur
+  // d'une fonction de rappel, et `decision.org` y redevient possiblement nul.
+  const orgId = decision.org.orgId;
+  const opportunities = await getPartnerOpportunities(orgId);
 
   return (
     <div>
@@ -150,6 +154,21 @@ export default async function PartnerRequestsPage() {
                   ) : (
                     <RespondButton itemId={item.id} label="Répondre" />
                   )}
+
+                  {/* Jusqu'ici, un partenaire à qui manquait une information
+                      n'avait aucun moyen de la demander : il ouvrait un
+                      brouillon de devis, ou chiffrait de travers. Il désigne
+                      une **demande**, jamais un client — c'est ce qui garde
+                      l'appel d'offres anonyme. */}
+                  {deadline.state !== "depasse" && request?.id ? (
+                    <AskQuestionButton
+                      requestId={request.id}
+                      partnerOrgId={orgId}
+                      base="/pro/messages"
+                      label="Poser une question"
+                      className="w-auto"
+                    />
+                  ) : null}
                 </div>
               </li>
             );

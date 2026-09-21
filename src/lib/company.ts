@@ -264,16 +264,39 @@ export async function getPendingQuoteApprovals(orgId: string): Promise<string[]>
   return (data ?? []).map((row) => row.subject_id);
 }
 
+/**
+ * Fiche de l'organisation, coordonnées comprises.
+ *
+ * ⚠️ **En deux lectures, et c'est nécessaire.** Depuis la migration 0036,
+ * `phone`, `billing_email`, `rccm` et `ifu` ne sont plus lisibles directement :
+ * le téléphone d'un partenaire relevé dans l'annuaire permettait de réserver en
+ * direct, commission comprise. Un droit de colonne ne sachant pas distinguer un
+ * membre d'un visiteur — les deux sont `authenticated` — ces quatre champs
+ * passent par `org_contact`, qui vérifie l'appartenance.
+ */
 export async function getCompanyProfile(orgId: string) {
   const supabase = await createClient();
 
-  const { data } = await supabase
-    .from("organizations")
-    .select("id, legal_name, brand_name, city, phone, billing_email, address, rccm, ifu, country, status")
-    .eq("id", orgId)
-    .maybeSingle();
+  const [{ data }, { data: contact }] = await Promise.all([
+    supabase
+      .from("organizations")
+      .select("id, legal_name, brand_name, city, address, country, status")
+      .eq("id", orgId)
+      .maybeSingle(),
+    supabase.rpc("org_contact", { org: orgId }),
+  ]);
 
-  return data;
+  if (!data) return null;
+
+  const coordonnees = (Array.isArray(contact) ? contact[0] : contact) ?? null;
+
+  return {
+    ...data,
+    phone: coordonnees?.phone ?? null,
+    billing_email: coordonnees?.billing_email ?? null,
+    rccm: coordonnees?.rccm ?? null,
+    ifu: coordonnees?.ifu ?? null,
+  };
 }
 
 // -----------------------------------------------------------------------------

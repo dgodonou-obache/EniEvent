@@ -280,6 +280,33 @@ export function renderEmail(
       });
     }
 
+    case "message.new": {
+      // ⚠️ **Aucun extrait du message.** C'est la seule charge utile du dépôt
+      // qui ne transporte volontairement aucun texte libre : le masquage des
+      // coordonnées vit dans `read_conversation`, et un extrait ici le
+      // contournerait — il suffirait d'écrire son numéro pour qu'il parte en
+      // clair dans une boîte de réception.
+      const pour = payload.pour === "partner" ? "partner" : "client";
+      const qui = text(payload.sender);
+      const espace = pour === "partner" ? "/pro/messages" : "/compte/messages";
+
+      return shell({
+        subject: qui ? `${qui} vous a envoyé un message` : "Vous avez un nouveau message",
+        preheader: "Répondez depuis votre espace ÉniEvent.",
+        heading: qui ? `${qui} vous a écrit` : "Vous avez un nouveau message",
+        intro:
+          pour === "partner"
+            ? "Un client attend une précision avant de décider. Une réponse rapide " +
+              "pèse souvent autant que le prix."
+            : "Votre prestataire vous a répondu. Retrouvez l'échange dans votre espace.",
+        details: [["Conversation", text(payload.reference)]],
+        cta: { label: "Lire et répondre", href: `${base}${espace}` },
+        outro:
+          "Par sécurité, le contenu des messages ne circule pas par courriel : " +
+          "il se lit uniquement dans votre espace.",
+      });
+    }
+
     default:
       return null;
   }

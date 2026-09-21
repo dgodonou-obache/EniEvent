@@ -22,6 +22,7 @@ const LOT_BY_PREFIX: { prefix: string; lot: string }[] = [
   { prefix: "/pro/reservations", lot: "Lot 2 — Chaîne financière" },
   { prefix: "/pro", lot: "Lot 3 — Back-office partenaire" },
 
+  { prefix: "/entreprise/messages", lot: "Lot 6 — Confiance" },
   { prefix: "/entreprise/devis", lot: "Lot 4 — Tunnel de devis" },
   { prefix: "/entreprise/projets", lot: "Lot 4 — Tunnel de devis" },
   { prefix: "/entreprise/reservations", lot: "Lot 2 — Chaîne financière" },

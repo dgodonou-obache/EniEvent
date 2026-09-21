@@ -151,6 +151,10 @@ export const companyNav: SpaceNav = {
     {
       title: "Organisation",
       items: [
+        // Une entreprise est un client : elle lance des appels d'offres et doit
+        // pouvoir parler à ses prestataires. L'entrée manquait, et les espaces
+        // étant étanches, on ne pouvait pas la renvoyer vers `/compte`.
+        { label: "Messages", href: "/entreprise/messages", icon: MessageSquare },
         { label: "Fournisseurs", href: "/entreprise/fournisseurs", icon: Handshake },
         { label: "Équipe", href: "/entreprise/equipe", icon: Users },
         { label: "Paramètres", href: "/entreprise/parametres", icon: Settings },
