@@ -2,8 +2,9 @@ import Link from "next/link";
 
 import type { HeaderAccount } from "@/lib/auth/home";
 
-// Comme dans l'en-tête : uniquement les routes construites. Les pages
-// éditoriales et légales viendront avec leur lot, et reprendront leur place ici.
+// Comme dans l'en-tête : uniquement les routes construites. ⚠️ Un `href` n'est
+// qu'une chaîne — rien ne le confronte à l'arborescence de `src/app`.
+// `tests/navigation.test.ts` garde cette correspondance.
 const COLUMNS = [
   {
     title: "Découvrir",
@@ -29,6 +30,15 @@ const COLUMNS = [
       { href: "/pro/connexion", label: "Espace partenaire" },
     ],
   },
+  {
+    title: "ÉniEvent",
+    links: [
+      { href: "/contact", label: "Nous contacter" },
+      { href: "/conditions-generales", label: "Conditions générales" },
+      { href: "/confidentialite", label: "Confidentialité" },
+      { href: "/mentions-legales", label: "Mentions légales" },
+    ],
+  },
 ];
 
 /**
@@ -48,7 +58,7 @@ export function PublicFooter({ account = null }: { account?: HeaderAccount | nul
   return (
     <footer className="border-t border-slate-100 bg-white">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-5">
           <div className="lg:col-span-1">
             <p className="text-xl font-bold tracking-tight text-slate-900">
               <span className="text-orange-500">Éni</span>Event
@@ -81,8 +91,6 @@ export function PublicFooter({ account = null }: { account?: HeaderAccount | nul
           <p className="text-xs text-slate-400">
             © {new Date().getFullYear()} ÉniEvent. Tous droits réservés.
           </p>
-          {/* Les pages légales (CGU, CGV, confidentialité) arrivent au lot 8,
-              avec la mise en production. */}
           <p className="text-xs text-slate-400">Cotonou, Bénin</p>
         </div>
       </div>

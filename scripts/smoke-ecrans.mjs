@@ -54,6 +54,10 @@ const PARCOURS = [
       "/admin/connexion",
       "/admin/mot-de-passe-oublie",
       "/nouveau-mot-de-passe",
+      "/contact",
+      "/mentions-legales",
+      "/conditions-generales",
+      "/confidentialite",
     ],
   },
   {
