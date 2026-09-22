@@ -1,10 +1,13 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, MailCheck } from "lucide-react";
+import { Loader2, MailCheck, UserCheck } from "lucide-react";
 
+import { ResendConfirmation } from "@/components/auth/ResendConfirmation";
 import { Button } from "@/components/ui/button";
+import { describeSignUp } from "@/lib/auth/signup-outcome";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -28,8 +31,15 @@ export function SignUpForm({ variant, redirectTo }: SignUpFormProps) {
   const [formError, setFormError] = React.useState<string | null>(null);
   const [isPending, setIsPending] = React.useState(false);
   const [awaitingConfirmation, setAwaitingConfirmation] = React.useState<string | null>(null);
+  const [alreadyRegistered, setAlreadyRegistered] = React.useState<string | null>(null);
 
   const needsCompany = variant !== "particulier";
+
+  // Les espaces sont étanches (§4) : on renvoie vers la connexion de l'espace
+  // où l'on se trouve, jamais vers celle du grand public depuis `/pro`.
+  const signInHref = variant === "partenaire" ? "/pro/connexion" : "/connexion";
+  const forgotHref =
+    variant === "partenaire" ? "/pro/mot-de-passe-oublie" : "/mot-de-passe-oublie";
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -62,26 +72,66 @@ export function SignUpForm({ variant, redirectTo }: SignUpFormProps) {
       },
     });
 
-    if (error) {
-      setFormError(
-        error.message.toLowerCase().includes("already")
-          ? "Un compte existe déjà avec cette adresse. Connectez-vous plutôt."
-          : "La création du compte a échoué. Réessayez dans un instant.",
-      );
-      setIsPending(false);
+    // ⚠️ Lire la réponse est **contre-intuitif** : Supabase ne rend aucune
+    // erreur quand l'adresse est déjà prise, seulement un utilisateur sans
+    // identité. Sans cette lecture, on affiche « Vérifiez votre boîte mail »
+    // pour un courriel qui ne partira jamais — l'impasse qui a fait tourner en
+    // rond un vrai partenaire.
+    const issue = describeSignUp({ ...data, error }, parsed.data.email);
+    setIsPending(false);
+
+    if (issue.kind === "deja-inscrit") {
+      setAlreadyRegistered(issue.email);
       return;
     }
 
-    // Sans session, la confirmation d'e-mail est active : le compte existe mais
-    // n'est pas encore utilisable. Le dire clairement évite l'impression d'échec.
-    if (!data.session) {
-      setAwaitingConfirmation(parsed.data.email);
-      setIsPending(false);
+    if (issue.kind === "echec") {
+      setFormError(issue.message);
+      return;
+    }
+
+    if (issue.kind === "confirmation-attendue") {
+      setAwaitingConfirmation(issue.email);
       return;
     }
 
     router.push(redirectTo);
     router.refresh();
+  }
+
+  if (alreadyRegistered) {
+    return (
+      <div className="text-center">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-orange-50">
+          <UserCheck className="h-6 w-6 text-orange-600" aria-hidden />
+        </div>
+        <h2 className="mt-4 text-lg font-bold text-slate-900">Cette adresse a déjà un compte</h2>
+        <p className="mt-2 text-sm leading-relaxed text-slate-500">
+          <span className="font-medium text-slate-900">{alreadyRegistered}</span> est déjà
+          enregistrée sur ÉniEvent. Un même courriel ne sert qu&apos;une fois, quel que soit
+          l&apos;espace — client, partenaire ou entreprise.
+        </p>
+
+        <div className="mt-5 space-y-3">
+          <Link href={signInHref} className="block">
+            <Button className="w-full">Me connecter</Button>
+          </Link>
+
+          {/* Le compte peut exister sans avoir jamais été confirmé : c'est
+              exactement le cas qui bloquait. Sans ce bouton, se connecter
+              échouerait et l'utilisateur n'aurait plus aucune issue. */}
+          <ResendConfirmation email={alreadyRegistered} />
+
+          <p className="text-xs leading-relaxed text-slate-400">
+            Mot de passe oublié ?{" "}
+            <Link href={forgotHref} className="font-semibold text-orange-600">
+              Réinitialisez-le
+            </Link>
+            . Vous vouliez un second compte ? Utilisez une autre adresse.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   if (awaitingConfirmation) {
@@ -97,8 +147,13 @@ export function SignUpForm({ variant, redirectTo }: SignUpFormProps) {
           dessus pour activer votre compte.
         </p>
         <p className="mt-4 text-xs text-slate-400">
-          Pensez à regarder dans vos courriers indésirables.
+          Pensez à regarder dans vos courriers indésirables — c&apos;est là qu&apos;il
+          atterrit le plus souvent.
         </p>
+
+        <div className="mt-5">
+          <ResendConfirmation email={awaitingConfirmation} />
+        </div>
       </div>
     );
   }
