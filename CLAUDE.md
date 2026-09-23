@@ -14,7 +14,10 @@ la copie, les formulaires et les données de démonstration sont béninois.
 mobile money = MTN MoMo, Moov Money, Celtiis Cash (**ni Wave, ni Orange Money**) ;
 devise XOF ; registres RCCM et IFU.
 
-Plan d'implémentation de référence : `C:\Users\dgodo\.claude\plans\wobbly-puzzling-kay.md`.
+**Où en est le produit : `docs/LOTS.md`** — ce qui est livré, ce qui reste, et dans quel
+ordre. C'est le seul document à lire pour savoir quoi construire ensuite ; les anciens
+plans de `~/.claude/plans/` décrivent des lots déjà livrés et ne font plus foi.
+
 Cette V2 remplace l'app v1 située dans `..\ÉniEvent` (lecture seule, source de reprise).
 
 ## Stack
@@ -54,9 +57,12 @@ Mise en ligne, variables à poser, lecture des pannes : `docs/DEPLOIEMENT.md`.
 | `npm run smoke:paiement` | **Ouvre un vrai paiement** chez FedaPay — refuse de tourner sur une clé de production |
 | `npm run smoke:messagerie` | Ouvre un fil, écrit des deux côtés, vérifie le masquage — **seul endroit où se teste l'absence de droit direct** |
 | `npm run smoke:annulation` | Réserve, encaisse, annule et rembourse contre le vrai Supabase — nettoie derrière lui |
+| `npm run smoke:cloisonnement` | Rejoue l'attaque du §4 : chaque compte contre chaque écran d'administration, **puis sans navigateur** |
+| `npm run smoke:ecrans` | Rend réellement chaque route avec une session — le seul contrôle qui attrape une erreur de sérialisation RSC |
+| `npm run admin:creer` | Crée un compte d'administration sur le vrai projet |
 
-Les autres `smoke:*` (`offre`, `planning`, `devis`, `entreprise`, `photos`) jouent un
-parcours métier contre le vrai Supabase.
+Les autres `smoke:*` (`offre`, `planning`, `devis`, `entreprise`, `photos`, `commande`)
+jouent un parcours métier contre le vrai Supabase.
 
 Recette manuelle : `docs/RECETTE.md`.
 
@@ -192,6 +198,16 @@ Les cinq espaces sont étanches. Un partenaire déconnecté est renvoyé sur
 `/pro/connexion`, jamais sur `/connexion` ; aucun lien « retour au site » dans les
 back-offices.
 
+**Une exception, assumée et unique : `/compte`.** Un particulier n'est pas un
+exploitant — c'est un visiteur de la place de marché qui se trouve connecté. Le renvoyer
+chercher un lieu sans se déconnecter est le parcours normal, pas une fuite : son en-tête
+porte donc un lien « Explorer » vers `/recherche`
+(`src/app/(account)/layout.tsx`). `/pro`, `/entreprise` et `/admin` restent sans porte de
+sortie. Même logique dans l'autre sens : un particulier qui vient de confirmer son
+adresse atterrit sur `/`, et non sur un espace vide qu'il n'a pas encore rempli
+(`src/app/auth/confirm/route.ts`) — un partenaire, lui, a quelque chose à y faire tout de
+suite et reste chez lui.
+
 L'autorisation (rôle, appartenance à une organisation) est faite dans le layout serveur
 de chaque espace — **sauf `/admin`, refusé dans le proxy**.
 
@@ -228,6 +244,14 @@ barrière devant quelqu'un qui n'ouvre pas de navigateur.
 - Suivre `.claude/rules/design-system.md` — orange pêche en primaire, teal par touches,
   neutres slate, `rounded-2xl`, ombres douces, `active:scale-[0.98]`, `transition-all`.
 - **Jamais** de `<input type="date">` natif : utiliser `CustomDatePicker`.
+- **Un formulaire ne se contente pas de refuser : il montre où.** Tout formulaire validé
+  côté serveur passe par `useFieldErrors` (`src/components/ui/use-field-errors.ts`), qui
+  encadre les champs fautifs en rouge **et** emmène l'utilisateur au premier d'entre eux,
+  dans l'ordre du DOM et non dans celui du schéma Zod. Un message d'erreur en pied de
+  page laisse chercher sur un formulaire long ; sur mobile, il est hors écran.
+  Tout champ de mot de passe est un `PasswordInput`
+  (`src/components/ui/password-input.tsx`), avec son œil : refuser de montrer ce qu'on
+  tape ne protège personne et fait échouer des connexions légitimes.
 - ⚠️ **Aucune fonction ne traverse la frontière serveur → client** : composant
   d'icône, callback, classe. La sérialisation RSC échoue **à l'exécution
   seulement** — ni `tsc`, ni `eslint`, ni `next build` ne la voient, car ces
@@ -305,9 +329,20 @@ qui appelle une réponse doit déclencher une notification.**
   garde ses propres gabarits. Les deux passent par `src/lib/notify/shell.ts`, sans quoi
   l'identité visuelle divergerait à la première retouche. Les gabarits Supabase vivent
   dans `src/lib/notify/auth-emails.ts` : le dépôt reste la source de vérité,
-  `npm run mails:auth` republie, et `tests/auth-emails.test.ts` vérifie les marqueurs
-  (`{{ .ConfirmationURL }}`, `{{ .Token }}`) — un marqueur mal orthographié ne lève
-  aucune erreur, il envoie un bouton qui ne mène nulle part.
+  `npm run mails:auth` republie, et `tests/auth-emails.test.ts` vérifie les marqueurs —
+  un marqueur mal orthographié ne lève aucune erreur, il envoie un bouton qui ne mène
+  nulle part.
+- ⚠️ **`{{ .ConfirmationURL }}` est proscrit, et le test l'interdit explicitement.** Ce
+  marqueur a produit pendant des semaines des liens qui ne pouvaient structurellement
+  pas aboutir — « Ce lien n'est plus valable » sur un courriel reçu à l'instant. Deux
+  causes, aucune corrigeable par un réglage : la session revient soit dans un
+  **fragment** (`#access_token=…`), que le navigateur ne transmet **jamais** au serveur,
+  soit dans un **code PKCE**, dont le vérificateur est un cookie posé sur le navigateur
+  d'origine — or on ouvre ses courriels où ils arrivent, et l'application Gmail ouvre le
+  sien. Tous les liens passent donc par `{{ .TokenHash }}` et la route `/auth/confirm`,
+  qui appelle `verifyOtp({ token_hash, type })` : tout arrive en paramètre de requête,
+  aucun cookie préalable n'est exigé, le lien marche depuis n'importe quel appareil.
+  C'est le chemin que Supabase documente pour le rendu côté serveur.
 - Resend est isolé dans `src/lib/mail/resend.ts` — seul fichier du dépôt à le connaître.
   Trois pièges y sont documentés : l'expéditeur exige un **domaine vérifié** (sinon 403,
   au libellé trompeur), le champ de réponse s'appelle **`reply_to`** et non `replyTo`

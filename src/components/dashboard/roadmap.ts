@@ -10,46 +10,54 @@ export { NAV_BY_SPACE, type Space };
  * arrive et ce qu'elle contiendra. Les vraies pages, plus spécifiques, priment
  * automatiquement sur la route attrape-tout — cette table se vide donc d'
  * elle-même à mesure que les lots sont livrés.
+ *
+ * ⚠️ **Cette table ne nomme que des lots à venir.** Les lots numérotés 1 à 8 du
+ * plan d'origine sont livrés ou dissous ; un écran qui annonçait « arrive au
+ * lot 2 » alors que le lot 2 est en production depuis des semaines dit au
+ * lecteur que le produit est à l'arrêt. Les lots restants sont donc lettrés,
+ * pour qu'aucune confusion ne soit possible avec l'ancienne numérotation, et
+ * leur contenu est détaillé dans `docs/LOTS.md` — **qui doit rester d'accord
+ * avec cette table.**
  */
 
 /** Lot livrant chaque préfixe de route. Du plus spécifique au plus général. */
 const LOT_BY_PREFIX: { prefix: string; lot: string }[] = [
-  { prefix: "/pro/demandes", lot: "Lot 4 — Tunnel de devis" },
-  { prefix: "/pro/devis", lot: "Lot 4 — Tunnel de devis" },
-  { prefix: "/pro/messages", lot: "Lot 6 — Confiance" },
-  { prefix: "/pro/avis", lot: "Lot 6 — Confiance" },
-  { prefix: "/pro/finances", lot: "Lot 2 — Chaîne financière" },
-  { prefix: "/pro/reservations", lot: "Lot 2 — Chaîne financière" },
-  { prefix: "/pro", lot: "Lot 3 — Back-office partenaire" },
+  // — Espace partenaire —
+  { prefix: "/pro/avis", lot: "Lot A — Confiance" },
+  { prefix: "/pro/finances/factures", lot: "Lot B — Facturation" },
+  { prefix: "/pro/finances/commissions", lot: "Lot B — Facturation" },
+  { prefix: "/pro/equipe", lot: "Lot C — Comptes & administration" },
+  { prefix: "/pro/documents", lot: "Lot C — Comptes & administration" },
+  { prefix: "/pro/promotions", lot: "Lot D — Confort" },
+  { prefix: "/pro/statistiques", lot: "Lot D — Confort" },
+  { prefix: "/pro/support", lot: "Lot D — Confort" },
+  { prefix: "/pro", lot: "Lot D — Confort" },
 
-  { prefix: "/entreprise/messages", lot: "Lot 6 — Confiance" },
-  { prefix: "/entreprise/devis", lot: "Lot 4 — Tunnel de devis" },
-  { prefix: "/entreprise/projets", lot: "Lot 4 — Tunnel de devis" },
-  { prefix: "/entreprise/reservations", lot: "Lot 2 — Chaîne financière" },
-  { prefix: "/entreprise/factures", lot: "Lot 2 — Chaîne financière" },
-  { prefix: "/entreprise", lot: "Lot 5 — Espace entreprise" },
+  // — Espace entreprise —
+  // Ses trois écrans manquants tiennent tous à la facture : une entreprise
+  // rend des comptes, là où un particulier garde un reçu.
+  { prefix: "/entreprise/reservations", lot: "Lot B — Facturation" },
+  { prefix: "/entreprise/factures", lot: "Lot B — Facturation" },
+  { prefix: "/entreprise/rapports", lot: "Lot B — Facturation" },
+  { prefix: "/entreprise", lot: "Lot C — Comptes & administration" },
 
-  { prefix: "/admin/moderation", lot: "Lot 3 — Boucle de l'offre" },
-  { prefix: "/admin/partenaires", lot: "Lot 3 — Boucle de l'offre" },
-  { prefix: "/admin/paiements", lot: "Lot 2 — Chaîne financière" },
-  { prefix: "/admin/versements", lot: "Lot 2 — Chaîne financière" },
-  { prefix: "/admin/remboursements", lot: "Lot 2 — Chaîne financière" },
-  { prefix: "/admin/litiges", lot: "Lot 6 — Confiance" },
-  { prefix: "/admin/avis", lot: "Lot 6 — Confiance" },
-  { prefix: "/admin/demandes", lot: "Lot 4 — Tunnel de devis" },
-  { prefix: "/admin/projets", lot: "Lot 4 — Tunnel de devis" },
-  { prefix: "/admin", lot: "Lot 7 — Back-office & ops" },
+  // — Back-office —
+  { prefix: "/admin/avis", lot: "Lot A — Confiance" },
+  { prefix: "/admin/litiges", lot: "Lot A — Confiance" },
+  { prefix: "/admin/signalements", lot: "Lot A — Confiance" },
+  { prefix: "/admin/reservations", lot: "Lot B — Facturation" },
+  { prefix: "/admin/commissions", lot: "Lot B — Facturation" },
+  { prefix: "/admin/cms", lot: "Lot E — Éditorial & SEO" },
+  { prefix: "/admin/medias", lot: "Lot E — Éditorial & SEO" },
+  { prefix: "/admin/promotions", lot: "Lot D — Confort" },
+  { prefix: "/admin", lot: "Lot C — Comptes & administration" },
 
-  // Espace particulier. Ses écrans suivent le client, pas un métier : ils
-  // arrivent donc avec le lot qui crée la donnée qu'ils affichent.
-  { prefix: "/compte/reservations", lot: "Lot 2 — Chaîne financière" },
-  { prefix: "/compte/paiements", lot: "Lot 2 — Chaîne financière" },
-  { prefix: "/compte/documents", lot: "Lot 2 — Chaîne financière" },
-  { prefix: "/compte/messages", lot: "Lot 6 — Confiance" },
-  { prefix: "/compte/favoris", lot: "Lot 8 — Éditorial & SEO" },
-  { prefix: "/compte/profil", lot: "Lot 3 — Comptes & paramètres" },
-  { prefix: "/compte", lot: "Lot 2 — Chaîne financière" },
-  { prefix: "/projets", lot: "Lot 4 — Tunnel de devis" },
+  // — Espace particulier —
+  // Ses écrans suivent le client, pas un métier.
+  { prefix: "/compte/favoris", lot: "Lot D — Confort" },
+  { prefix: "/compte/documents", lot: "Lot D — Confort" },
+  { prefix: "/compte", lot: "Lot D — Confort" },
+  { prefix: "/projets", lot: "Lot D — Confort" },
 ];
 
 export function lotFor(pathname: string): string {

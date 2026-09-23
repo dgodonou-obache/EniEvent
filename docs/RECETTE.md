@@ -39,9 +39,18 @@ session : le formulaire affiche « Vérifiez votre boîte mail », et le compte 
 sert qu'après le clic sur le lien reçu. Les quatre comptes ci-dessus sont créés
 déjà confirmés par l'API d'administration — ils se connectent directement.
 
-Les messages partent par le SMTP d'`contact@enievent.com` (OVH, `ssl0.ovh.net`
-port 465). Une inscription qui n'aboutit jamais se diagnostique donc dans cette
-boîte d'abord, et dans les journaux d'authentification Supabase ensuite.
+Ces messages partent de **Supabase Auth**, par le SMTP de Resend
+(`smtp.resend.com` port 465, utilisateur `resend`, expéditeur
+`ÉniEvent <contact@enievent.com>`). Une inscription qui n'aboutit jamais se
+diagnostique donc dans les journaux Resend d'abord, et dans les journaux
+d'authentification Supabase ensuite — pas dans une boîte OVH, qui n'est plus sur
+le chemin.
+
+> ⚠️ **Un courriel « delivered » ne prouve pas que le lien fonctionne.** Le
+> symptôme à connaître : le message arrive, le bouton mène droit à « Ce lien
+> n'est plus valable ». La cause n'est jamais l'expiration — c'est le gabarit.
+> Voir `CLAUDE.md` §8 : tout lien passe par `{{ .TokenHash }}` et
+> `/auth/confirm`, jamais par `{{ .ConfirmationURL }}`.
 
 ---
 
@@ -96,9 +105,12 @@ boîte d'abord, et dans les journaux d'authentification Supabase ensuite.
    électrogène et climatisation, et surtout les conditions **en français clair** —
    « Un acompte de 50 % bloque la date… » et non un jargon de politique.
 3. Dans l'encart de réservation, choisir **un vendredi** : le total affiche
-   150 000 FCFA + 10 % de frais de service.
+   150 000 FCFA. **Attendu : aucune ligne de frais, aucune commission, rien
+   au-delà du prix.** Le client paie le prix affiché ; la plateforme se rémunère
+   sur la part du partenaire, à l'encaissement. Toute mention de « frais de
+   service » à cet écran est un défaut bloquant, pas un détail de copie.
 4. Ajouter **le samedi suivant** : ce jour est majoré (195 000 FCFA), la mention
-   « week-end » apparaît, et le total est recalculé.
+   « week-end » apparaît, et le total est recalculé — toujours sans frais.
 5. Les **lundis sont grisés** : le jeu de démonstration les ferme.
 6. Sur une annonce ayant des photos, cliquer la grande image **ou une vignette**.
    **Attendu** : la visionneuse s'ouvre sur la photo cliquée, avec le compteur
@@ -282,27 +294,180 @@ un seuil de validation à 1 500 000 FCFA et une offre au-dessus de ce seuil.
 > engagement, et qu'un prestataire ne voit ni les budgets ni les avals de son
 > client.
 
-## 10. Écrans à venir
+## 10. Réserver et payer
+
+Le premier parcours qui fait entrer de l'argent. FedaPay tourne en **bac à
+sable** : aucun franc réel ne bouge, et l'écran le dit.
+
+1. En particulier, ouvrir une annonce en **réservation immédiate**, choisir une
+   date ouverte, réserver. **Attendu** : une commande avec sa référence `CMD-…`.
+2. Ouvrir **Mes réservations**. **Attendu** : la ligne porte le **nom de
+   l'annonce** (« Salle Étoile — Haie Vive »), l'enseigne en seconde ligne.
+   Un client reconnaît ce qu'il a réservé, pas la raison sociale qui le loue.
+3. **Attendu** : l'échéancier **entier** est visible avant le premier
+   règlement — acompte et solde, avec leurs dates. Découvrir un second
+   versement après avoir payé le premier fait abandonner, à juste titre.
+4. Seule la **prochaine** échéance porte un bouton ; les suivantes s'affichent
+   en attente. Les règlements se font dans l'ordre, la base l'impose.
+5. Cliquer **Régler**. **Attendu** : la page FedaPay, avec le bandeau
+   « Mode test ». Payer avec un moyen de test.
+6. Revenir. **Attendu** : l'échéance passe « Réglé », la barre d'avancement
+   bouge, « Reste à régler » se met à jour.
+7. **Attendu, partout dans ce parcours : aucun frais.** Le montant réglé est
+   celui de la fiche, au franc près.
+8. Faire échouer volontairement un paiement, puis recommencer. **Attendu** :
+   le second essai fonctionne — un refus ne bloque pas la commande.
+
+> `npm run smoke:paiement` ouvre une vraie transaction en bac à sable et refuse
+> de tourner sur une clé de production. `npm run smoke:commande` rejoue la
+> commande complète contre le vrai Supabase.
+
+## 11. Annuler et rembourser
+
+**La retenue s'annonce avant, jamais après.** C'est le premier motif de litige
+d'une place de marché.
+
+1. Sur une réservation payée dont la date est **lointaine**, cliquer
+   **Annuler cette réservation**. **Attendu** : la somme exacte qui sera rendue,
+   en francs — pas un taux à appliquer soi-même, pas le seul nom du barème.
+2. **Attendu** : deux gestes. Le premier ouvre, le second confirme. Une
+   annulation ne se rattrape pas ; la date repart au catalogue aussitôt.
+3. Confirmer. **Attendu** : la commande passe « Annulée », et la date redevient
+   réservable sur la fiche publique.
+4. Recommencer sur une réservation dont la date est **proche** (dans le barème,
+   au-delà du seuil de gratuité). **Attendu** : le remboursement annoncé est
+   **partiel**, et la retenue est dite en clair avant de confirmer.
+5. Essayer d'annuler une réservation dont la date est **passée**.
+   **Attendu** : refus. On ne verse au partenaire qu'après la prestation et on
+   n'annule qu'avant : les deux fenêtres ne se recouvrent jamais, donc on ne
+   peut pas rembourser un client avec de l'argent déjà parti.
+6. Côté partenaire, annuler une réservation acceptée. **Attendu** : le client
+   est remboursé **intégralement**, quel que soit le barème. Celui-ci protège le
+   partenaire du changement d'avis du client, pas de sa propre défaillance.
+7. En administrateur, ouvrir **`/admin/remboursements`**. **Attendu** : le
+   remboursement attend d'être exécuté à la main et d'être marqué envoyé.
+   FedaPay refuse `/refunds` tant que le compte marchand n'est pas validé :
+   l'écran est un **registre**, il ne déclenche aucun virement.
+
+> `npm run smoke:annulation` réserve, encaisse, annule et rembourse contre le
+> vrai Supabase, puis nettoie derrière lui.
+
+## 12. Messagerie — parler sans se donner ses coordonnées
+
+Le seul revenu de la plateforme est la commission. Si le client et le
+prestataire s'échangent leurs numéros avant de réserver, la vente se fait
+ailleurs et la commission s'applique à zéro.
+
+1. Sans être connecté, ouvrir une fiche annonce. **Attendu** : **aucun numéro
+   de téléphone nulle part**, ni à l'écran, ni dans le code source de la page.
+   L'annuaire est fermé depuis la migration 0036.
+2. En particulier, cliquer **Poser une question** sous l'encart de réservation.
+   Écrire un message contenant un numéro : `Appelez-moi au 01 97 00 00 01`.
+3. Se connecter en partenaire, ouvrir **Messages**. **Attendu** : le message
+   est là, **le numéro masqué**, et le client n'est désigné que par « Le
+   client » — aucun nom tant qu'aucune commande n'existe.
+4. Répondre en glissant une adresse e-mail. **Attendu** : masquée aussi, et
+   masquée **des deux côtés** — la règle n'est pas à sens unique.
+5. Essayer les autres formes : `+229 01 97 00 00 01`, `0197000001`,
+   `01.97.00.00.01`. **Attendu** : toutes masquées. En revanche un prix
+   (`150 000`), une date et une référence `CMD-…` restent lisibles — masquer
+   un montant rendrait la négociation impossible.
+6. Échanger **dix messages d'affilée** dans le même sens. **Attendu** : le
+   destinataire reçoit **un seul** courriel, pas dix. Sa réponse rouvre le
+   droit d'alerter.
+7. Ouvrir ce courriel. **Attendu** : il annonce qu'un message attend, avec
+   l'expéditeur et le contexte — **jamais le texte du message**. Y mettre un
+   extrait suffirait à contourner tout le masquage.
+8. Aller jusqu'au paiement (chapitre 10), puis rouvrir le fil.
+   **Attendu** : les coordonnées apparaissent **en clair**, dans les anciens
+   messages compris. La commission est acquise, les deux parties doivent
+   pouvoir se coordonner.
+9. En partenaire, ouvrir **Demandes reçues** et poser une question sur une
+   demande. **Attendu** : possible sans savoir qui est le client.
+10. Vérifier qu'un **second partenaire** ne voit pas ce fil.
+
+> Le masquage est un **ralentisseur, pas un mur** : « zéro un quatre-vingt-dix-
+> sept » passera toujours. Il rend le contournement volontaire et visible, ce
+> qui suffit à décourager l'usage par simple commodité.
+>
+> `npm run smoke:messagerie` est le **seul** endroit où se vérifie l'absence de
+> droit de lecture directe sur `messages` : PGlite ne reproduit pas les droits
+> par défaut de Supabase, un test local passerait sans rien prouver.
+
+## 13. Commission par partenaire
+
+1. En administrateur, ouvrir **`/admin/partenaires`**. **Attendu** : chaque
+   partenaire avec son taux, et l'**origine** de ce taux — barème général ou
+   décision propre. Un taux affiché sans son origine se lit comme une décision
+   qu'on aurait prise sur ce partenaire.
+2. Fixer un taux propre à un partenaire, puis passer une réservation chez lui.
+   **Attendu** : la ventilation suit ce taux, et le client paie **le même
+   prix** — la commission se prend sur la part du partenaire.
+3. **Vider** le champ. **Attendu** : le partenaire revient au barème général.
+   Un champ vide n'est pas un taux de zéro : l'un suit la règle, l'autre est
+   une décision.
+4. Modifier le barème général. **Attendu** : les partenaires à taux propre ne
+   bougent pas.
+5. **Attendu** : les commandes **déjà passées** ne changent pas de commission.
+   Le taux est figé à la création, comme le barème d'annulation — les
+   conditions d'une réservation conclue ne se réécrivent pas.
+
+## 14. Écrans à venir
 
 Cliquer n'importe quelle entrée de menu non encore construite — par exemple
-**Versements**, **Promotions** ou **Journal d'audit**.
+**Promotions**, **Journal d'audit** ou **Utilisateurs**.
 **Attendu** : une page qui nomme le lot livrant cet écran, et non un 404.
 
-## 11. Inscription réelle
+L'état exact — ce qui est livré, ce qui reste, dans quel ordre — est dans
+`docs/LOTS.md`.
+
+## 15. Inscription réelle, et les liens reçus par courriel
 
 1. Se déconnecter, ouvrir `/inscription`.
 2. Onglet **Particulier** : renseigner un e-mail neuf, un mot de passe de
-   10 caractères minimum. **Attendu** : accès immédiat à `/compte`.
-3. Ouvrir `/pro/inscription`, saisir le téléphone `97 00 00 01`.
+   10 caractères minimum. **Attendu** : pas de session ouverte, mais l'écran
+   « Vérifiez votre boîte mail ». La confirmation d'adresse est active.
+3. Cliquer le lien reçu. **Attendu** : on arrive sur **l'accueil**, connecté, le
+   prénom visible dans l'en-tête — et non sur `/compte`, qui serait vide : ce
+   client n'a encore rien réservé. Son espace reste à un clic.
+4. **Ouvrir le lien sur un autre appareil** (téléphone, ou l'application Gmail
+   qui ouvre son propre navigateur). **Attendu** : il fonctionne aussi. C'est le
+   contrôle qui compte — un lien qui n'aboutit que sur le navigateur d'origine
+   est le symptôme du gabarit `{{ .ConfirmationURL }}`, banni du dépôt.
+5. Recommencer l'inscription **avec la même adresse**. **Attendu** : un message
+   qui dit que l'adresse est déjà utilisée et propose de se connecter. Supabase
+   renvoie ici un succès silencieux (protection contre l'énumération de
+   comptes) : sans cet écran, l'utilisateur attend un courriel qui ne viendra
+   jamais. Vérifier aussi qu'une adresse déjà prise **dans un autre espace**
+   (client, pro, entreprise) est signalée de la même façon.
+6. Cliquer **l'œil** dans le champ de mot de passe : la saisie devient lisible,
+   et le champ ne perd pas le focus.
+7. Soumettre un formulaire avec deux champs fautifs. **Attendu** : les deux
+   cadres passent au **rouge**, et la page se déplace sur le **premier fautif
+   dans l'ordre de l'écran** — pas sur le dernier, pas en pied de page.
+8. Ouvrir `/pro/inscription`, saisir le téléphone `97 00 00 01`.
    **Attendu** : refus — c'est l'ancien format à 8 chiffres, plus composable
    depuis le 30 novembre 2024.
-4. Saisir `01 97 00 00 01` : accepté. Le compte, l'organisation partenaire et la
+9. Saisir `01 97 00 00 01` : accepté. Le compte, l'organisation partenaire et la
    fiche prestataire sont créés ensemble ; le tableau de bord affiche le nom de
    la structure.
 
-## 12. Mobile
+**Mot de passe oublié**
 
-Refaire les étapes 1, 2, 4, 7, 8 et 9 dans une fenêtre de **390 px de large**.
+10. Sur `/connexion`, **Mot de passe oublié**, saisir une adresse existante.
+11. Ouvrir le courriel reçu et cliquer le bouton. **Attendu** : le formulaire de
+    nouveau mot de passe s'ouvre réellement. Si « Ce lien n'est plus valable »
+    apparaît sur un lien reçu à l'instant, c'est le gabarit qu'il faut regarder,
+    pas la durée d'expiration.
+12. Définir un nouveau mot de passe, puis se connecter avec. **Attendu** :
+    l'ancien ne fonctionne plus.
+13. Recliquer le **même** lien. **Attendu** : refusé — un lien de
+    réinitialisation ne sert qu'une fois.
+
+## 16. Mobile
+
+Refaire les chapitres 1, 2, 4, 7, 8, 9, 10 et 12 dans une fenêtre de
+**390 px de large**.
 **Attendu** : les filtres se replient derrière un bouton « Afficher », aucun
 débordement horizontal, le calendrier reste dans l'écran, et la barre d'action
 du planning reste collée en bas — la sélection se fait en haut de l'écran, les
@@ -310,7 +475,7 @@ boutons doivent rester atteignables sans remonter.
 
 ---
 
-## 13. Expiration des sessions
+## 17. Expiration des sessions
 
 1. Se connecter en administrateur, ouvrir `/admin`, puis laisser passer plus
    d'une heure sans naviguer. **Attendu** : au retour, redirection vers
@@ -329,16 +494,37 @@ boutons doivent rester atteignables sans remonter.
 ## Vérifications automatiques
 
 ```bash
-npm run verify           # typecheck + lint + 424 tests
-npm run db:verify        # migrations rejouées dans un Postgres jetable, RLS partout
-npm run smoke            # 13 contrôles contre le vrai Supabase, comptes purgés après
-npm run smoke:offre      # la boucle partenaire → modération → catalogue, en réel
-npm run smoke:planning   # ouverture des dates, prix plancher, cloisonnement
-npm run smoke:devis      # appel d'offres : offres scellées, acceptation atomique
-npm run smoke:entreprise # seuil de validation, aval, imputation budgétaire
-npm run smoke:photos     # stockage réel : cloisonnement par dossier, URL publique
-npm run smoke:sms        # ENVOI RÉEL par Premux — consomme un crédit, exige SMS_TEST_TO
+npm run verify             # typecheck + lint + 628 tests
+npm run db:verify          # migrations rejouées dans un Postgres jetable, RLS partout
+npm run smoke              # contrôles de bout en bout contre le vrai Supabase
+npm run smoke:offre        # la boucle partenaire → modération → catalogue, en réel
+npm run smoke:planning     # ouverture des dates, prix plancher, cloisonnement
+npm run smoke:devis        # appel d'offres : offres scellées, acceptation atomique
+npm run smoke:entreprise   # seuil de validation, aval, imputation budgétaire
+npm run smoke:photos       # stockage réel : cloisonnement par dossier, URL publique
+npm run smoke:commande     # commande, ventilation, échéancier
+npm run smoke:paiement     # PAIEMENT RÉEL en bac à sable — refuse une clé de production
+npm run smoke:annulation   # annulation, barème, remboursement — nettoie derrière lui
+npm run smoke:messagerie   # masquage, seuils, absence de droit de lecture directe
+npm run smoke:cloisonnement# chaque compte contre chaque écran, puis SANS navigateur
+npm run smoke:ecrans       # rend réellement chaque route avec une session
+npm run smoke:email        # ENVOI RÉEL par Resend — exige EMAIL_TEST_TO
 ```
+
+Trois d'entre eux ne se remplacent par aucun test local, et il faut savoir
+pourquoi :
+
+- **`smoke:cloisonnement`** — son second bloc interroge les tables **sans
+  navigateur**. C'est la seule barrière devant quelqu'un qui n'en ouvre pas.
+- **`smoke:ecrans`** — une fonction qui traverse la frontière serveur → client
+  échoue **à l'exécution seulement**. Ni `tsc`, ni `eslint`, ni `next build` ne
+  la voient : ces pages sont dynamiques et ne sont jamais prérendues.
+- **`smoke:messagerie`** — PGlite ne reproduit pas les droits par défaut de
+  Supabase, qui accorde `SELECT` à `authenticated` sur chaque table neuve. Un
+  test local « cette table n'est pas lisible » passe sans rien prouver.
+
+`npm run smoke:sms` existe encore mais **le canal est débranché** (migration
+0035) : il ne sert qu'à un éventuel retour en arrière, et consomme un crédit.
 
 ---
 
@@ -349,14 +535,27 @@ correspondantes affichent un écran nommant leur lot, pas un 404.
 
 | Absent | Arrive au |
 |---|---|
-| Panier, paiement, réservation effective | Lot 2 |
-| Créneaux (matin, après-midi, soirée) — le planning ouvre à la journée | Lot 4 |
-| Notification par e-mail (le SMS, lui, part déjà) | Lot 4, suite |
-| Entreprise : factures et rapports de dépenses | Lot 2, puis lot 5 |
-| Invitation d'un collègue dans l'espace entreprise | Lot 6 |
-| Avis, litiges, contrats, messagerie | Lot 6 |
-| Section « Les valeurs sûres » — classement par note réelle | Lot 6 |
-| Reste du back-office admin : KYC, finances, CMS, audit | Lot 7 |
-| Packs, pages éditoriales, blog, pages légales | Lots 4 et 8 |
-| Recadrage et compression des photos côté navigateur | Lot 8 |
-| Purge du cache CDN à la suppression d'une photo (une heure d'écart) | Lot 8 |
+| Avis et notes — donc pas de classement « les mieux notés » | Lot A |
+| Litiges et médiation | Lot A |
+| Factures PDF : partenaire, entreprise, client | Lot B |
+| Entreprise : réservations et rapports de dépenses | Lot B |
+| Invitation d'un collègue par courriel (l'écran Équipe existe, l'envoi non) | Lot C |
+| Reste du back-office : utilisateurs, catégories, villes, CMS, audit, flags | Lot C |
+| Favoris, documents du client | Lot D |
+| Créneaux (matin, après-midi, soirée) — le planning ouvre à la journée | Lot D |
+| Promotions et codes de réduction | Lot D |
+| Pages éditoriales, blog, packs | Lot E |
+| Recadrage et compression des photos côté navigateur | Lot E |
+| Purge du cache CDN à la suppression d'une photo (une heure d'écart) | Lot E |
+| Pièces jointes et temps réel dans la messagerie | Lot E |
+
+**Livrés depuis** : paiement et réservation effective, annulation et
+remboursement, versements aux partenaires, commission par partenaire,
+messagerie client ↔ prestataire, notifications par courriel, pages légales.
+
+> ⚠️ **Deux limites d'exploitation, pas de code.** FedaPay refuse `/payouts`
+> (403) et `/refunds` (401) tant que le compte marchand n'est pas validé :
+> versements et remboursements sont des **registres** tenus à la main. Et le
+> catalogue de démonstration (6 partenaires fictifs, 15 annonces, numéros
+> séquentiels) est encore en ligne — il doit disparaître avant le premier vrai
+> client. Voir `docs/LOTS.md`.

@@ -31,30 +31,46 @@ describe("couverture des menus", () => {
 
   it("couvre aussi les sous-routes non listées au menu", () => {
     // `/pro/annonces/nouvelle` n'est pas une entrée de menu mais doit hériter
-    // du titre et du lot de `/pro/annonces`.
+    // du titre de `/pro/annonces`, et d'un lot par la route attrape-tout.
     expect(navItemFor("partner", "/pro/annonces/nouvelle")?.label).toBe("Mes annonces");
-    expect(lotFor("/pro/annonces/nouvelle")).toMatch(/Lot 3/);
+    expect(lotFor("/pro/annonces/nouvelle")).not.toBe("À planifier");
   });
 });
 
 describe("attribution des lots", () => {
   it("retient le préfixe le plus spécifique", () => {
-    // `/pro/finances/versements` relève de la chaîne financière, pas du
-    // back-office partenaire, bien qu'il commence par `/pro`.
-    expect(lotFor("/pro/finances/versements")).toMatch(/Lot 2/);
-    expect(lotFor("/pro/planning")).toMatch(/Lot 3/);
+    // `/pro/finances/factures` relève de la facturation, pas du repli de
+    // l'espace partenaire, bien qu'il commence par `/pro`.
+    expect(lotFor("/pro/finances/factures")).toMatch(/Lot B/);
+    expect(lotFor("/pro/statistiques")).toMatch(/Lot D/);
   });
 
-  it("range les devis au lot 4, quel que soit l'espace", () => {
-    expect(lotFor("/pro/devis")).toMatch(/Lot 4/);
-    expect(lotFor("/entreprise/devis")).toMatch(/Lot 4/);
-    expect(lotFor("/admin/demandes")).toMatch(/Lot 4/);
+  it("range la facturation au même lot, quel que soit l'espace", () => {
+    expect(lotFor("/pro/finances/factures")).toMatch(/Lot B/);
+    expect(lotFor("/entreprise/factures")).toMatch(/Lot B/);
+    expect(lotFor("/admin/reservations")).toMatch(/Lot B/);
   });
 
-  it("place la modération au lot en cours, pas au lot 7", () => {
-    // La modération fait partie de la boucle de l'offre livrée maintenant.
-    expect(lotFor("/admin/moderation")).toMatch(/Lot 3/);
-    expect(lotFor("/admin/feature-flags")).toMatch(/Lot 7/);
+  it("range les avis et les litiges au lot de la confiance", () => {
+    expect(lotFor("/pro/avis")).toMatch(/Lot A/);
+    expect(lotFor("/admin/avis")).toMatch(/Lot A/);
+    expect(lotFor("/admin/litiges")).toMatch(/Lot A/);
+  });
+
+  /**
+   * ⚠️ Le garde-fou qui compte vraiment.
+   *
+   * Un écran d'attente annonçant un lot **déjà livré** ne dit pas « pas
+   * encore » : il dit « ce produit est à l'arrêt ». C'est arrivé — les lots 2
+   * à 5 étaient en production pendant que les menus les annonçaient à venir.
+   * Les lots restants sont donc lettrés, et cette liste interdit le retour de
+   * l'ancienne numérotation dans la table.
+   */
+  it("ne nomme aucun lot de l'ancienne numérotation", () => {
+    const tous = ALL.map((item) => lotFor(item.href));
+    const anciens = tous.filter((lot) => /Lot \d/.test(lot));
+
+    expect(anciens).toEqual([]);
   });
 });
 
