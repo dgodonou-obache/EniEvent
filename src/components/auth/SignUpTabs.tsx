@@ -11,7 +11,11 @@ const TABS = [
     value: "particulier" as const,
     label: "Particulier",
     hint: "Mariage, anniversaire, baptême, réception privée.",
-    redirectTo: "/compte",
+    // L'accueil, et non `/compte` : un particulier qui vient de s'inscrire n'a
+    // rien réservé, son espace est vide. Il est venu chercher un lieu. Le même
+    // choix est fait dans `/auth/confirm`, qui est le chemin réellement
+    // emprunté tant que la confirmation d'adresse est exigée.
+    redirectTo: "/",
   },
   {
     value: "entreprise" as const,

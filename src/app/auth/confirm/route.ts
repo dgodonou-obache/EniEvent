@@ -61,9 +61,23 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL(suivant, origin));
   }
 
+  const accountType = data.user?.user_metadata?.account_type;
+
+  // **Un particulier qui vient de s'inscrire n'a rien à voir dans son espace.**
+  // Il n'a encore rien réservé : « Mes réservations » est vide, « Mes projets »
+  // aussi. On l'emmène donc sur l'accueil, là où commence ce pour quoi il est
+  // venu — chercher un lieu, comparer, réserver. Son espace reste à un clic,
+  // l'en-tête affichant son nom dès qu'il est connecté.
+  //
+  // Un partenaire ou une entreprise, eux, ont quelque chose à faire tout de
+  // suite : publier une annonce, régler un circuit de validation. Les envoyer
+  // sur la vitrine publique les perdrait.
+  if (type === "signup" && accountType === "particulier") {
+    return NextResponse.redirect(new URL("/", origin));
+  }
+
   // À défaut, chacun chez soi : envoyer un partenaire sur `/compte` lui ferait
   // croire qu'il s'est trompé de compte.
-  const accountType = data.user?.user_metadata?.account_type;
   const destination = typeof accountType === "string" ? homeFor(accountType as never) : "/compte";
 
   return NextResponse.redirect(new URL(destination, origin));

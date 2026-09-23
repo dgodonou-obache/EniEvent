@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Search } from "lucide-react";
 
 import { signOut } from "@/app/auth/actions";
 import { AccountNav } from "@/components/account/AccountNav";
@@ -18,7 +19,23 @@ export default async function AccountLayout({ children }: { children: React.Reac
             <span className="text-orange-500">Éni</span>Event
           </Link>
 
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-1 sm:gap-3">
+            {/* Le passage vers le catalogue, dit en toutes lettres.
+
+                ⚠️ Ce lien **n'existe que dans l'espace client**, et c'est une
+                exception assumée à la règle §4 : un particulier est d'abord un
+                visiteur de la place de marché, il doit pouvoir retourner
+                chercher un lieu sans se déconnecter. Un partenaire ou un
+                administrateur, eux, n'ont rien à faire sur la vitrine — leurs
+                espaces restent sans porte de sortie. */}
+            <Link
+              href="/recherche"
+              className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition-all duration-200 hover:bg-orange-50 hover:text-orange-600 active:scale-[0.98]"
+            >
+              <Search className="h-4 w-4" aria-hidden />
+              <span className="hidden sm:inline">Explorer</span>
+            </Link>
+
             <span className="hidden truncate text-sm font-medium text-slate-600 sm:block">
               {identity.name}
             </span>
