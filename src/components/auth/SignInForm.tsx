@@ -8,6 +8,7 @@ import { ResendConfirmation } from "@/components/auth/ResendConfirmation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { describeSignIn } from "@/lib/auth/signup-outcome";
 import { createClient } from "@/utils/supabase/client";
 
@@ -116,10 +117,9 @@ export function SignInForm({ defaultRedirect, redirectTo }: SignInFormProps) {
 
       <div>
         <Label htmlFor="password">Mot de passe</Label>
-        <Input
+        <PasswordInput
           id="password"
           name="password"
-          type="password"
           autoComplete="current-password"
           required
           placeholder="••••••••"

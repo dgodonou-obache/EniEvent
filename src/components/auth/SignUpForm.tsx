@@ -7,10 +7,11 @@ import { Loader2, MailCheck, UserCheck } from "lucide-react";
 
 import { ResendConfirmation } from "@/components/auth/ResendConfirmation";
 import { Button } from "@/components/ui/button";
-import { describeSignUp } from "@/lib/auth/signup-outcome";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Select } from "@/components/ui/select";
+import { describeSignUp } from "@/lib/auth/signup-outcome";
 import { schemaFor, signUpMetadata, type SignUpVariant } from "@/lib/validation/auth";
 import { PHONE_PLACEHOLDER } from "@/lib/validation/phone";
 import { createClient } from "@/utils/supabase/client";
@@ -182,7 +183,7 @@ export function SignUpForm({ variant, redirectTo }: SignUpFormProps) {
             <Field id="city" label="Ville" placeholder="Cotonou" error={errors.city} />
             <div>
               <Label htmlFor="country">Pays</Label>
-              <Select id="country" name="country" defaultValue="CI">
+              <Select id="country" name="country" defaultValue="BJ">
                 {COUNTRIES.map((c) => (
                   <option key={c.code} value={c.code}>
                     {c.label}
@@ -247,15 +248,21 @@ function Field({ id, label, error, hint, ...props }: FieldProps) {
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
 
+  // Un champ de mot de passe reçoit sa bascule d'affichage sans que l'appelant
+  // ait à y penser : le jour où un second en apparaît, il l'aura aussi.
+  const { type, ...rest } = props;
+  const Champ = type === "password" ? PasswordInput : Input;
+
   return (
     <div>
       <Label htmlFor={id}>{label}</Label>
-      <Input
+      <Champ
         id={id}
         name={id}
+        {...(type === "password" ? {} : { type })}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : hint ? hintId : undefined}
-        {...props}
+        {...rest}
       />
       {error ? (
         <p id={errorId} role="alert" className="mt-1.5 text-xs font-medium text-red-600">

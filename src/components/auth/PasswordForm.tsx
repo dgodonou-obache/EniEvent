@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { Check, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { passwordSchema } from "@/lib/validation/auth";
 import { createClient } from "@/utils/supabase/client";
 
@@ -95,10 +95,9 @@ export function PasswordForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <Label htmlFor="password">Nouveau mot de passe</Label>
-        <Input
+        <PasswordInput
           id="password"
           name="password"
-          type="password"
           required
           autoComplete="new-password"
           aria-describedby="regle-mdp"
@@ -110,7 +109,12 @@ export function PasswordForm({
 
       <div>
         <Label htmlFor="confirmation">Confirmer</Label>
-        <Input id="confirmation" name="confirmation" type="password" required autoComplete="new-password" />
+        <PasswordInput
+          id="confirmation"
+          name="confirmation"
+          required
+          autoComplete="new-password"
+        />
       </div>
 
       {erreur ? (
