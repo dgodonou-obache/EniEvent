@@ -46,8 +46,44 @@ describe("marqueurs Supabase", () => {
     // C'est le contrôle qui compte : sans ce marqueur, le message part avec un
     // bouton qui ne mène nulle part, et le compte ne peut pas être activé.
     for (const cle of ["confirmation", "recovery", "magic_link", "email_change", "invite"]) {
-      expect(parCle[cle].html, cle).toContain("{{ .ConfirmationURL }}");
+      expect(parCle[cle].html, cle).toContain("{{ .TokenHash }}");
+      expect(parCle[cle].html, cle).toContain("/auth/confirm?token_hash=");
     }
+  });
+
+  it("n'emploie plus jamais le lien tout fait de Supabase", () => {
+    // ⚠️ `{{ .ConfirmationURL }}` rapporte la session soit dans le **fragment**
+    // — que le navigateur ne transmet jamais au serveur — soit sous forme de
+    // code PKCE, dont l'échange exige un cookie déposé par le navigateur qui a
+    // fait la demande. On ouvre ses courriels là où ils arrivent : l'application
+    // Gmail ouvre son propre navigateur, sans ce cookie. Les deux échouaient, et
+    // l'utilisateur lisait « ce lien n'est plus valable » sur un lien reçu à
+    // l'instant. Le retour de ce marqueur ferait revenir la panne.
+    for (const t of AUTH_TEMPLATES) {
+      expect(t.html, t.key).not.toContain("{{ .ConfirmationURL }}");
+    }
+  });
+
+  it("vise le bon type de vérification sur chaque modèle", () => {
+    // Un `type` erroné fait échouer `verifyOtp` sans rien dire d'utile : le
+    // jeton est bon, mais on lui demande de prouver autre chose.
+    const attendus: Record<string, string> = {
+      confirmation: "type=signup",
+      recovery: "type=recovery",
+      magic_link: "type=magiclink",
+      email_change: "type=email_change",
+      invite: "type=invite",
+    };
+
+    for (const [cle, attendu] of Object.entries(attendus)) {
+      expect(parCle[cle].html, cle).toContain(attendu);
+    }
+  });
+
+  it("emmène la réinitialisation sur le formulaire de mot de passe", () => {
+    // Sans `suivant`, l'utilisateur atterrirait dans son espace avec une
+    // session ouverte mais sans avoir changé le mot de passe qu'il a oublié.
+    expect(parCle["recovery"].html).toContain(encodeURIComponent("/nouveau-mot-de-passe"));
   });
 
   it("emploie le code, et non un lien, pour la ré-authentification", () => {

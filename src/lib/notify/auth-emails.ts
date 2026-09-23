@@ -48,6 +48,26 @@ function gabarit(
   return { key, nom, subject, html };
 }
 
+
+/**
+ * Adresse d'arrivée d'un lien envoyé par courriel.
+ *
+ * ⚠️ **Surtout pas `{{ .ConfirmationURL }}`.** Ce marqueur produit un lien qui
+ * rapporte la session soit dans le **fragment** (`#access_token=…`), que le
+ * navigateur ne transmet jamais au serveur, soit sous forme de **code PKCE**,
+ * dont l'échange exige un cookie déposé par le navigateur qui a fait la
+ * demande — absent dès qu'on ouvre son courriel ailleurs, ce qui est le cas
+ * courant depuis l'application Gmail. Les deux échouaient, et un utilisateur
+ * lisait « ce lien n'est plus valable » sur un lien reçu à l'instant.
+ *
+ * `{{ .TokenHash }}` se vérifie côté serveur (`/auth/confirm`), sans cookie
+ * préalable : le lien fonctionne donc depuis n'importe quel appareil.
+ */
+function lien(type: string, suivant?: string): string {
+  const suite = suivant ? `&suivant=${encodeURIComponent(suivant)}` : "";
+  return `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=${type}${suite}`;
+}
+
 export const AUTH_TEMPLATES: readonly AuthTemplate[] = [
   gabarit("confirmation", "Confirmer l'inscription", {
     subject: "Confirmez votre adresse e-mail",
@@ -56,7 +76,7 @@ export const AUTH_TEMPLATES: readonly AuthTemplate[] = [
     intro:
       "Bienvenue sur ÉniEvent. Confirmez votre adresse pour activer votre compte " +
       "et commencer à organiser votre événement.",
-    cta: { label: "Confirmer mon adresse", href: "{{ .ConfirmationURL }}" },
+    cta: { label: "Confirmer mon adresse", href: lien("signup") },
     outro:
       "Ce lien est valable une heure. Si vous n'avez pas créé de compte sur " +
       "ÉniEvent, ignorez ce message : rien ne sera activé.",
@@ -69,7 +89,7 @@ export const AUTH_TEMPLATES: readonly AuthTemplate[] = [
     intro:
       "Vous avez demandé à réinitialiser votre mot de passe. Suivez le lien " +
       "ci-dessous pour en choisir un nouveau.",
-    cta: { label: "Choisir un nouveau mot de passe", href: "{{ .ConfirmationURL }}" },
+    cta: { label: "Choisir un nouveau mot de passe", href: lien("recovery", "/nouveau-mot-de-passe") },
     // Rassurer explicitement : sans cette phrase, recevoir ce message sans
     // l'avoir demandé fait craindre que le compte soit déjà compromis.
     outro:
@@ -83,7 +103,7 @@ export const AUTH_TEMPLATES: readonly AuthTemplate[] = [
     preheader: "Connectez-vous sans mot de passe.",
     heading: "Connectez-vous en un clic",
     intro: "Voici votre lien de connexion à ÉniEvent. Aucun mot de passe à saisir.",
-    cta: { label: "Me connecter", href: "{{ .ConfirmationURL }}" },
+    cta: { label: "Me connecter", href: lien("magiclink") },
     outro:
       "Ce lien est valable une heure et ne fonctionne qu'une fois. Ne le " +
       "transmettez à personne : il donne accès à votre compte.",
@@ -100,7 +120,7 @@ export const AUTH_TEMPLATES: readonly AuthTemplate[] = [
       ["Adresse actuelle", "{{ .Email }}"],
       ["Nouvelle adresse", "{{ .NewEmail }}"],
     ],
-    cta: { label: "Confirmer le changement", href: "{{ .ConfirmationURL }}" },
+    cta: { label: "Confirmer le changement", href: lien("email_change") },
     outro:
       "Tant que vous n'avez pas confirmé, votre adresse actuelle reste active. " +
       "Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.",
@@ -113,7 +133,7 @@ export const AUTH_TEMPLATES: readonly AuthTemplate[] = [
     intro:
       "Quelqu'un vous a invité à rejoindre ÉniEvent. Acceptez l'invitation pour " +
       "créer votre compte et choisir votre mot de passe.",
-    cta: { label: "Accepter l'invitation", href: "{{ .ConfirmationURL }}" },
+    cta: { label: "Accepter l'invitation", href: lien("invite") },
     outro: "Si vous ne savez pas d'où vient cette invitation, ignorez ce message.",
   }),
 
