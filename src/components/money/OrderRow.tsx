@@ -46,9 +46,15 @@ export function OrderRow({ order, perspective }: Props) {
           <p className="truncate font-bold text-slate-900">
             {perspective === "partner" || perspective === "admin"
               ? order.reference
-              : (order.partnerName ?? "Prestation")}
+              : // On réserve une salle, pas une société : le client cherche
+                // « Jardin de Fidjrossè », pas « Espaces Cotonou ». L'enseigne
+                // passe en seconde ligne, comme dans la messagerie.
+                (order.listingTitle ?? order.partnerName ?? "Prestation")}
           </p>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+            {perspective === "client" && order.listingTitle && order.partnerName ? (
+              <span>{order.partnerName}</span>
+            ) : null}
             {perspective === "client" ? <span>{order.reference}</span> : null}
             {perspective !== "client" && order.partnerName ? (
               <span>{order.partnerName}</span>

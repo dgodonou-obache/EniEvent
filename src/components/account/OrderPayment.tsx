@@ -56,9 +56,16 @@ export function OrderPayment({ order, requestId, sandbox }: Props) {
   return (
     <section className="rounded-2xl border border-slate-100 bg-white p-5 sm:p-6">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-base font-bold text-slate-900">
-          {order.partnerName ?? "Prestation retenue"}
-        </h3>
+        <div className="min-w-0">
+          {/* Le nom de ce qu'on a réservé, pas celui de la société qui le
+              loue : c'est ce que le client reconnaît dans sa liste. */}
+          <h3 className="text-base font-bold text-slate-900">
+            {order.listingTitle ?? order.partnerName ?? "Prestation retenue"}
+          </h3>
+          {order.listingTitle && order.partnerName ? (
+            <p className="mt-0.5 text-xs text-slate-500">{order.partnerName}</p>
+          ) : null}
+        </div>
         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
           {order.reference} · {order.statusLabel}
         </span>

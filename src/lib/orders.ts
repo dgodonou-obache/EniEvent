@@ -59,6 +59,14 @@ export interface OrderView {
   commission: number;
   commissionRate: number;
   partnerName: string | null;
+  /**
+   * Nom de l'annonce, figé à la commande (migration 0039).
+   *
+   * On réserve une salle, pas une société : c'est ce nom que le client cherche
+   * dans sa liste. Nul pour une commande née d'un devis sans annonce visée —
+   * l'interface retombe alors sur l'enseigne.
+   */
+  listingTitle: string | null;
   eventDate: string | null;
   /** Demande d'origine, pour une commande née d'un devis accepté. */
   requestId: string | null;
@@ -127,6 +135,7 @@ function toView(
     commission: partage.commission.amount,
     commissionRate: Number(order.commission_rate),
     partnerName: order.organizations?.brand_name ?? order.organizations?.legal_name ?? null,
+    listingTitle: order.listing_title,
     eventDate: order.event_date,
     requestId: order.request_id,
     listingId: order.listing_id,
@@ -144,7 +153,7 @@ function toView(
 }
 
 const SELECT =
-  "id, reference, status, currency, total, commission_rate, event_date, start_date, end_date, quote_id, request_id, listing_id, client_id, org_id, created_at, updated_at, paid_at, cancelled_at, cancel_reason, organizations(brand_name, legal_name)";
+  "id, reference, status, currency, total, commission_rate, event_date, start_date, end_date, quote_id, request_id, listing_id, client_id, org_id, created_at, updated_at, paid_at, cancelled_at, cancel_reason, listing_title, organizations(brand_name, legal_name)";
 
 async function hydrate(orders: unknown[]): Promise<OrderView[]> {
   if (orders.length === 0) return [];

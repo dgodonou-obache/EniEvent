@@ -1097,6 +1097,7 @@ export type Database = {
           event_date: string | null
           id: string
           listing_id: string | null
+          listing_title: string | null
           org_id: string
           paid_at: string | null
           quote_id: string | null
@@ -1120,6 +1121,7 @@ export type Database = {
           event_date?: string | null
           id?: string
           listing_id?: string | null
+          listing_title?: string | null
           org_id: string
           paid_at?: string | null
           quote_id?: string | null
@@ -1143,6 +1145,7 @@ export type Database = {
           event_date?: string | null
           id?: string
           listing_id?: string | null
+          listing_title?: string | null
           org_id?: string
           paid_at?: string | null
           quote_id?: string | null
@@ -2549,6 +2552,7 @@ export type Database = {
           event_date: string | null
           id: string
           listing_id: string | null
+          listing_title: string | null
           org_id: string
           paid_at: string | null
           quote_id: string | null
