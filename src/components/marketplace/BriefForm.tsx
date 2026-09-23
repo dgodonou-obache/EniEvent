@@ -6,6 +6,8 @@ import { Check, Info, Loader2, Send } from "lucide-react";
 import { submitBrief, type BriefState } from "@/app/(marketplace)/demande-de-devis/actions";
 import { CustomDatePicker } from "@/components/shared/CustomDatePicker";
 import { Button } from "@/components/ui/button";
+import { useFieldErrors } from "@/components/ui/use-field-errors";
+import { FieldError } from "@/components/ui/field-error";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -53,6 +55,7 @@ export function BriefForm({
     submitBrief,
     {},
   );
+  const formRef = useFieldErrors(state.errors);
 
   const [selected, setSelected] = React.useState<string[]>(
     preselectedCategoryId ? [preselectedCategoryId] : [],
@@ -81,7 +84,7 @@ export function BriefForm({
   const overAllocated = globalAmount > 0 && allocated > globalAmount;
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form ref={formRef} action={formAction} className="space-y-6">
       {selected.map((id) => (
         <input key={id} type="hidden" name="categoryIds" value={id} />
       ))}
@@ -374,14 +377,6 @@ function Section({
   );
 }
 
-function FieldError({ message }: { message?: string }) {
-  if (!message) return null;
-  return (
-    <p role="alert" className="mt-1.5 text-xs text-red-600">
-      {message}
-    </p>
-  );
-}
 
 /** Lecture indulgente : « 1 500 000 » saisi à la main doit valoir 1500000. */
 function toAmount(value: string | undefined): number {

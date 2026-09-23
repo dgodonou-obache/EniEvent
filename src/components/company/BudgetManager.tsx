@@ -9,6 +9,8 @@ import {
   type CompanyState,
 } from "@/app/(company)/entreprise/actions";
 import { Button } from "@/components/ui/button";
+import { useFieldErrors } from "@/components/ui/use-field-errors";
+import { FieldError } from "@/components/ui/field-error";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { format, money, type CurrencyCode } from "@/lib/money";
@@ -207,6 +209,7 @@ function CostCenterForm({ row, onDone }: { row?: Usage; onDone: () => void }) {
     saveCostCenter,
     {},
   );
+  const formRef = useFieldErrors(state.errors);
 
   // Refermer dès que l'enregistrement a réussi : laisser le formulaire ouvert
   // laisserait croire qu'il reste quelque chose à faire.
@@ -215,7 +218,7 @@ function CostCenterForm({ row, onDone }: { row?: Usage; onDone: () => void }) {
   }, [state.ok, onDone]);
 
   return (
-    <form action={formAction} className="rounded-2xl border border-slate-100 bg-white p-5">
+    <form ref={formRef} action={formAction} className="rounded-2xl border border-slate-100 bg-white p-5">
       {row ? (
         <input type="hidden" name="costCenterId" value={row.cost_center_id ?? ""} />
       ) : null}
@@ -326,14 +329,6 @@ function Feedback({ state }: { state: CompanyState }) {
   );
 }
 
-function FieldError({ message }: { message?: string }) {
-  if (!message) return null;
-  return (
-    <p role="alert" className="mt-1.5 text-xs text-red-600">
-      {message}
-    </p>
-  );
-}
 
 function frenchDate(value: string): string {
   return new Date(value).toLocaleDateString("fr-FR", {

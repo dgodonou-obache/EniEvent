@@ -14,6 +14,8 @@ import {
 } from "@/app/(partner)/pro/(dashboard)/annonces/actions";
 import { ListingStatusBadge } from "@/components/dashboard/ListingStatusBadge";
 import { Button } from "@/components/ui/button";
+import { useFieldErrors } from "@/components/ui/use-field-errors";
+import { FieldError } from "@/components/ui/field-error";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -475,13 +477,14 @@ interface SectionProps {
 
 function Section({ title, description, listingId, action, hidden, children }: SectionProps) {
   const [state, formAction, pending] = React.useActionState<ActionState, FormData>(action, {});
+  const formRef = useFieldErrors(state.errors);
 
   return (
     <section className="rounded-2xl border border-slate-100 bg-white p-6">
       <h2 className="font-bold text-slate-900">{title}</h2>
       <p className="mt-1 text-sm text-slate-500">{description}</p>
 
-      <form action={formAction} className="mt-5 space-y-4">
+      <form ref={formRef} action={formAction} className="mt-5 space-y-4">
         <input type="hidden" name="listingId" value={listingId} />
         {Object.entries(hidden ?? {}).map(([name, value]) => (
           <input key={name} type="hidden" name={name} value={value} />
@@ -574,11 +577,3 @@ function Checkbox({
   );
 }
 
-function FieldError({ message }: { message?: string }) {
-  if (!message) return null;
-  return (
-    <p role="alert" className="mt-1.5 text-xs font-medium text-red-600">
-      {message}
-    </p>
-  );
-}

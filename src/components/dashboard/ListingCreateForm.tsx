@@ -5,6 +5,8 @@ import { Loader2 } from "lucide-react";
 
 import { createListing, type ActionState } from "@/app/(partner)/pro/(dashboard)/annonces/actions";
 import { Button } from "@/components/ui/button";
+import { useFieldErrors } from "@/components/ui/use-field-errors";
+import { FieldError } from "@/components/ui/field-error";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -41,10 +43,11 @@ const MODES = [
 
 export function ListingCreateForm({ categoryGroups, cities }: ListingCreateFormProps) {
   const [state, action, pending] = React.useActionState<ActionState, FormData>(createListing, {});
+  const formRef = useFieldErrors(state.errors);
   const [mode, setMode] = React.useState("both");
 
   return (
-    <form action={action} className="space-y-5">
+    <form ref={formRef} action={action} className="space-y-5">
       <div>
         <Label htmlFor="title">Titre de l&apos;annonce</Label>
         <Input
@@ -172,11 +175,3 @@ export function ListingCreateForm({ categoryGroups, cities }: ListingCreateFormP
   );
 }
 
-function FieldError({ message }: { message?: string }) {
-  if (!message) return null;
-  return (
-    <p role="alert" className="mt-1.5 text-xs font-medium text-red-600">
-      {message}
-    </p>
-  );
-}

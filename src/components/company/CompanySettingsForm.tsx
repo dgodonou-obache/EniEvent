@@ -9,6 +9,8 @@ import {
   type CompanyState,
 } from "@/app/(company)/entreprise/actions";
 import { Button } from "@/components/ui/button";
+import { useFieldErrors } from "@/components/ui/use-field-errors";
+import { FieldError } from "@/components/ui/field-error";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -73,9 +75,10 @@ function ProfileSection({
     saveCompanyProfile,
     {},
   );
+  const formRef = useFieldErrors(state.errors);
 
   return (
-    <form action={formAction} className="rounded-2xl border border-slate-100 bg-white p-5 sm:p-6">
+    <form ref={formRef} action={formAction} className="rounded-2xl border border-slate-100 bg-white p-5 sm:p-6">
       <h2 className="font-bold text-slate-900">Fiche entreprise</h2>
       <p className="mt-1 text-sm text-slate-500">
         Ce que les prestataires voient, et ce qui figurera sur vos factures.
@@ -191,6 +194,7 @@ function ApprovalSection({
     saveCompanySettings,
     {},
   );
+  const formRef = useFieldErrors(state.errors);
 
   const [threshold, setThreshold] = React.useState(
     settings?.approval_threshold != null ? String(settings.approval_threshold) : "",
@@ -200,7 +204,7 @@ function ApprovalSection({
   const preview = Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 
   return (
-    <form action={formAction} className="rounded-2xl border border-slate-100 bg-white p-5 sm:p-6">
+    <form ref={formRef} action={formAction} className="rounded-2xl border border-slate-100 bg-white p-5 sm:p-6">
       <h2 className="font-bold text-slate-900">Circuit de validation</h2>
       <p className="mt-1 text-sm text-slate-500">
         Au-delà du seuil, retenir une offre demande l&apos;aval d&apos;un valideur. C&apos;est
@@ -283,11 +287,3 @@ function Feedback({ state }: { state: CompanyState }) {
   );
 }
 
-function FieldError({ message }: { message?: string }) {
-  if (!message) return null;
-  return (
-    <p role="alert" className="mt-1.5 text-xs text-red-600">
-      {message}
-    </p>
-  );
-}

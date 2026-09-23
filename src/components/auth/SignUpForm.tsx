@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
+import { useFieldErrors } from "@/components/ui/use-field-errors";
 import { Select } from "@/components/ui/select";
 import { describeSignUp } from "@/lib/auth/signup-outcome";
 import { schemaFor, signUpMetadata, type SignUpVariant } from "@/lib/validation/auth";
@@ -33,6 +34,10 @@ export function SignUpForm({ variant, redirectTo }: SignUpFormProps) {
   const [isPending, setIsPending] = React.useState(false);
   const [awaitingConfirmation, setAwaitingConfirmation] = React.useState<string | null>(null);
   const [alreadyRegistered, setAlreadyRegistered] = React.useState<string | null>(null);
+
+  // La validation est faite par Zod **avant** l envoi : le formulaire ne part
+  // pas, et sans repère l utilisateur ne voit rien se produire.
+  const formRef = useFieldErrors(errors);
 
   const needsCompany = variant !== "particulier";
 
@@ -160,7 +165,7 @@ export function SignUpForm({ variant, redirectTo }: SignUpFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="space-y-4">
+    <form ref={formRef} onSubmit={handleSubmit} noValidate className="space-y-4">
       <Field
         id="fullName"
         label="Votre nom complet"

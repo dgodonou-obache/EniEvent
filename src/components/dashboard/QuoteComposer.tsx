@@ -12,6 +12,8 @@ import {
   type QuoteState,
 } from "@/app/(partner)/pro/(dashboard)/devis/actions";
 import { Button } from "@/components/ui/button";
+import { useFieldErrors } from "@/components/ui/use-field-errors";
+import { FieldError } from "@/components/ui/field-error";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -91,6 +93,11 @@ export function QuoteComposer({
     withdrawQuote,
     {},
   );
+
+  // Deux formulaires portent des erreurs par champ : la ligne qu on ajoute, et
+  // l en-tête du devis. Chacun a son ancre.
+  const ligneRef = useFieldErrors(lineState.errors);
+  const enteteRef = useFieldErrors(headerState.errors);
 
   const overBudget = budgetMax != null && subtotal > budgetMax;
 
@@ -181,7 +188,7 @@ export function QuoteComposer({
         <Feedback state={removeState} />
 
         {editable ? (
-          <form action={lineAction} className="mt-5 space-y-3 border-t border-slate-100 pt-5">
+          <form ref={ligneRef} action={lineAction} className="mt-5 space-y-3 border-t border-slate-100 pt-5">
             <input type="hidden" name="quoteId" value={quoteId} />
 
             <p className="text-sm font-bold text-slate-900">Ajouter une ligne</p>
@@ -247,7 +254,7 @@ export function QuoteComposer({
       </section>
 
       {/* Message et validité */}
-      <form action={headerAction} className="rounded-2xl border border-slate-100 bg-white p-5 sm:p-6">
+      <form ref={enteteRef} action={headerAction} className="rounded-2xl border border-slate-100 bg-white p-5 sm:p-6">
         <input type="hidden" name="quoteId" value={quoteId} />
 
         <h2 className="font-bold text-slate-900">Votre message</h2>
@@ -383,14 +390,6 @@ function Feedback({ state }: { state: QuoteState }) {
   );
 }
 
-function FieldError({ message }: { message?: string }) {
-  if (!message) return null;
-  return (
-    <p role="alert" className="mt-1.5 text-xs text-red-600">
-      {message}
-    </p>
-  );
-}
 
 function Note({ tone, children }: { tone: "danger" | "success"; children: React.ReactNode }) {
   return (
