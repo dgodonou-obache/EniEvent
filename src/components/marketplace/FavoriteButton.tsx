@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Heart, Loader2 } from "lucide-react";
+import { Heart } from "lucide-react";
 
 import { toggleFavorite, type FavoriteState } from "@/app/(account)/compte/favoris/actions";
 import { cn } from "@/lib/utils";
@@ -13,11 +13,19 @@ import { cn } from "@/lib/utils";
  * mis l'annonce de côté : ce serait de la preuve sociale fabriquée, et la
  * politique RLS rend l'agrégat illisible de toute façon (guide §5).
  *
- * **L'état bascule à l'affichage, pas au retour du serveur.** Sur une
- * connexion mobile béninoise, attendre l'aller-retour ferait douter du clic et
- * en provoquerait un second. Le serveur a le dernier mot : `useActionState`
- * rend l'état réel, et le rendu s'y aligne — y compris pour annuler la
- * bascule si l'écriture a échoué.
+ * ⚠️ **Le formulaire ne porte aucun état, et c'est la correction d'un défaut
+ * réel.** La première version envoyait un champ caché `active` calculé au
+ * rendu : le clic déclenchait un nouveau rendu **avant** que le navigateur ne
+ * sérialise le formulaire, si bien que le serveur recevait l'inverse de
+ * l'intention. Premier clic sans effet, second clic qui allumait le cœur sans
+ * rien écrire. La bascule est désormais décidée en base, et le formulaire ne
+ * transmet que l'identifiant de l'annonce — il n'y a plus d'état à
+ * désynchroniser.
+ *
+ * **L'affichage anticipe sans jamais mentir.** Pendant l'envoi, on montre
+ * l'inverse de la dernière vérité connue : c'est exactement ce que la bascule
+ * va produire. Dès la réponse, on affiche ce que la base dit — y compris quand
+ * l'écriture a échoué. Aucun état local, donc aucune dérive possible.
  */
 
 interface Props {
@@ -63,19 +71,6 @@ export function FavoriteButton({
     {},
   );
 
-  const [optimiste, setOptimiste] = React.useState(initial);
-
-  // Le serveur tranche. Ajustement au rendu plutôt que dans un effet : c'est
-  // un calcul, pas une conséquence — et `react-hooks/set-state-in-effect`
-  // refuse la seconde forme.
-  const [vuServeur, setVuServeur] = React.useState<boolean | undefined>(undefined);
-  if (state.active !== undefined && state.active !== vuServeur) {
-    setVuServeur(state.active);
-    setOptimiste(state.active);
-  }
-
-  const actif = optimiste;
-
   // Un visiteur non connecté n'a nulle part où ranger un favori. Plutôt qu'un
   // bouton qui ne fera rien, un lien qui l'emmène se connecter et le ramène.
   if (!signedIn) {
@@ -92,6 +87,15 @@ export function FavoriteButton({
     );
   }
 
+  // La dernière vérité connue : celle du serveur dès qu'elle est arrivée, sinon
+  // celle du rendu initial.
+  const connu = state.active ?? initial;
+
+  // Pendant l'envoi, on montre le résultat que la bascule va produire. Aucune
+  // variable d'état n'est nécessaire — et c'est ce qui rend la désynchronisation
+  // impossible.
+  const actif = pending ? !connu : connu;
+
   return (
     <form
       action={action}
@@ -101,7 +105,6 @@ export function FavoriteButton({
       onClick={(e) => e.stopPropagation()}
     >
       <input type="hidden" name="listingId" value={listingId} />
-      <input type="hidden" name="active" value={String(!actif)} />
 
       <button
         type="submit"
@@ -109,20 +112,23 @@ export function FavoriteButton({
         aria-label={actif ? "Retirer des favoris" : "Garder de côté"}
         title={actif ? "Retirer des favoris" : "Garder de côté"}
         disabled={pending}
-        onClick={() => setOptimiste(!actif)}
         className={boutonClasses(variant)}
       >
-        {pending ? (
-          <Loader2 className="h-4 w-4 animate-spin text-slate-400" aria-hidden />
-        ) : (
-          <Heart
-            className={cn(
-              "h-4 w-4 transition-all duration-200",
-              actif ? "fill-orange-500 text-orange-500" : "text-slate-500",
-            )}
-            aria-hidden
-          />
-        )}
+        {/* ⚠️ Le cœur reste visible pendant l'envoi, dans sa couleur
+            d'arrivée. Un spinner à sa place effacerait précisément le retour
+            que la personne attend : elle a cliqué pour voir le cœur changer.
+            L'opacité dit que ce n'est pas encore confirmé, sans rien cacher.
+            Sur une connexion mobile béninoise, l'aller-retour se compte en
+            centaines de millisecondes — c'est là que le retour immédiat
+            compte le plus. */}
+        <Heart
+          className={cn(
+            "h-4 w-4 transition-all duration-200",
+            actif ? "fill-orange-500 text-orange-500" : "text-slate-500",
+            pending && "opacity-60",
+          )}
+          aria-hidden
+        />
       </button>
 
       {state.error ? (

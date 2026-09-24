@@ -304,6 +304,22 @@ barrière devant quelqu'un qui n'ouvre pas de navigateur.
 - Suivre `.claude/rules/design-system.md` — orange pêche en primaire, teal par touches,
   neutres slate, `rounded-2xl`, ombres douces, `active:scale-[0.98]`, `transition-all`.
 - **Jamais** de `<input type="date">` natif : utiliser `CustomDatePicker`.
+- ⚠️ **Un champ caché ne porte jamais une valeur que le clic de soumission modifie.**
+  Le clic met l'état à jour, React refait le rendu, **puis** le navigateur sérialise le
+  formulaire : le champ vaut alors l'inverse, et le serveur reçoit le contraire de la
+  demande. Le cœur des favoris envoyait ainsi `active={String(!actif)}` — premier clic
+  sans effet, second clic qui allumait le cœur **sans rien écrire**, la réponse identique
+  à la précédente n'entraînant même pas de correction. Ni `tsc`, ni `eslint`, ni les
+  tests ne voient cette course. Quand l'état d'arrivée dépend de l'état de départ, la
+  bascule se décide **en base**, où la vérité se trouve déjà, et le formulaire ne
+  transporte qu'un identifiant. Porter une **sélection** faite plus tôt (des dates, une
+  case) reste légitime : `BookingBox` et `PlanningBoard` le font correctement.
+  `tests/formulaires-server-actions.test.ts` garde la règle — et ce test a lui-même dû
+  être éprouvé en réintroduisant le défaut, sa première version ne l'attrapait pas.
+- **Un retour optimiste ne se remplace pas par un indicateur de chargement.** Mettre un
+  sablier à la place du cœur efface précisément ce que la personne attend : elle a cliqué
+  pour le voir changer. On montre l'état d'arrivée, atténué tant qu'il n'est pas
+  confirmé, et la réponse du serveur tranche — y compris pour revenir en arrière.
 - **Un formulaire ne se contente pas de refuser : il montre où.** Tout formulaire validé
   côté serveur passe par `useFieldErrors` (`src/components/ui/use-field-errors.ts`), qui
   encadre les champs fautifs en rouge **et** emmène l'utilisateur au premier d'entre eux,
