@@ -22,6 +22,8 @@ export const KINDS = [
   "request.deadline",
   "order.cancelled",
   "message.new",
+  "member.invited",
+  "support.new",
 ] as const;
 export type NotificationKind = (typeof KINDS)[number];
 
@@ -139,6 +141,31 @@ export function renderSms(
       return toGsmSafe(
         `ÉniEvent : ${qui || "Un message"} vous a écrit. ` +
           `Répondez sur ${base}${pour === "partner" ? "/pro" : "/compte"}/messages`,
+      );
+    }
+
+    case "member.invited": {
+      // ⚠️ **Le jeton ne part jamais par SMS.** Il fait 64 caractères : à lui
+      // seul il ferait exploser le segment, et surtout un lien d'invitation
+      // recopié à la main depuis un écran de téléphone n'arrive jamais entier.
+      // L'invitation vit par courriel ; ce texte n'existe que pour le jour
+      // improbable où le canal SMS serait rebranché, et il renvoie au courriel.
+      const org = short(payload.orgName, 22);
+
+      return toGsmSafe(
+        `ÉniEvent : ${org || "une structure"} vous invite à rejoindre son équipe. ` +
+          `Le lien est dans le courriel que nous venons de vous envoyer.`,
+      );
+    }
+
+    case "support.new": {
+      // Destinataire : l'équipe, pas un utilisateur. Le sujet suffit à décider
+      // s'il faut ouvrir tout de suite.
+      const sujet = short(payload.subject, 40);
+
+      return toGsmSafe(
+        `ÉniEvent : nouveau message au support${sujet ? ` — ${sujet}` : ""}. ` +
+          `À traiter sur ${base}/admin`,
       );
     }
 

@@ -1,4 +1,6 @@
 import { DEFAULT_CURRENCY, format, money, type CurrencyCode } from "@/lib/money";
+import { COMPANY_ROLE_LABELS } from "@/lib/validation/company";
+import { PARTNER_ROLE_LABELS } from "@/lib/validation/partner";
 
 import type { EmailContent } from "@/lib/mail/resend";
 
@@ -41,6 +43,19 @@ function text(value: unknown): string {
 function short(value: unknown, max: number): string {
   const raw = text(value);
   return raw.length <= max ? raw : `${raw.slice(0, max - 1).trimEnd()}…`;
+}
+
+/**
+ * Un rôle d'organisation, dit en clair.
+ *
+ * Les deux familles vivent dans la même énumération Postgres ; « owner » porte
+ * le même libellé des deux côtés, les autres ne se recoupent pas. Un rôle
+ * inconnu s'affiche tel quel plutôt que de disparaître : un invité qui ne voit
+ * aucun rôle ne sait pas ce qu'on lui propose.
+ */
+function roleLabel(value: unknown): string {
+  const raw = text(value);
+  return PARTNER_ROLE_LABELS[raw] ?? COMPANY_ROLE_LABELS[raw] ?? raw;
 }
 
 /** `2026-12-24` devient « 24 décembre 2026 ». Vide si la date est absente. */
@@ -304,6 +319,56 @@ export function renderEmail(
         outro:
           "Par sécurité, le contenu des messages ne circule pas par courriel : " +
           "il se lit uniquement dans votre espace.",
+      });
+    }
+
+    case "member.invited": {
+      const org = text(payload.orgName);
+      const jeton = text(payload.token);
+
+      // Sans jeton, le lien ne mènerait nulle part : mieux vaut ne rien
+      // envoyer et laisser la tâche planifiée le signaler.
+      if (!jeton) return null;
+
+      return shell({
+        subject: org ? `${org} vous invite à rejoindre son équipe` : "Vous êtes invité sur ÉniEvent",
+        preheader: "Acceptez l'invitation pour accéder à l'espace de la structure.",
+        heading: org ? `${org} vous invite` : "Vous avez reçu une invitation",
+        intro:
+          "Quelqu'un de cette structure vous a ajouté à son équipe sur ÉniEvent. " +
+          "En acceptant, vous accédez à son espace avec le rôle indiqué ci-dessous.",
+        details: [
+          ["Structure", org],
+          ["Rôle proposé", roleLabel(payload.role)],
+        ],
+        cta: { label: "Rejoindre l'équipe", href: `${base}/invitation/${jeton}` },
+        outro:
+          "Ce lien est personnel et valable quinze jours. Il ne fonctionne qu'avec " +
+          "l'adresse à laquelle ce message a été envoyé. " +
+          "Si vous ne connaissez pas cette structure, ignorez ce message : " +
+          "aucun compte n'est créé tant que vous n'avez rien accepté.",
+      });
+    }
+
+    case "support.new": {
+      // ⚠️ Le corps **voyage ici**, contrairement à `message.new`. Ce n'est pas
+      // une inconséquence : ce message est adressé à l'équipe, qui a par
+      // ailleurs accès à la table. Le masquer obligerait à ouvrir le
+      // back-office pour lire une question, sans rien protéger de plus.
+      const sujet = text(payload.subject);
+      const corps = text(payload.body);
+
+      return shell({
+        subject: sujet ? `Support : ${sujet}` : "Nouveau message au support",
+        preheader: "Une demande d'aide vient d'arriver.",
+        heading: "Nouveau message au support",
+        intro: corps,
+        details: [
+          ["Sujet", sujet],
+          ["Répondre à", text(payload.replyTo)],
+        ],
+        cta: { label: "Ouvrir le back-office", href: `${base}/admin` },
+        outro: "Répondez directement à l'adresse indiquée : ce n'est pas une messagerie interne.",
       });
     }
 

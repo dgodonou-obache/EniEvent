@@ -27,8 +27,6 @@ const LOT_BY_PREFIX: { prefix: string; lot: string }[] = [
   { prefix: "/pro/finances/factures", lot: "Lot B — Facturation" },
   { prefix: "/pro/finances/commissions", lot: "Lot B — Facturation" },
   { prefix: "/pro/promotions", lot: "Lot D — Confort" },
-  { prefix: "/pro/statistiques", lot: "Lot D — Confort" },
-  { prefix: "/pro/support", lot: "Lot D — Confort" },
   { prefix: "/pro", lot: "Lot D — Confort" },
 
   // — Espace entreprise —
@@ -53,9 +51,9 @@ const LOT_BY_PREFIX: { prefix: string; lot: string }[] = [
   { prefix: "/admin", lot: "Lot D — Confort" },
 
   // — Espace particulier —
-  // Ses écrans suivent le client, pas un métier.
-  { prefix: "/compte/favoris", lot: "Lot D — Confort" },
-  { prefix: "/compte/documents", lot: "Lot D — Confort" },
+  // ✅ Complet depuis le lot D : ses huit entrées de menu ont toutes leur
+  // écran. Les replis ci-dessous ne couvrent plus que d'éventuelles
+  // sous-routes à venir.
   { prefix: "/compte", lot: "Lot D — Confort" },
   { prefix: "/projets", lot: "Lot D — Confort" },
 ];

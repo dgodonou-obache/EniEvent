@@ -612,6 +612,53 @@ export type Database = {
           },
         ]
       }
+      favorites: {
+        Row: {
+          created_at: string
+          listing_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          listing_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          listing_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "favorites_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listing_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "favorites_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "favorites_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings_bookable_now"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "favorites_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feature_flags: {
         Row: {
           description: string
@@ -1253,6 +1300,67 @@ export type Database = {
             columns: ["request_id"]
             isOneToOne: false
             referencedRelation: "quote_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_invitations: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string | null
+          org_id: string
+          role: Database["public"]["Enums"]["org_role"]
+          token: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          org_id: string
+          role: Database["public"]["Enums"]["org_role"]
+          token?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          org_id?: string
+          role?: Database["public"]["Enums"]["org_role"]
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_invitations_accepted_by_fkey"
+            columns: ["accepted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_invitations_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_invitations_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -2317,6 +2425,54 @@ export type Database = {
           },
         ]
       }
+      support_requests: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          org_id: string | null
+          reply_to: string
+          status: string
+          subject: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          org_id?: string | null
+          reply_to: string
+          status?: string
+          subject: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          org_id?: string | null
+          reply_to?: string
+          status?: string
+          subject?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_requests_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       venue_details: {
         Row: {
           accessibility_pmr: boolean
@@ -2567,6 +2723,27 @@ export type Database = {
       }
     }
     Functions: {
+      accept_invitation: {
+        Args: { jeton: string }
+        Returns: {
+          created_at: string
+          id: string
+          invited_by: string | null
+          joined_at: string | null
+          org_id: string
+          org_type: Database["public"]["Enums"]["org_type"]
+          role: Database["public"]["Enums"]["org_role"]
+          status: Database["public"]["Enums"]["member_status"]
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "organization_members"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       accept_quote: { Args: { target: string }; Returns: undefined }
       admin_companies: {
         Args: never
@@ -2737,6 +2914,42 @@ export type Database = {
       enqueue_deadline_reminders: {
         Args: { fenetre?: string }
         Returns: number
+      }
+      invitation_preview: {
+        Args: { jeton: string }
+        Returns: {
+          already_accepted: boolean
+          email: string
+          expired: boolean
+          org_name: string
+          org_type: Database["public"]["Enums"]["org_type"]
+          role: Database["public"]["Enums"]["org_role"]
+        }[]
+      }
+      invite_member: {
+        Args: {
+          adresse: string
+          org: string
+          role_demande: Database["public"]["Enums"]["org_role"]
+        }
+        Returns: {
+          accepted_at: string | null
+          accepted_by: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string | null
+          org_id: string
+          role: Database["public"]["Enums"]["org_role"]
+          token: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "organization_invitations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       mark_notification: {
         Args: { delivered: boolean; detail?: string; target: string }

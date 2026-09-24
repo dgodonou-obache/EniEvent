@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 
 import { ListingDetail } from "@/components/marketplace/ListingDetail";
 import { getAvailabilities, getListingBySlug, getSimilarListings } from "@/lib/listings";
+import { getFavoriteIds } from "@/lib/favorites";
+import { getUser } from "@/lib/auth/session";
 
 type Params = Promise<{ slug: string }>;
 
@@ -26,12 +28,20 @@ export default async function ServicePage({ params }: { params: Params }) {
 
   if (listing.kind !== "service") redirect(`/lieux/${listing.slug}`);
 
-  const [availabilities, similar] = await Promise.all([
+  const [availabilities, similar, favoris, user] = await Promise.all([
     getAvailabilities(listing.id),
     getSimilarListings({ id: listing.id, city: listing.city }),
+    getFavoriteIds(),
+    getUser(),
   ]);
 
   return (
-    <ListingDetail listing={listing} availabilities={availabilities} similar={similar} />
+    <ListingDetail
+      listing={listing}
+      availabilities={availabilities}
+      similar={similar}
+      isFavorite={favoris.has(listing.id)}
+      signedIn={user !== null}
+    />
   );
 }

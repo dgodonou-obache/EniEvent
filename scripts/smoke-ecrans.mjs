@@ -91,6 +91,7 @@ const PARCOURS = [
       "/pro/statistiques",
       "/pro/parametres",
       "/pro/equipe",
+      "/pro/support",
       "/pro/documents",
     ],
   },

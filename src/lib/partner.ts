@@ -156,3 +156,104 @@ export async function getListingAvailabilities(listingId: string, from: string, 
 
   return data ?? [];
 }
+
+export interface PartnerPerformance {
+  days: number;
+  /** Devis réellement envoyés au client. Les brouillons ne comptent pas. */
+  quotesSent: number;
+  quotesAccepted: number;
+  quotesDeclined: number;
+  /** En attente de décision : ni acceptés, ni refusés, ni périmés. */
+  quotesPending: number;
+  /** `null` tant qu'aucun devis n'a été tranché : 0 % serait un jugement faux. */
+  acceptanceRate: number | null;
+  /** Heures entre la publication d'une demande et l'envoi du devis. */
+  responseHours: number | null;
+  ordersCount: number;
+  /** Dates ouvertes à venir, et celles déjà prises. */
+  openDays: number;
+  bookedDays: number;
+}
+
+/**
+ * Ce qu'un partenaire peut savoir de son activité.
+ *
+ * ⚠️ **Aucune statistique de consultation.** Le dépôt ne compte ni vue, ni
+ * impression, ni clic : afficher « 340 vues cette semaine » demanderait
+ * d'inventer le chiffre. Ce que l'on montre se recompte ligne à ligne.
+ *
+ * ⚠️ **`partner_profiles.acceptance_rate` et `response_time_avg_h` ne sont pas
+ * lus ici, et c'est volontaire.** Le commentaire de la migration 0002 annonce
+ * des « statistiques recalculées par déclencheur » — ce déclencheur n'a jamais
+ * été écrit, et les deux colonnes sont nulles sur la totalité des partenaires
+ * en production. Les afficher donnerait « — » partout, ou pire, un zéro qui se
+ * lirait comme un jugement. On recalcule donc depuis `quotes`, qui est la
+ * source, et ces colonnes restent à brancher le jour où le volume le justifie.
+ */
+export async function getPartnerPerformance(
+  orgId: string,
+  days = 90,
+): Promise<PartnerPerformance> {
+  const supabase = await createClient();
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const aujourdhui = new Date().toISOString().slice(0, 10);
+
+  const [devis, commandes, dates] = await Promise.all([
+    supabase
+      .from("quotes")
+      .select("status, created_at, quote_request_items(quote_requests(created_at))")
+      .eq("org_id", orgId)
+      .gte("created_at", since),
+    supabase
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .gte("created_at", since),
+    supabase
+      .from("availabilities")
+      .select("status, listings!inner(org_id)")
+      .eq("listings.org_id", orgId)
+      .gte("date", aujourdhui),
+  ]);
+
+  const lignes = devis.data ?? [];
+  const envoyes = lignes.filter((q) => q.status !== "draft");
+  const acceptes = envoyes.filter((q) => q.status === "accepted").length;
+  const refuses = envoyes.filter((q) => q.status === "declined").length;
+  const tranches = acceptes + refuses;
+
+  // Le délai ne se mesure que sur les devis dont on connaît la demande
+  // d'origine : un devis lié à une demande supprimée fausserait la moyenne
+  // plutôt que de l'enrichir.
+  const delais = envoyes
+    .map((q) => {
+      const ouverture = q.quote_request_items?.quote_requests?.created_at;
+      if (!ouverture) return null;
+
+      const heures =
+        (new Date(q.created_at).getTime() - new Date(ouverture).getTime()) / 3_600_000;
+
+      // Un délai négatif signale une donnée incohérente, pas une réponse
+      // instantanée : on l'écarte au lieu de le compter comme zéro.
+      return heures >= 0 ? heures : null;
+    })
+    .filter((h): h is number => h !== null);
+
+  const creneaux = dates.data ?? [];
+
+  return {
+    days,
+    quotesSent: envoyes.length,
+    quotesAccepted: acceptes,
+    quotesDeclined: refuses,
+    quotesPending: envoyes.filter((q) => q.status === "sent").length,
+    acceptanceRate: tranches === 0 ? null : Math.round((acceptes / tranches) * 100),
+    responseHours:
+      delais.length === 0
+        ? null
+        : Math.round((delais.reduce((t, h) => t + h, 0) / delais.length) * 10) / 10,
+    ordersCount: commandes.count ?? 0,
+    openDays: creneaux.filter((d) => d.status === "open").length,
+    bookedDays: creneaux.filter((d) => d.status === "booked").length,
+  };
+}

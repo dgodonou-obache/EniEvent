@@ -195,6 +195,15 @@ posé n'éteint pas une fonctionnalité qui marchait.
   à ne pas retirer de `set_account_type` : on ne se retire pas à soi-même
   l'administration, et on ne rétrograde pas le dernier administrateur — `/admin` étant
   refusé dans le proxy, la porte se refermerait sans clé.
+- ⚠️ **`revoke select (colonne)` ne retire rien à un `grant select` de table.** Postgres
+  accepte l'ordre sans erreur et sans effet : un `revoke` par colonne ne mord que sur un
+  `grant` par colonne. Constaté sur `organization_invitations.token` (migration 0042), où
+  le jeton restait lisible par le propriétaire de la structure — et sur
+  `organizations.phone` avant lui (0036). **La seule forme qui marche est l'énumération
+  positive** : `revoke select on T from authenticated`, puis
+  `grant select (col1, col2, …) on T to authenticated`. Corollaire de terrain : `select *`
+  cesse alors de fonctionner pour tout le monde, y compris dans les tests — c'est le
+  comportement voulu, pas une régression.
 - ⚠️ **`auth.users` n'est pas exposé par PostgREST**, et ne doit pas l'être : cette table
   porte les empreintes de mots de passe. Les adresses e-mail n'existent donc **nulle
   part** dans `public` — `profiles` n'en a pas. `admin_users()` en extrait les quatre
@@ -271,6 +280,21 @@ barrière devant quelqu'un qui n'ouvre pas de navigateur.
   meilleur. Une mise en avant se fonde sur un **fait vérifiable ligne à ligne** — la
   section « Réservez sans attendre » de l'accueil s'appuie sur des dates réellement
   ouvertes, et se vide d'elle-même si elles se referment.
+  **Les favoris suivent la même règle, et la base la rend indiscutable** : aucun compteur
+  « 42 personnes ont aimé » n'existe, et `favorites_own` (migration 0042) empêche
+  l'agrégat d'être calculé, même par quelqu'un qui écrirait la requête exprès. Ne pas
+  ajouter de fonction rendant un nombre de favoris par annonce.
+- ⚠️ **« Pas encore de donnée » et « zéro » ne s'écrivent pas pareil.** Un taux
+  d'acceptation à `0 %` se lit comme un jugement — « vous ne convertissez rien » — alors
+  que le vrai message est qu'aucun devis n'a encore été tranché. Les statistiques
+  partenaire rendent donc `null` et affichent « — », jamais un zéro trompeur. Même
+  vigilance pour un taux de remplissage sans date ouverte : c'est un planning vide, pas
+  une mauvaise performance, et l'écran le dit.
+- ⚠️ **Un reçu n'est pas une facture, et le document doit le dire lui-même.** Une facture
+  est une pièce fiscale qui engage un RCCM, un IFU et une mention de TVA ; `legal.ts` les
+  porte encore à `null`. `/compte/documents` émet donc des **reçus**, qui portent la
+  mention en toutes lettres — quelqu'un qui enregistre le PDF et le présente à son
+  comptable ne doit pas avoir à se souvenir d'une phrase lue ailleurs.
 - **Ne pas promettre ce qui n'existe pas.** L'accueil affichait 39 métiers dont 27 sans
   la moindre annonce ; il ne montre plus que les familles pourvues, avec leurs comptes.
   Un retour muet est du même ordre : une session expirée ou un lien périmé s'expliquent

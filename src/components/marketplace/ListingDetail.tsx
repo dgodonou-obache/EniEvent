@@ -19,6 +19,7 @@ import type { AvailabilityRow } from "@/lib/pricing";
 import { AskQuestionButton } from "@/components/messaging/AskQuestionButton";
 
 import { BookingBox } from "./BookingBox";
+import { FavoriteButton } from "./FavoriteButton";
 import { ListingCard } from "./ListingCard";
 import { ListingGallery } from "./ListingGallery";
 
@@ -26,9 +27,19 @@ interface ListingDetailProps {
   listing: Listing;
   availabilities: AvailabilityRow[];
   similar: ListingSummary[];
+  /** Vrai si le visiteur a déjà mis cette annonce de côté. */
+  isFavorite: boolean;
+  /** Faux pour un visiteur non connecté : le cœur devient alors un lien de connexion. */
+  signedIn: boolean;
 }
 
-export function ListingDetail({ listing, availabilities, similar }: ListingDetailProps) {
+export function ListingDetail({
+  listing,
+  availabilities,
+  similar,
+  isFavorite,
+  signedIn,
+}: ListingDetailProps) {
   const currency = (listing.currency ?? DEFAULT_CURRENCY) as CurrencyCode;
   const venue = listing.venue_details;
   const service = listing.service_details;
@@ -69,7 +80,8 @@ export function ListingDetail({ listing, availabilities, similar }: ListingDetai
         ) : null}
       </nav>
 
-      <header className="mb-6">
+      <header className="mb-6 flex items-start justify-between gap-4">
+        <div className="min-w-0">
         <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
           {listing.title}
         </h1>
@@ -86,6 +98,18 @@ export function ListingDetail({ listing, availabilities, similar }: ListingDetai
             <span className="text-sm">Pas encore d&apos;avis</span>
           )}
         </p>
+        </div>
+
+        {/* Mettre de côté. Le cœur est ici plutôt que dans l'encart de
+            réservation : on garde une salle de côté **avant** d'être prêt à
+            choisir une date, c'est même l'usage principal. */}
+        <FavoriteButton
+          listingId={listing.id}
+          initial={isFavorite}
+          signedIn={signedIn}
+          variant="inline"
+          className="shrink-0"
+        />
       </header>
 
       <ListingGallery photos={photos} title={listing.title} />

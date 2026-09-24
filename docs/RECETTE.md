@@ -488,7 +488,77 @@ En administrateur, sur `demo-admin@enievent.bj`.
 > déclencheur en base**, pas par l'interface. Un interrupteur qui ne ferait que
 > cacher un bouton laisserait passer tout appel direct.
 
-## 15. Écrans à venir
+## 15. Confort : favoris, reçus, statistiques, support, invitations
+
+**Favoris**
+
+1. Sans être connecté, ouvrir une fiche annonce. **Attendu** : le cœur mène à
+   la connexion, il n&apos;échoue pas en silence.
+2. Connecté en particulier, cliquer le cœur. **Attendu** : il se remplit
+   **immédiatement**, sans attendre l&apos;aller-retour serveur.
+3. Ouvrir **Favoris** : l&apos;annonce y est. **Attendu : aucun compteur du
+   genre « 42 personnes ont aimé »**, nulle part. C&apos;est un défaut bloquant
+   s&apos;il en apparaît un : la base rend d&apos;ailleurs l&apos;agrégat
+   incalculable.
+4. Faire dépublier cette annonce par son partenaire, puis recharger.
+   **Attendu** : un message disant qu&apos;une annonce de la sélection
+   n&apos;est plus disponible — et non une disparition silencieuse.
+
+**Reçus**
+
+5. Après un règlement (chapitre 10), ouvrir **Documents**. **Attendu** : le
+   reçu correspondant, au nom de l&apos;annonce.
+6. L&apos;ouvrir. **Attendu** : le document porte la mention **« Ce document
+   est un reçu, non une facture »**. C&apos;est le point à vérifier : sans
+   RCCM ni IFU renseignés, émettre une pièce fiscale serait faux.
+7. **Attendu** : aucune commission n&apos;y figure. Le client paie le prix
+   affiché, la part de la plateforme ne le regarde pas.
+8. Imprimer (Ctrl+P). **Attendu** : ni bouton, ni menu sur la page imprimée.
+
+**Statistiques partenaire**
+
+9. Ouvrir **Statistiques**. **Attendu : aucun compteur de vues**, nulle part —
+   le dépôt ne mesure aucune consultation, en afficher une serait l&apos;inventer.
+10. Sur un compte sans devis tranché. **Attendu** : le taux d&apos;acceptation
+    affiche **« — »**, jamais « 0 % ». La nuance compte : zéro se lit comme un
+    jugement.
+11. Fermer toutes ses dates. **Attendu** : un encart explique que c&apos;est un
+    planning vide, pas un mauvais taux de remplissage.
+
+**Support**
+
+12. Ouvrir **Aide & support**. **Attendu** : les questions fréquentes
+    **avant** le formulaire.
+13. Envoyer un message de moins de 20 caractères. **Attendu** : refus, le champ
+    en rouge, et la page s&apos;y déplace.
+14. Envoyer un vrai message. **Attendu** : confirmation disant que la réponse
+    arrivera **par courriel** — ce n&apos;est pas une messagerie.
+15. En administrateur, vérifier que la demande est arrivée. Le courriel part par
+    la file, pas depuis le formulaire.
+
+**Invitation d'un collègue**
+
+16. En propriétaire, **Équipe** → **Inviter un collègue**. Saisir une adresse
+    et un rôle. **Attendu** : le rôle choisi affiche ce qu&apos;il permet.
+17. **Attendu** : l&apos;invitation apparaît en attente, **sans jamais montrer
+    le lien**. Il part par courriel ; la base interdit même de le lire.
+18. Inviter quelqu&apos;un qui est déjà membre. **Attendu** : refus disant
+    qu&apos;il fait déjà partie de l&apos;équipe.
+19. Se connecter en **équipier** : aucun bouton d&apos;invitation. Un équipier
+    qui pourrait ajouter des membres contournerait la hiérarchie.
+20. Ouvrir le lien reçu **sans être connecté**. **Attendu** : la page dit qui
+    invite, à quel titre, et **à quelle adresse** — avant de demander quoi que
+    ce soit.
+21. Se connecter avec une **autre** adresse et accepter. **Attendu** : refus
+    nommant l&apos;adresse attendue. C&apos;est le contrôle qui compte : un
+    lien transféré ne doit faire entrer personne d&apos;autre.
+22. Se connecter avec la bonne adresse et accepter. **Attendu** : entrée dans
+    l&apos;équipe avec le rôle prévu, et arrivée dans l&apos;espace rejoint.
+23. Recliquer le même lien. **Attendu** : « déjà utilisée ».
+24. Ouvrir une URL d&apos;invitation inventée. **Attendu** : un refus qui
+    explique, pas un 404 ni une page blanche.
+
+## 16. Écrans à venir
 
 Cliquer n'importe quelle entrée de menu non encore construite — par exemple
 **Promotions**, **Journal d'audit** ou **Utilisateurs**.
@@ -497,7 +567,7 @@ Cliquer n'importe quelle entrée de menu non encore construite — par exemple
 L'état exact — ce qui est livré, ce qui reste, dans quel ordre — est dans
 `docs/LOTS.md`.
 
-## 16. Inscription réelle, et les liens reçus par courriel
+## 17. Inscription réelle, et les liens reçus par courriel
 
 1. Se déconnecter, ouvrir `/inscription`.
 2. Onglet **Particulier** : renseigner un e-mail neuf, un mot de passe de
@@ -540,7 +610,7 @@ L'état exact — ce qui est livré, ce qui reste, dans quel ordre — est dans
 13. Recliquer le **même** lien. **Attendu** : refusé — un lien de
     réinitialisation ne sert qu'une fois.
 
-## 17. Mobile
+## 18. Mobile
 
 Refaire les chapitres 1, 2, 4, 7, 8, 9, 10 et 12 dans une fenêtre de
 **390 px de large**.
@@ -551,7 +621,7 @@ boutons doivent rester atteignables sans remonter.
 
 ---
 
-## 18. Expiration des sessions
+## 19. Expiration des sessions
 
 1. Se connecter en administrateur, ouvrir `/admin`, puis laisser passer plus
    d'une heure sans naviguer. **Attendu** : au retour, redirection vers
@@ -570,7 +640,7 @@ boutons doivent rester atteignables sans remonter.
 ## Vérifications automatiques
 
 ```bash
-npm run verify             # typecheck + lint + 644 tests
+npm run verify             # typecheck + lint + 661 tests
 npm run db:verify          # migrations rejouées dans un Postgres jetable, RLS partout
 npm run smoke              # contrôles de bout en bout contre le vrai Supabase
 npm run smoke:offre        # la boucle partenaire → modération → catalogue, en réel
@@ -615,11 +685,8 @@ correspondantes affichent un écran nommant leur lot, pas un 404.
 | Litiges et médiation | Lot A |
 | Factures PDF : partenaire, entreprise, client | Lot B |
 | Entreprise : réservations et rapports de dépenses | Lot B |
-| Invitation d'un collègue par courriel (l'écran Équipe existe, l'envoi non) | Lot D |
-| Favoris, documents du client | Lot D |
 | Créneaux (matin, après-midi, soirée) — le planning ouvre à la journée | Lot D |
 | Promotions et codes de réduction | Lot D |
-| Statistiques partenaire, aide en ligne | Lot D |
 | Pages éditoriales, blog, packs | Lot E |
 | Recadrage et compression des photos côté navigateur | Lot E |
 | Purge du cache CDN à la suppression d'une photo (une heure d'écart) | Lot E |
@@ -628,8 +695,9 @@ correspondantes affichent un écran nommant leur lot, pas un 404.
 **Livrés depuis** : paiement et réservation effective, annulation et
 remboursement, versements aux partenaires, commission par partenaire,
 messagerie client ↔ prestataire, notifications par courriel, pages légales,
-et le back-office d'exploitation — comptes, référentiel, journal d'audit,
-rapports, interrupteurs, équipe et pièces justificatives du partenaire.
+le back-office d'exploitation — comptes, référentiel, journal d'audit, rapports,
+interrupteurs — et le confort : favoris, reçus de paiement, statistiques
+partenaire, aide en ligne, invitation d'un collègue par courriel.
 
 > ⚠️ **Deux limites d'exploitation, pas de code.** FedaPay refuse `/payouts`
 > (403) et `/refunds` (401) tant que le compte marchand n'est pas validé :

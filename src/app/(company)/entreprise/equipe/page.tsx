@@ -1,8 +1,10 @@
 import { Users } from "lucide-react";
 
+import { TeamInvite } from "@/components/shared/TeamInvite";
 import { EmptyState } from "@/components/ui/empty-state";
 import { requireSpace } from "@/lib/auth/session";
 import { getTeam } from "@/lib/company";
+import { getPendingInvitations } from "@/lib/invitations";
 import { formatBeninPhone } from "@/lib/validation/phone";
 import { APPROVER_ROLES, COMPANY_ROLES } from "@/lib/validation/company";
 
@@ -16,9 +18,14 @@ export default async function TeamPage() {
   if (!decision.granted || !decision.org) return null;
 
   const team = await getTeam(decision.org.orgId);
+  const invitations = await getPendingInvitations(decision.org.orgId);
   const approvers = team.filter(
     (member) => APPROVER_ROLES.includes(member.role) && member.status === "active",
   );
+
+  // ⚠️ `owner` et `admin` côté entreprise — pas `manager`, qui est un rôle
+  // partenaire et que la contrainte `role_matches_org_type` interdit ici.
+  const peutInviter = decision.org.role === "owner" || decision.org.role === "admin";
 
   return (
     <div>
@@ -28,6 +35,14 @@ export default async function TeamPage() {
           Qui peut demander, qui peut engager. {decision.org.orgName}
         </p>
       </div>
+
+      <TeamInvite
+        space="company"
+        roles={COMPANY_ROLES}
+        pending={invitations}
+        roleLabels={ROLE_LABELS}
+        canInvite={peutInviter}
+      />
 
       {/* Sans valideur, aucun engagement au-dessus du seuil ne peut aboutir :
           les demandes resteraient en attente sans que personne ne comprenne. */}

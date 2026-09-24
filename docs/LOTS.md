@@ -4,8 +4,8 @@ Ce qui est en ligne, ce qui reste, et dans quel ordre. **C'est le seul document 
 lire pour savoir quoi construire ensuite.** Les plans de `~/.claude/plans/`
 décrivent des lots déjà livrés et ne font plus foi.
 
-Dernière mise à jour : 24 septembre 2026, après le lot C.
-644 tests verts, 41 migrations, production sur https://enievent.com.
+Dernière mise à jour : 24 septembre 2026, après le lot C et la première tranche
+du lot D. 661 tests verts, 42 migrations, production sur https://enievent.com.
 
 ---
 
@@ -29,21 +29,22 @@ chiffrer, encaisser et être versé ; l'administration voit passer l'argent.
 | Notifications par courriel (SMS débranché) | En ligne |
 | Espace entreprise : budgets, validations, équipe | En ligne |
 | Back-office : comptes, référentiel, journal, rapports, interrupteurs | En ligne |
-| Partenaire : équipe et pièces justificatives | En ligne |
+| Partenaire : équipe, invitations, pièces justificatives, statistiques, support | En ligne |
+| Client : favoris et reçus de paiement | En ligne |
 | Pages légales | En ligne, **à compléter** (§3) |
 
 ## 2. Le décompte des écrans
 
-61 entrées de menu, **42 construites, 19 en attente**. Chaque entrée non
+61 entrées de menu, **46 construites, 15 en attente**. Chaque entrée non
 construite affiche un écran nommant son lot, jamais un 404
 (`src/components/dashboard/roadmap.ts`).
 
 | Espace | Livrés | Reste |
 |---|---|---|
-| Partenaire — `/pro` | 12 / 18 | 6 |
+| Partenaire — `/pro` | 14 / 18 | 4 |
 | Entreprise — `/entreprise` | 9 / 12 | 3 |
 | Back-office — `/admin` | 15 / 23 | 8 |
-| Particulier — `/compte` | 6 / 8 | 2 |
+| Particulier — `/compte` | **8 / 8** | — |
 
 Le déséquilibre initial est résorbé : le back-office d'exploitation est en
 place, et ce qui reste relève des avis, de la facturation et du confort.
@@ -187,20 +188,41 @@ de compte* demande un modèle que le schéma n'a pas ; l'ajouter à moitié
 laisserait des invitations qui n'aboutissent jamais. L'écran dit donc la marche
 à suivre. C'est reporté au **lot D**.
 
-### Lot D — Confort · 6 écrans
+### Lot D — Confort · première tranche **livrée** (migration 0042)
 
-`/compte/favoris` · `/compte/documents` · `/pro/promotions` ·
-`/pro/statistiques` · `/pro/support` · `/admin/promotions`
+✅ `/compte/favoris` · `/compte/documents` · `/pro/statistiques` ·
+`/pro/support` · **invitation d'un collègue par courriel**
 
-Favoris, documents du client, codes promotionnels, statistiques partenaire,
-aide. S'y ajoutent les **créneaux** (matin, après-midi, soirée) : le planning
-n'ouvre aujourd'hui qu'à la journée, et **l'invitation d'un collègue par
-courriel**, reportée du lot C faute d'un modèle d'invitation en attente de
-compte.
+Ce que la tranche a demandé, et qui n'était pas prévisible :
 
-**Pourquoi après.** Rien ici n'empêche une vente. Les promotions touchent
-l'argent et passent donc par `money.ts` et des tests, comme les autres modules
-financiers.
+- **Une table d'invitations à part.** `organization_members.user_id` référence
+  `profiles(id)` : on ne peut y inscrire quelqu'un qu'une fois son compte créé,
+  alors qu'inviter, c'est s'adresser à quelqu'un qui n'en a pas. Le jeton est
+  le secret, et **personne ne peut le lire** — pas même celui qui invite.
+- **⚠️ `revoke select (colonne)` ne retire pas un `grant select` de table.**
+  Postgres accepte le `revoke` sans rien changer. Le jeton restait donc lisible
+  par le propriétaire de la structure, sans la moindre erreur. Il faut
+  énumérer les colonnes autorisées, comme la migration 0036 l'avait fait pour
+  `organizations`. Un test l'a attrapé ; rien d'autre ne l'aurait fait.
+- **Les statistiques partenaire ne lisent pas `partner_profiles`.**
+  `acceptance_rate` et `response_time_avg_h` sont annoncées « recalculées par
+  déclencheur » depuis la migration 0002 — ce déclencheur n'a jamais existé, et
+  les deux colonnes sont nulles sur **tous** les partenaires en production. Les
+  chiffres se recalculent donc depuis `quotes`, qui est la source.
+- **Un reçu n'est pas une facture**, et le document le dit lui-même : sans RCCM
+  ni IFU dans `legal.ts`, émettre une pièce fiscale serait faux. La facture
+  reste au lot B.
+
+**Reste au lot D** : `/pro/promotions` et `/admin/promotions` (codes de
+réduction), et les **créneaux** matin / après-midi / soirée.
+
+⚠️ Ces deux chantiers **touchent le prix payé**, contrairement à la tranche
+livrée. Les promotions passent par `money.ts`, `allocate()` et des tests
+obligatoires (§1) ; les créneaux demandent de reprendre le planning partenaire,
+le calendrier public et `book_listing`. Bonne nouvelle pour ces derniers :
+`availabilities.slot` existe **déjà**, avec l'énumération complète et la clé
+unique `(listing_id, date, slot)` — c'est `PLANNING_SLOT = "journee"`, figé
+dans le code, qu'il faut ouvrir.
 
 ### Lot E — Éditorial & SEO · 2 écrans
 
@@ -223,7 +245,8 @@ sur un produit qui doit d'abord savoir le servir.
    Un produit vide ne se teste pas en vrai.
 3. **Lot A — Confiance.** Le seul lot que le client voit.
 4. **Lot B — Facturation.** Débloque le tunnel entreprise.
-5. **Lot D**, puis **E**. (Le lot C est livré.)
+5. **Fin du lot D** — promotions et créneaux — puis **lot E**. (Le lot C et la
+   première tranche du lot D sont livrés.)
 
 Les points 1 et 2 ne demandent pas une ligne de code, et rien de ce qui suit
 n'a d'effet commercial avant eux.

@@ -1,9 +1,15 @@
 import { Users } from "lucide-react";
 
+import { TeamInvite } from "@/components/shared/TeamInvite";
 import { EmptyState } from "@/components/ui/empty-state";
 import { requireSpace } from "@/lib/auth/session";
 import { getTeam } from "@/lib/company";
-import { PARTNER_ROLE_HINTS, PARTNER_ROLE_LABELS } from "@/lib/validation/partner";
+import { getPendingInvitations } from "@/lib/invitations";
+import {
+  PARTNER_ROLES,
+  PARTNER_ROLE_HINTS,
+  PARTNER_ROLE_LABELS,
+} from "@/lib/validation/partner";
 import { formatBeninPhone } from "@/lib/validation/phone";
 
 /**
@@ -14,13 +20,16 @@ import { formatBeninPhone } from "@/lib/validation/phone";
  * `org_type`, et `getTeam` ne fait aucune hypothèse. Seuls les libellés de
  * rôles changent — `PARTNER_ROLES` au lieu de `COMPANY_ROLES`.
  *
- * ⚠️ **Pas d'invitation depuis cet écran, et ce n'est pas un oubli.**
- * `organization_members.user_id` référence `profiles(id)` : un collègue ne
- * peut rejoindre l'équipe qu'une fois son compte créé. Inviter par courriel
- * demanderait de porter une invitation *en attente de compte*, que le modèle
- * ne prévoit pas — l'ajouter à moitié laisserait des invitations qui
- * n'aboutissent jamais. L'écran dit donc la marche à suivre plutôt que
- * d'offrir un bouton qui échouerait.
+ * **L'invitation par courriel** (migration 0042) a demandé une table à part.
+ * `organization_members.user_id` référence `profiles(id)` : on ne peut y
+ * inscrire quelqu'un qu'une fois son compte créé, alors qu'inviter un
+ * collègue, c'est précisément s'adresser à quelqu'un qui n'en a pas encore.
+ * Le lot C avait buté là-dessus et reporté plutôt que d'ajouter à moitié.
+ *
+ * ⚠️ **Seuls `owner` et `manager` invitent.** Un équipier qui pourrait ajouter
+ * des membres contournerait la hiérarchie de la structure en un clic.
+ * `invite_member` le refuse déjà ; l'écran n'offre pas le geste, pour ne pas
+ * proposer ce que la base rejettera.
  */
 
 export const metadata = { title: "Équipe" };
@@ -36,7 +45,9 @@ export default async function PartnerTeamPage() {
   if (!decision.granted || !decision.org) return null;
 
   const team = await getTeam(decision.org.orgId);
+  const invitations = await getPendingInvitations(decision.org.orgId);
   const actifs = team.filter((m) => m.status === "active");
+  const peutInviter = decision.org.role === "owner" || decision.org.role === "manager";
 
   return (
     <div>
@@ -47,11 +58,18 @@ export default async function PartnerTeamPage() {
         </p>
       </div>
 
-      {actifs.length === 1 ? (
+      <TeamInvite
+        space="partner"
+        roles={PARTNER_ROLES}
+        pending={invitations}
+        roleLabels={PARTNER_ROLE_LABELS}
+        canInvite={peutInviter}
+      />
+
+      {actifs.length === 1 && invitations.length === 0 ? (
         <p className="mb-6 rounded-2xl bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-600">
-          <strong>Vous êtes seul sur ce compte.</strong> Pour ajouter quelqu&apos;un, demandez-lui
-          de créer son compte sur <span className="font-mono">/pro/inscription</span>, puis
-          écrivez-nous : nous le rattacherons à votre structure avec le rôle que vous choisirez.
+          <strong>Vous êtes seul sur ce compte.</strong> Un collègue qui reçoit une invitation
+          créera son compte au passage : il n&apos;a rien à préparer de son côté.
         </p>
       ) : null}
 

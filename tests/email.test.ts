@@ -25,6 +25,16 @@ const CONFIG = {
 const SITE = "https://enievent.com";
 const UUID = "3f2504e0-4f89-41d3-9a0c-0305e82c3301";
 
+/**
+ * Charge utile représentative, passée à **tous** les types par les garde-fous
+ * ci-dessous.
+ *
+ * Elle porte un `token` parce que `member.invited` en exige un : son courriel
+ * n'existe que pour porter un lien d'acceptation, et le rendre sans jeton
+ * enverrait un bouton qui ne mène nulle part. Les autres types l'ignorent.
+ */
+const PAYLOAD = { city: "Cotonou", requestId: UUID, token: "a".repeat(64), orgName: "Salle Étoile" };
+
 /** Les tests n'attendent pas les 550 ms de cadencement. */
 const NO_WAIT = async () => {};
 
@@ -225,7 +235,7 @@ describe("garde-fous de rédaction", () => {
   it("rend tous les types déclarés", () => {
     // Un `kind` posé en base sans contenu associé resterait bloqué en file.
     for (const kind of KINDS) {
-      expect(renderEmail(kind, { city: "Cotonou", requestId: UUID }, SITE), kind).not.toBeNull();
+      expect(renderEmail(kind, PAYLOAD, SITE), kind).not.toBeNull();
     }
   });
 
@@ -238,7 +248,7 @@ describe("garde-fous de rédaction", () => {
     // (`PublicHeader.tsx`). L'e-mail avait l'inverse. Rien ne relie ces deux
     // endroits : seul ce test empêche la prochaine retouche de réinverser.
     for (const kind of KINDS) {
-      const mail = renderEmail(kind, { city: "Cotonou", requestId: UUID }, SITE)!;
+      const mail = renderEmail(kind, PAYLOAD, SITE)!;
 
       expect(mail.html, kind).toContain('<span style="color:#f97316;">Éni</span>Event');
       expect(mail.html, kind).not.toContain('Éni<span style="color:#f97316;">Event</span>');
@@ -271,7 +281,7 @@ describe("garde-fous de rédaction", () => {
     // Un message sans corps texte est noté comme indésirable par la plupart
     // des filtres — et illisible pour qui lit son courrier en texte brut.
     for (const kind of KINDS) {
-      const mail = renderEmail(kind, { city: "Cotonou", requestId: UUID, offres: 2 }, SITE)!;
+      const mail = renderEmail(kind, { ...PAYLOAD, offres: 2 }, SITE)!;
 
       expect(mail.text.length, kind).toBeGreaterThan(40);
       expect(mail.text, kind).not.toContain("<");
