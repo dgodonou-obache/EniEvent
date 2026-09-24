@@ -612,6 +612,41 @@ export type Database = {
           },
         ]
       }
+      feature_flags: {
+        Row: {
+          description: string
+          enabled: boolean
+          key: string
+          label: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          description: string
+          enabled?: boolean
+          key: string
+          label: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          description?: string
+          enabled?: boolean
+          key?: string
+          label?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feature_flags_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kyc_documents: {
         Row: {
           created_at: string
@@ -2533,6 +2568,34 @@ export type Database = {
     }
     Functions: {
       accept_quote: { Args: { target: string }; Returns: undefined }
+      admin_companies: {
+        Args: never
+        Returns: {
+          billing_email: string
+          brand_name: string
+          city: string
+          created_at: string
+          legal_name: string
+          member_count: number
+          org_id: string
+          phone: string
+          status: Database["public"]["Enums"]["org_status"]
+        }[]
+      }
+      admin_users: {
+        Args: { decalage?: number; limite?: number; recherche?: string }
+        Returns: {
+          account_type: Database["public"]["Enums"]["account_type"]
+          created_at: string
+          email: string
+          email_confirmed: boolean
+          full_name: string
+          id: string
+          last_sign_in_at: string
+          org_count: number
+          phone: string
+        }[]
+      }
       attach_payment_reference: {
         Args: { adresse?: string; cle: string; ref: string }
         Returns: undefined
@@ -2898,6 +2961,30 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      set_account_type: {
+        Args: {
+          cible: string
+          nouveau: Database["public"]["Enums"]["account_type"]
+        }
+        Returns: {
+          account_type: Database["public"]["Enums"]["account_type"]
+          avatar_url: string | null
+          city: string | null
+          country: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          locale: string
+          phone: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       set_commission_rate: {
         Args: { org: string; taux?: number }
         Returns: {
@@ -2924,6 +3011,54 @@ export type Database = {
         }
       }
       set_default_commission_rate: { Args: { taux: number }; Returns: number }
+      set_feature_flag: {
+        Args: { actif: boolean; cle: string }
+        Returns: {
+          description: string
+          enabled: boolean
+          key: string
+          label: string
+          updated_at: string
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "feature_flags"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_org_status: {
+        Args: {
+          nouveau: Database["public"]["Enums"]["org_status"]
+          org: string
+        }
+        Returns: {
+          account_manager_id: string | null
+          address: string | null
+          billing_email: string | null
+          brand_name: string | null
+          city: string | null
+          country: string
+          created_at: string
+          id: string
+          ifu: string | null
+          legal_name: string
+          logo_url: string | null
+          phone: string | null
+          rccm: string | null
+          slug: string | null
+          status: Database["public"]["Enums"]["org_status"]
+          type: Database["public"]["Enums"]["org_type"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "organizations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       settle_payment: {
         Args: {
           cle: string

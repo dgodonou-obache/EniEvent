@@ -28,10 +28,21 @@ $$;
 
 -- Version simplifiée de auth.users : seules les colonnes que notre schéma
 -- référence réellement.
+-- ⚠️ Ce stub doit porter **toutes** les colonnes que le dépôt interroge, pas
+-- seulement celles qu'il écrit. `admin_users` (migration 0040) lit
+-- `email_confirmed_at` et `last_sign_in_at` : sans elles ici, la fonction se
+-- compile en production et échoue au banc d'essai — l'inverse exact du piège
+-- habituel, et tout aussi coûteux.
+--
+-- `email_confirmed_at` mérite son commentaire : c'est ce champ resté nul qui
+-- trahit une inscription dont le courriel n'est jamais arrivé, et c'est
+-- arrivé en production.
 create table if not exists auth.users (
   id uuid primary key default gen_random_uuid(),
   email text unique,
   raw_user_meta_data jsonb not null default '{}'::jsonb,
+  email_confirmed_at timestamptz,
+  last_sign_in_at timestamptz,
   created_at timestamptz not null default now()
 );
 

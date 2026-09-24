@@ -412,7 +412,83 @@ ailleurs et la commission s'applique à zéro.
    Le taux est figé à la création, comme le barème d'annulation — les
    conditions d'une réservation conclue ne se réécrivent pas.
 
-## 14. Écrans à venir
+## 14. Back-office : comptes, référentiel, exploitation
+
+En administrateur, sur `demo-admin@enievent.bj`.
+
+**Comptes**
+
+1. **`/admin/utilisateurs`**. **Attendu** : chaque compte avec son **adresse
+   e-mail** — elle ne vient pas de `profiles`, qui n'en porte aucune — et la
+   mention **« Adresse jamais confirmée »** en évidence le cas échéant. C'est
+   le premier symptôme d'un courriel qui n'arrive pas.
+2. Chercher `demo`. **Attendu** : la liste se réduit, l'URL porte `?q=demo`.
+3. Passer un compte de « Particulier » à « Partenaire », **Appliquer**.
+   **Attendu** : confirmation, et le changement tient après rechargement.
+4. Choisir « Administration » pour quelqu'un. **Attendu** : un encart rouge
+   prévient que ce compte ouvrira le back-office entier — **avant** de
+   confirmer, pas après.
+5. Essayer de **vous** retirer l'administration. **Attendu** : refus expliquant
+   que vous ne pourriez plus revenir sur cet écran. Ce n'est pas une politesse :
+   `/admin` est refusé dans le proxy, la porte se refermerait derrière vous.
+6. **`/admin/entreprises`**. **Attendu** : les entreprises clientes, leurs
+   coordonnées et leur nombre de membres. Suspendre une entreprise demande
+   **deux gestes**, et le second annonce ce qui va se passer.
+
+**Référentiel**
+
+7. **`/admin/categories`** → **Ajouter une catégorie**, saisir un nom déjà pris.
+   **Attendu** : « … existe déjà », pas une erreur de clé dupliquée.
+8. **Renommer** une catégorie. **Attendu** : l'adresse publique ne change pas —
+   les liens déjà partagés et indexés continuent de fonctionner.
+9. **Masquer** une catégorie pourvue. **Attendu** : elle disparaît des filtres,
+   **et ses annonces restent en ligne et réservables**. Un partenaire ne perd
+   pas sa vitrine parce qu'on réorganise un référentiel.
+10. **`/admin/villes`** → renommer une ville ayant des annonces.
+    **Attendu** : le message annonce **combien d'annonces ont été déplacées**.
+    Les annonces portent le nom de leur ville en toutes lettres : sans ce
+    déplacement, elles sortiraient de la recherche sans que rien ne le signale.
+    Vérifier sur `/recherche` que le filtre trouve bien le nouveau nom.
+
+**Exploitation**
+
+11. **`/admin/journal`**. **Attendu** : les décisions récentes, chacune lue
+    « de → à », avec leur auteur. Filtrer par type. **Attendu** : seuls des
+    types **réellement présents** sont proposés.
+12. Les gestes des étapes 3 et 9 doivent y figurer : le journal est écrit par
+    la base, pas par l'interface.
+13. **`/admin/rapports`**. **Attendu** : l'**encaissé**, jamais le commandé, et
+    la commission présentée comme le seul revenu. Changer de période.
+14. **`/admin/feature-flags`** → couper **Messagerie**, en confirmant.
+15. Se connecter en client et tenter d'écrire un message. **Attendu** : refus.
+    **Les fils existants restent lisibles** — une coupure empêche d'écrire,
+    elle n'efface rien.
+16. Rallumer l'interrupteur (un seul clic, pas de confirmation : rallumer remet
+    le produit dans son état normal). **Attendu** : l'envoi repasse.
+17. Couper **Inscriptions partenaires**, puis ouvrir `/pro/inscription` dans un
+    onglet privé. **Attendu** : la création de compte partenaire est refusée.
+    Rallumer.
+
+**Côté partenaire**
+
+18. **`/pro/equipe`** avec `demo-partenaire@enievent.bj`. **Attendu** : les
+    membres et leur rôle en clair. Aucun bouton d'invitation — il dit la marche
+    à suivre, parce qu'un collègue doit d'abord créer son compte.
+19. **`/pro/documents`** → déposer une pièce. **Attendu** : elle passe « En
+    cours de vérification ». Essayer un fichier HEIC : refus expliquant qu'il
+    faut le convertir. Essayer un fichier de plus de 8 Mo : refus chiffré.
+20. Cliquer **Voir**. **Attendu** : le document s'ouvre. **L'URL est signée et
+    expire en une minute** : la recopier et la rouvrir plus tard doit échouer.
+    C'est le point à vérifier — le seau est privé, contrairement à celui des
+    photos.
+21. Se connecter avec un compte **équipier** de la même structure.
+    **Attendu** : il consulte l'avancement mais n'a aucun bouton de dépôt.
+
+> ⚠️ Le contrôle qui compte à l'étape 15 : la coupure est appliquée **par un
+> déclencheur en base**, pas par l'interface. Un interrupteur qui ne ferait que
+> cacher un bouton laisserait passer tout appel direct.
+
+## 15. Écrans à venir
 
 Cliquer n'importe quelle entrée de menu non encore construite — par exemple
 **Promotions**, **Journal d'audit** ou **Utilisateurs**.
@@ -421,7 +497,7 @@ Cliquer n'importe quelle entrée de menu non encore construite — par exemple
 L'état exact — ce qui est livré, ce qui reste, dans quel ordre — est dans
 `docs/LOTS.md`.
 
-## 15. Inscription réelle, et les liens reçus par courriel
+## 16. Inscription réelle, et les liens reçus par courriel
 
 1. Se déconnecter, ouvrir `/inscription`.
 2. Onglet **Particulier** : renseigner un e-mail neuf, un mot de passe de
@@ -464,7 +540,7 @@ L'état exact — ce qui est livré, ce qui reste, dans quel ordre — est dans
 13. Recliquer le **même** lien. **Attendu** : refusé — un lien de
     réinitialisation ne sert qu'une fois.
 
-## 16. Mobile
+## 17. Mobile
 
 Refaire les chapitres 1, 2, 4, 7, 8, 9, 10 et 12 dans une fenêtre de
 **390 px de large**.
@@ -475,7 +551,7 @@ boutons doivent rester atteignables sans remonter.
 
 ---
 
-## 17. Expiration des sessions
+## 18. Expiration des sessions
 
 1. Se connecter en administrateur, ouvrir `/admin`, puis laisser passer plus
    d'une heure sans naviguer. **Attendu** : au retour, redirection vers
@@ -494,7 +570,7 @@ boutons doivent rester atteignables sans remonter.
 ## Vérifications automatiques
 
 ```bash
-npm run verify             # typecheck + lint + 628 tests
+npm run verify             # typecheck + lint + 644 tests
 npm run db:verify          # migrations rejouées dans un Postgres jetable, RLS partout
 npm run smoke              # contrôles de bout en bout contre le vrai Supabase
 npm run smoke:offre        # la boucle partenaire → modération → catalogue, en réel
@@ -539,11 +615,11 @@ correspondantes affichent un écran nommant leur lot, pas un 404.
 | Litiges et médiation | Lot A |
 | Factures PDF : partenaire, entreprise, client | Lot B |
 | Entreprise : réservations et rapports de dépenses | Lot B |
-| Invitation d'un collègue par courriel (l'écran Équipe existe, l'envoi non) | Lot C |
-| Reste du back-office : utilisateurs, catégories, villes, CMS, audit, flags | Lot C |
+| Invitation d'un collègue par courriel (l'écran Équipe existe, l'envoi non) | Lot D |
 | Favoris, documents du client | Lot D |
 | Créneaux (matin, après-midi, soirée) — le planning ouvre à la journée | Lot D |
 | Promotions et codes de réduction | Lot D |
+| Statistiques partenaire, aide en ligne | Lot D |
 | Pages éditoriales, blog, packs | Lot E |
 | Recadrage et compression des photos côté navigateur | Lot E |
 | Purge du cache CDN à la suppression d'une photo (une heure d'écart) | Lot E |
@@ -551,7 +627,9 @@ correspondantes affichent un écran nommant leur lot, pas un 404.
 
 **Livrés depuis** : paiement et réservation effective, annulation et
 remboursement, versements aux partenaires, commission par partenaire,
-messagerie client ↔ prestataire, notifications par courriel, pages légales.
+messagerie client ↔ prestataire, notifications par courriel, pages légales,
+et le back-office d'exploitation — comptes, référentiel, journal d'audit,
+rapports, interrupteurs, équipe et pièces justificatives du partenaire.
 
 > ⚠️ **Deux limites d'exploitation, pas de code.** FedaPay refuse `/payouts`
 > (403) et `/refunds` (401) tant que le compte marchand n'est pas validé :

@@ -147,6 +147,18 @@ Aucune transition d'état (réservation, devis, paiement, séquestre) ne se déc
 client. Server Actions ou fonctions Postgres `SECURITY DEFINER` uniquement, journalisées
 dans `audit_logs`. Les transitions autorisées vivent dans `src/lib/states.ts`.
 
+⚠️ **Un interrupteur qui ne commande rien est pire que pas d'interrupteur.** L'exploitant
+le bascule, croit avoir agi, et le produit continue comme avant — jusqu'à la réclamation.
+`feature_flags` (migration 0040) ne porte donc que des clés **réellement obéies**, et
+l'obéissance vit dans un **déclencheur sur la table**, jamais dans une Server Action ni en
+tête d'une fonction d'écriture : garder l'entrée de la table couvre tous les chemins, y
+compris ceux qu'on oublie. `conversations` en avait trois — `open_conversation`,
+`open_conversation_for_request` et la console — et un interrupteur qui ferme deux portes
+sur trois ne ferme rien. **Ajouter une clé demande d'écrire d'abord l'endroit qui lui
+obéit**, et `tests/rls-administration.test.ts` vérifie la coupure en base, pas à l'écran.
+`app.feature_enabled` rend **vrai** pour une clé absente : un interrupteur qu'on n'a pas
+posé n'éteint pas une fonctionnalité qui marchait.
+
 ### 3. Sécurité
 - ⚠️ **PGlite ne reproduit pas les droits par défaut de Supabase.** Sur le vrai projet,
   un `alter default privileges` accorde `INSERT, SELECT, UPDATE, DELETE` à `anon` et
@@ -175,6 +187,30 @@ dans `audit_logs`. Les transitions autorisées vivent dans `src/lib/states.ts`.
   RLS. Exception : un administrateur est lui aussi `authenticated`, donc un `grant` ne
   sait pas l'en distinguer ; là où seul l'administrateur doit écrire (`kyc_documents`),
   c'est la RLS qui tranche, pas les colonnes.
+- **Corollaire : une colonne de privilège n'est écrite par personne tant qu'on ne lui a
+  pas ouvert une porte.** Les trois de la migration 0021 en ont une depuis la 0040 —
+  `set_account_type`, `set_org_status`, `set_feature_flag`, sur le moule de
+  `set_commission_rate`. Un `update` direct, **même lancé par un administrateur**, ne
+  lève rien et ne touche aucune ligne : c'est le cas silencieux ci-dessus. Deux verrous
+  à ne pas retirer de `set_account_type` : on ne se retire pas à soi-même
+  l'administration, et on ne rétrograde pas le dernier administrateur — `/admin` étant
+  refusé dans le proxy, la porte se refermerait sans clé.
+- ⚠️ **`auth.users` n'est pas exposé par PostgREST**, et ne doit pas l'être : cette table
+  porte les empreintes de mots de passe. Les adresses e-mail n'existent donc **nulle
+  part** dans `public` — `profiles` n'en a pas. `admin_users()` en extrait les quatre
+  colonnes utiles derrière `app.is_admin()`. Même motif pour les coordonnées fermées par
+  la 0036 (`admin_companies()`, `org_contact()`). ⚠️ `auth.users.email` et
+  `organizations.billing_email` sont des **`citext`** : une fonction qui les déclare
+  `text` sans transtyper échoue à l'appel sur « structure of query does not match
+  function result type », un message qui ne nomme pas la colonne fautive.
+- ⚠️ **Deux seaux de stockage, deux régimes.** `annonces` est **public** — une vignette
+  est vue par des visiteurs non connectés, la signer coûterait un aller-retour par
+  image. `justificatifs` (migration 0041) est **privé** : on y dépose des pièces
+  d'identité et des RIB, et une URL de seau public n'est protégée que par son obscurité,
+  or elle voyage dans les journaux, les caches et les historiques. La lecture s'y fait
+  par URL signée d'une minute, émise côté serveur. Ne jamais y construire une URL
+  `…/object/public/…`. Dans les deux seaux, le cloisonnement tient au **chemin**
+  (`{org_id}/…`) ; `justificatifs` exige en plus le rôle `owner` ou `accountant`.
 - Les sessions expirent par inactivité : **14 jours**, et **1 heure sur `/admin`**
   (`src/lib/auth/inactivity.ts`). Horodatage signé en HMAC, pas d'état en base — le
   proxy s'exécute à chaque requête. Sans `SESSION_SECRET`, le délai est inactif : jamais

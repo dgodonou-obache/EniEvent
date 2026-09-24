@@ -4,8 +4,8 @@ Ce qui est en ligne, ce qui reste, et dans quel ordre. **C'est le seul document 
 lire pour savoir quoi construire ensuite.** Les plans de `~/.claude/plans/`
 décrivent des lots déjà livrés et ne font plus foi.
 
-Dernière mise à jour : 23 septembre 2026, au commit `7b93bb9`.
-628 tests verts, 39 migrations, production sur https://enievent.com.
+Dernière mise à jour : 24 septembre 2026, après le lot C.
+644 tests verts, 41 migrations, production sur https://enievent.com.
 
 ---
 
@@ -28,24 +28,25 @@ chiffrer, encaisser et être versé ; l'administration voit passer l'argent.
 | Messagerie client ↔ prestataire, coordonnées masquées | En ligne |
 | Notifications par courriel (SMS débranché) | En ligne |
 | Espace entreprise : budgets, validations, équipe | En ligne |
+| Back-office : comptes, référentiel, journal, rapports, interrupteurs | En ligne |
+| Partenaire : équipe et pièces justificatives | En ligne |
 | Pages légales | En ligne, **à compléter** (§3) |
 
 ## 2. Le décompte des écrans
 
-61 entrées de menu, **33 construites, 28 en attente**. Chaque entrée non
+61 entrées de menu, **42 construites, 19 en attente**. Chaque entrée non
 construite affiche un écran nommant son lot, jamais un 404
 (`src/components/dashboard/roadmap.ts`).
 
 | Espace | Livrés | Reste |
 |---|---|---|
-| Partenaire — `/pro` | 10 / 18 | 8 |
+| Partenaire — `/pro` | 12 / 18 | 6 |
 | Entreprise — `/entreprise` | 9 / 12 | 3 |
-| Back-office — `/admin` | 8 / 23 | **15** |
+| Back-office — `/admin` | 15 / 23 | 8 |
 | Particulier — `/compte` | 6 / 8 | 2 |
 
-Le déséquilibre est voulu : les écrans livrés sont ceux que traverse l'argent.
-Le back-office restant est de l'outillage d'exploitation — utile à vous, jamais
-à un client.
+Le déséquilibre initial est résorbé : le back-office d'exploitation est en
+place, et ce qui reste relève des avis, de la facturation et du confort.
 
 ---
 
@@ -113,7 +114,7 @@ dissous, et un écran annonçant « arrive au lot 2 » alors que le lot 2 est en
 production depuis des semaines dit au lecteur que le produit est à l'arrêt.
 `tests/roadmap.test.ts` interdit désormais le retour de l'ancienne numérotation.
 
-### Lot A — Confiance · 3 écrans
+### Lot A — Confiance · 4 écrans
 
 `/pro/avis` · `/admin/avis` · `/admin/signalements` · `/admin/litiges`
 
@@ -130,7 +131,7 @@ réellement payée. Le lien se fait sur `orders`, pas sur un formulaire ouvert,
 sinon la première salle venue s'auto-note. Et la section « Les valeurs sûres »
 de l'accueil ne s'allume qu'une fois des notes réelles en base.
 
-### Lot B — Facturation · 5 écrans
+### Lot B — Facturation · 7 écrans
 
 `/pro/finances/factures` · `/pro/finances/commissions` ·
 `/entreprise/factures` · `/entreprise/reservations` · `/entreprise/rapports` ·
@@ -147,23 +148,44 @@ qui ne voit pas le détail de sa commission finit par la contester.
 arrondie ligne à ligne perd des francs. Le montant d'une facture doit être relu
 depuis `orders` et `payments`, jamais recalculé à l'affichage.
 
-### Lot C — Comptes & administration · 9 écrans
+### ~~Lot C — Comptes & administration~~ · **livré** (migrations 0040 et 0041)
 
 `/admin/utilisateurs` · `/admin/entreprises` · `/admin/categories` ·
 `/admin/villes` · `/admin/journal` · `/admin/rapports` ·
 `/admin/feature-flags` · `/pro/equipe` · `/pro/documents`
 
-Le back-office d'exploitation : gérer les comptes, le référentiel, lire le
-journal d'audit, inviter un collègue par courriel.
+Ce qu'il a fallu ouvrir, et qui n'était pas évident :
 
-**Pourquoi.** C'est ce qui vous évite d'ouvrir SQL pour la moindre correction.
-Le travail est volumineux mais peu risqué : ces écrans lisent et écrivent des
-données déjà modélisées.
+- **Trois colonnes de privilège n'étaient écrites par personne.**
+  `profiles.account_type`, `organizations.status` et le nouvel
+  `feature_flags.enabled` se règlent par `set_account_type`, `set_org_status`
+  et `set_feature_flag`. La migration 0021 avait retiré les deux premières du
+  `grant update` après trois élévations de privilèges réelles ; un
+  administrateur étant `authenticated` comme les autres, un `update` direct ne
+  lève rien et ne touche aucune ligne.
+- **L'administration ne pouvait pas lire les adresses e-mail** : elles vivent
+  dans `auth.users`, que PostgREST n'expose pas. `admin_users()` les en extrait
+  derrière `app.is_admin()`. Même chose pour les coordonnées des entreprises,
+  que la migration 0036 avait fermées — `admin_companies()`.
+- **Deux verrous contre l'enfermement** : un administrateur ne peut pas se
+  retirer l'administration, et le dernier administrateur ne peut pas être
+  rétrogradé. Sans eux, la seule sortie serait une requête SQL sur le projet.
+- **Le seau des pièces justificatives n'existait pas.** `kyc_documents`
+  attendait depuis la migration 0002 un stockage qui n'avait jamais été créé :
+  un partenaire ne pouvait déposer ni RCCM, ni IFU, ni RIB. Le seau
+  `justificatifs` est **privé**, contrairement à celui des photos, et se lit
+  par URL signée d'une minute.
+- **Deux interrupteurs, obéis par des déclencheurs** et non par l'interface :
+  fermer les inscriptions partenaires, couper la messagerie. Un interrupteur
+  appliqué dans une Server Action laisserait passer tout appel qui ne la
+  traverse pas — et `conversations` a trois chemins d'écriture.
 
-**Attention.** Toute colonne qui **définit un privilège** — `account_type`,
-`role`, `status`, une commission — se protège par un droit de colonne **et** un
-déclencheur, jamais par la seule RLS (`CLAUDE.md` §3). Un écran
-« Utilisateurs » est précisément l'endroit où cette règle se perd.
+**Ce qui n'y est pas** : l'invitation d'un collègue par courriel.
+`organization_members.user_id` référence `profiles(id)` — un collègue ne
+rejoint l'équipe qu'une fois son compte créé. Porter une invitation *en attente
+de compte* demande un modèle que le schéma n'a pas ; l'ajouter à moitié
+laisserait des invitations qui n'aboutissent jamais. L'écran dit donc la marche
+à suivre. C'est reporté au **lot D**.
 
 ### Lot D — Confort · 6 écrans
 
@@ -172,7 +194,9 @@ déclencheur, jamais par la seule RLS (`CLAUDE.md` §3). Un écran
 
 Favoris, documents du client, codes promotionnels, statistiques partenaire,
 aide. S'y ajoutent les **créneaux** (matin, après-midi, soirée) : le planning
-n'ouvre aujourd'hui qu'à la journée.
+n'ouvre aujourd'hui qu'à la journée, et **l'invitation d'un collègue par
+courriel**, reportée du lot C faute d'un modèle d'invitation en attente de
+compte.
 
 **Pourquoi après.** Rien ici n'empêche une vente. Les promotions touchent
 l'argent et passent donc par `money.ts` et des tests, comme les autres modules
@@ -199,7 +223,7 @@ sur un produit qui doit d'abord savoir le servir.
    Un produit vide ne se teste pas en vrai.
 3. **Lot A — Confiance.** Le seul lot que le client voit.
 4. **Lot B — Facturation.** Débloque le tunnel entreprise.
-5. **Lot C**, puis **D**, puis **E**.
+5. **Lot D**, puis **E**. (Le lot C est livré.)
 
 Les points 1 et 2 ne demandent pas une ligne de code, et rien de ce qui suit
 n'a d'effet commercial avant eux.

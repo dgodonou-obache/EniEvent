@@ -90,6 +90,8 @@ const PARCOURS = [
       "/pro/finances/versements",
       "/pro/statistiques",
       "/pro/parametres",
+      "/pro/equipe",
+      "/pro/documents",
     ],
   },
   {
@@ -117,7 +119,18 @@ const PARCOURS = [
       "/admin/demandes?etat=open",
       "/admin/demandes?etat=awarded",
       "/admin/partenaires",
+      "/admin/entreprises",
       "/admin/utilisateurs",
+      // La recherche est un chemin distinct : elle appelle `admin_users` avec
+      // un argument, et c'est là qu'une signature de fonction mal accordée se
+      // manifeste — jamais à la compilation.
+      "/admin/utilisateurs?q=demo",
+      "/admin/categories",
+      "/admin/villes",
+      "/admin/journal",
+      "/admin/rapports",
+      "/admin/rapports?jours=7",
+      "/admin/feature-flags",
       "/admin/paiements",
       "/admin/versements",
       "/admin/remboursements",

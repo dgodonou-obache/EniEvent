@@ -26,8 +26,6 @@ const LOT_BY_PREFIX: { prefix: string; lot: string }[] = [
   { prefix: "/pro/avis", lot: "Lot A — Confiance" },
   { prefix: "/pro/finances/factures", lot: "Lot B — Facturation" },
   { prefix: "/pro/finances/commissions", lot: "Lot B — Facturation" },
-  { prefix: "/pro/equipe", lot: "Lot C — Comptes & administration" },
-  { prefix: "/pro/documents", lot: "Lot C — Comptes & administration" },
   { prefix: "/pro/promotions", lot: "Lot D — Confort" },
   { prefix: "/pro/statistiques", lot: "Lot D — Confort" },
   { prefix: "/pro/support", lot: "Lot D — Confort" },
@@ -39,9 +37,11 @@ const LOT_BY_PREFIX: { prefix: string; lot: string }[] = [
   { prefix: "/entreprise/reservations", lot: "Lot B — Facturation" },
   { prefix: "/entreprise/factures", lot: "Lot B — Facturation" },
   { prefix: "/entreprise/rapports", lot: "Lot B — Facturation" },
-  { prefix: "/entreprise", lot: "Lot C — Comptes & administration" },
+  { prefix: "/entreprise", lot: "Lot B — Facturation" },
 
   // — Back-office —
+  // Le lot C a livré comptes, référentiel, journal, rapports et interrupteurs.
+  // Ce qui reste ici ne relève plus de l'administration des comptes.
   { prefix: "/admin/avis", lot: "Lot A — Confiance" },
   { prefix: "/admin/litiges", lot: "Lot A — Confiance" },
   { prefix: "/admin/signalements", lot: "Lot A — Confiance" },
@@ -50,7 +50,7 @@ const LOT_BY_PREFIX: { prefix: string; lot: string }[] = [
   { prefix: "/admin/cms", lot: "Lot E — Éditorial & SEO" },
   { prefix: "/admin/medias", lot: "Lot E — Éditorial & SEO" },
   { prefix: "/admin/promotions", lot: "Lot D — Confort" },
-  { prefix: "/admin", lot: "Lot C — Comptes & administration" },
+  { prefix: "/admin", lot: "Lot D — Confort" },
 
   // — Espace particulier —
   // Ses écrans suivent le client, pas un métier.
