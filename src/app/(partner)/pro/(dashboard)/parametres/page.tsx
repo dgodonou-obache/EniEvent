@@ -2,6 +2,8 @@ import { CalendarClock, Wallet } from "lucide-react";
 
 import { PayoutAccountForm } from "@/components/partner/PayoutAccountForm";
 import { ScheduleEditor } from "@/components/partner/ScheduleEditor";
+import { DeleteAccount } from "@/components/shared/DeleteAccount";
+import { getDeletionBlockers } from "@/lib/account-deletion";
 import { requireSpace } from "@/lib/auth/session";
 import { getPayoutAccount } from "@/lib/payouts";
 import { createClient } from "@/utils/supabase/server";
@@ -22,6 +24,7 @@ export default async function PartnerSettingsPage() {
   if (!decision.granted || !decision.org) return null;
 
   const orgId = decision.org.orgId;
+  const blockers = await getDeletionBlockers();
 
   const supabase = await createClient();
   const { data: lignes } = await supabase
@@ -98,6 +101,14 @@ export default async function PartnerSettingsPage() {
           }
         />
       </section>
+
+      {/* ⚠️ Un partenaire ne peut pas partir en laissant une prestation à
+          honorer ou un versement à recevoir — et pas davantage s'il est le
+          dernier aux commandes d'une structure qui a vécu. Les raisons sont
+          affichées ici, avant le geste. */}
+      <div className="max-w-xl">
+        <DeleteAccount blockers={blockers} />
+      </div>
     </div>
   );
 }

@@ -4,8 +4,9 @@ Ce qui est en ligne, ce qui reste, et dans quel ordre. **C'est le seul document 
 lire pour savoir quoi construire ensuite.** Les plans de `~/.claude/plans/`
 décrivent des lots déjà livrés et ne font plus foi.
 
-Dernière mise à jour : 24 septembre 2026, après le lot C et la première tranche
-du lot D. 661 tests verts, 42 migrations, production sur https://enievent.com.
+Dernière mise à jour : 25 septembre 2026, après le lot C, la première tranche du
+lot D et la suppression de compte. 678 tests verts, 43 migrations, production sur
+https://enievent.com.
 
 ---
 
@@ -31,6 +32,7 @@ chiffrer, encaisser et être versé ; l'administration voit passer l'argent.
 | Back-office : comptes, référentiel, journal, rapports, interrupteurs | En ligne |
 | Partenaire : équipe, invitations, pièces justificatives, statistiques, support | En ligne |
 | Client : favoris et reçus de paiement | En ligne |
+| Suppression de compte, sous conditions (client, partenaire, entreprise) | En ligne |
 | Pages légales | En ligne, **à compléter** (§3) |
 
 ## 2. Le décompte des écrans

@@ -43,6 +43,12 @@ create table if not exists auth.users (
   raw_user_meta_data jsonb not null default '{}'::jsonb,
   email_confirmed_at timestamptz,
   last_sign_in_at timestamptz,
+  -- Écrites par la suppression de compte (migration 0043) : l'adresse est
+  -- remplacée par une valeur non routable, le mot de passe invalidé, et
+  -- `banned_until` ferme la connexion pour de bon.
+  phone text,
+  encrypted_password text,
+  banned_until timestamptz,
   created_at timestamptz not null default now()
 );
 

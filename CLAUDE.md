@@ -220,6 +220,20 @@ posé n'éteint pas une fonctionnalité qui marchait.
   par URL signée d'une minute, émise côté serveur. Ne jamais y construire une URL
   `…/object/public/…`. Dans les deux seaux, le cloisonnement tient au **chemin**
   (`{org_id}/…`) ; `justificatifs` exige en plus le rôle `owner` ou `accountant`.
+- ⚠️ **Supprimer un compte, c'est anonymiser — pas effacer.** La chaîne
+  `profiles → quote_requests → quote_request_items → quotes` est **en cascade** :
+  effacer un client emporterait les devis que ses partenaires ont chiffrés, c'est-à-dire
+  le travail et l'historique commercial de quelqu'un d'autre. `delete_my_account`
+  (migration 0043) applique donc deux régimes — effacement réel **seulement** quand il
+  n'y a ni commande, ni devis, ni message ; anonymisation sinon, les pièces comptables
+  survivant sans le nom. La fonction ne prend **aucun paramètre** : elle agit sur
+  `auth.uid()`, il n'y a donc pas de cible à garder. On ne part pas non plus en laissant
+  une prestation à honorer, de l'argent dû dans un sens ou l'autre, une négociation
+  ouverte, ou une structure sans personne aux commandes —
+  `account_deletion_blockers()` dit lesquels, en clair, **avant** le geste.
+  ⚠️ Le bannissement se pose à une **date lointaine finie**, jamais `'infinity'` : avec
+  l'infini, l'API d'administration cesse de rendre le compte, qui disparaît de
+  `listUsers` et du tableau de bord alors que la ligne est bien là.
 - Les sessions expirent par inactivité : **14 jours**, et **1 heure sur `/admin`**
   (`src/lib/auth/inactivity.ts`). Horodatage signé en HMAC, pas d'état en base — le
   proxy s'exécute à chaque requête. Sans `SESSION_SECRET`, le délai est inactif : jamais
@@ -304,6 +318,13 @@ barrière devant quelqu'un qui n'ouvre pas de navigateur.
 - Suivre `.claude/rules/design-system.md` — orange pêche en primaire, teal par touches,
   neutres slate, `rounded-2xl`, ombres douces, `active:scale-[0.98]`, `transition-all`.
 - **Jamais** de `<input type="date">` natif : utiliser `CustomDatePicker`.
+- ⚠️ **Un fichier `"use server"` ne peut exporter que des fonctions asynchrones.** Une
+  constante y est silencieusement retirée du module servi au navigateur : le composant
+  client qui l'importe échoue à l'exécution sur « Export X doesn't exist in target
+  module ». Ni `tsc` ni `eslint` ne le voient — même famille que la sérialisation RSC,
+  et c'est `npm run smoke:ecrans` qui l'attrape. Ce qui doit traverser la frontière vit
+  dans un module neutre : `src/lib/validation/` en tient déjà plusieurs, sans
+  `server-only`.
 - ⚠️ **Un champ caché ne porte jamais une valeur que le clic de soumission modifie.**
   Le clic met l'état à jour, React refait le rendu, **puis** le navigateur sérialise le
   formulaire : le champ vaut alors l'inverse, et le serveur reçoit le contraire de la

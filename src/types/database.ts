@@ -1859,6 +1859,7 @@ export type Database = {
           city: string | null
           country: string | null
           created_at: string
+          deleted_at: string | null
           full_name: string | null
           id: string
           locale: string
@@ -1871,6 +1872,7 @@ export type Database = {
           city?: string | null
           country?: string | null
           created_at?: string
+          deleted_at?: string | null
           full_name?: string | null
           id: string
           locale?: string
@@ -1883,6 +1885,7 @@ export type Database = {
           city?: string | null
           country?: string | null
           created_at?: string
+          deleted_at?: string | null
           full_name?: string | null
           id?: string
           locale?: string
@@ -2745,6 +2748,13 @@ export type Database = {
         }
       }
       accept_quote: { Args: { target: string }; Returns: undefined }
+      account_deletion_blockers: {
+        Args: never
+        Returns: {
+          code: string
+          reason: string
+        }[]
+      }
       admin_companies: {
         Args: never
         Returns: {
@@ -2911,6 +2921,7 @@ export type Database = {
         Returns: undefined
       }
       default_commission_rate: { Args: never; Returns: number }
+      delete_my_account: { Args: never; Returns: string }
       enqueue_deadline_reminders: {
         Args: { fenetre?: string }
         Returns: number
@@ -3185,6 +3196,7 @@ export type Database = {
           city: string | null
           country: string | null
           created_at: string
+          deleted_at: string | null
           full_name: string | null
           id: string
           locale: string

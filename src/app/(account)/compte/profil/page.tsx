@@ -1,4 +1,6 @@
 import { PasswordForm } from "@/components/auth/PasswordForm";
+import { DeleteAccount } from "@/components/shared/DeleteAccount";
+import { getDeletionBlockers } from "@/lib/account-deletion";
 import { getSessionContext } from "@/lib/auth/session";
 
 export const metadata = { title: "Profil" };
@@ -6,6 +8,7 @@ export const metadata = { title: "Profil" };
 export default async function ProfilPage() {
   // Le layout de l'espace a déjà exigé une session : elle existe forcément ici.
   const context = await getSessionContext();
+  const blockers = await getDeletionBlockers();
 
   return (
     <div className="max-w-xl">
@@ -38,6 +41,8 @@ export default async function ProfilPage() {
           <PasswordForm apres="/compte/profil" />
         </div>
       </section>
+
+      <DeleteAccount blockers={blockers} />
     </div>
   );
 }

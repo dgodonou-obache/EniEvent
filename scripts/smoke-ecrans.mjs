@@ -58,6 +58,7 @@ const PARCOURS = [
       "/mentions-legales",
       "/conditions-generales",
       "/confidentialite",
+      "/compte-supprime",
     ],
   },
   {

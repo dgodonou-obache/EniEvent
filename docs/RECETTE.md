@@ -558,7 +558,65 @@ En administrateur, sur `demo-admin@enievent.bj`.
 24. Ouvrir une URL d&apos;invitation inventée. **Attendu** : un refus qui
     explique, pas un 404 ni une page blanche.
 
-## 16. Écrans à venir
+## 16. Supprimer son compte
+
+Le seul geste irréversible du produit. Il se vérifie sur un compte jetable,
+**jamais sur un compte de démonstration**.
+
+**Ce qui empêche de partir**
+
+1. Créer un compte, réserver une prestation à venir et régler l&apos;acompte.
+2. Ouvrir **Profil** → section **Supprimer mon compte**. **Attendu** : le geste
+   n&apos;est pas offert, et la raison est dite en clair — « Vous avez 1
+   réservation en cours ». Aucun formulaire de confirmation n&apos;apparaît.
+3. Annuler la réservation, ou attendre que la date passe. **Attendu** : le
+   blocage tombe de lui-même, sans intervention.
+4. Reprendre avec un **remboursement en attente**. **Attendu** : bloqué. C&apos;est
+   le garde-fou le moins intuitif et le plus important — sans lui, quelqu&apos;un
+   part et plus personne ne sait à qui envoyer l&apos;argent.
+5. En partenaire, avec un versement dû, ou en étant **seul aux commandes**
+   d&apos;une structure qui a des annonces. **Attendu** : bloqué, avec le nom de
+   la structure et la marche à suivre.
+6. En entreprise, avec un engagement **en attente d&apos;aval**. **Attendu** :
+   bloqué — un valideur qui s&apos;en va laisse les demandes coincées.
+7. Créer un compte partenaire et n&apos;en rien faire. **Attendu** : la
+   suppression est possible, et la structure part avec son fondateur. C&apos;est
+   l&apos;inscription faite par erreur : la retenir à vie n&apos;aurait aucun sens.
+
+**Le geste**
+
+8. Sur un compte sans blocage, cliquer **Supprimer mon compte**. **Attendu** :
+   un champ demandant d&apos;écrire **SUPPRIMER**. Un second clic ne suffit pas.
+9. Saisir autre chose. **Attendu** : refus, et le compte intact.
+10. Saisir **SUPPRIMER**. **Attendu** : déconnexion immédiate et arrivée sur
+    `/compte-supprime`.
+
+**Ce qui reste, et ce qui part**
+
+11. Sur un compte **sans aucune histoire** : l&apos;écran final annonce que tout
+    a été effacé. Vérifier qu&apos;il ne reste rien.
+12. Sur un compte **ayant réservé ou reçu un devis** : l&apos;écran annonce que
+    les pièces des transactions sont conservées sans le nom. Vérifier que :
+    - le nom et le téléphone sont vides ;
+    - **le devis chiffré par le partenaire est toujours là** — c&apos;est le
+      point qui a motivé toute la conception, ces lignes ne sont pas seulement
+      celles du client ;
+    - la commande du partenaire est intacte, avec son montant.
+13. Dans les deux cas, se reconnecter avec l&apos;ancienne adresse.
+    **Attendu** : impossible.
+14. Se réinscrire avec cette même adresse. **Attendu** : possible, et le
+    nouveau compte n&apos;a aucun lien avec l&apos;ancien.
+15. Dans le tableau de bord Supabase, chercher le compte anonymisé.
+    **Attendu** : il y figure encore, avec une adresse en
+    `@enievent.invalid`. S&apos;il a disparu, c&apos;est le piège du bannissement
+    à l&apos;infini — voir `CLAUDE.md` §3.
+
+> `tests/rls-suppression-compte.test.ts` couvre les blocages et les deux
+> régimes contre un Postgres jetable. Ce qu&apos;il ne peut pas voir : la
+> visibilité du compte dans l&apos;API d&apos;administration, qui est un
+> comportement de Supabase et non de Postgres — d&apos;où l&apos;étape 15.
+
+## 17. Écrans à venir
 
 Cliquer n'importe quelle entrée de menu non encore construite — par exemple
 **Promotions**, **Journal d'audit** ou **Utilisateurs**.
@@ -567,7 +625,7 @@ Cliquer n'importe quelle entrée de menu non encore construite — par exemple
 L'état exact — ce qui est livré, ce qui reste, dans quel ordre — est dans
 `docs/LOTS.md`.
 
-## 17. Inscription réelle, et les liens reçus par courriel
+## 18. Inscription réelle, et les liens reçus par courriel
 
 1. Se déconnecter, ouvrir `/inscription`.
 2. Onglet **Particulier** : renseigner un e-mail neuf, un mot de passe de
@@ -610,7 +668,7 @@ L'état exact — ce qui est livré, ce qui reste, dans quel ordre — est dans
 13. Recliquer le **même** lien. **Attendu** : refusé — un lien de
     réinitialisation ne sert qu'une fois.
 
-## 18. Mobile
+## 19. Mobile
 
 Refaire les chapitres 1, 2, 4, 7, 8, 9, 10 et 12 dans une fenêtre de
 **390 px de large**.
@@ -621,7 +679,7 @@ boutons doivent rester atteignables sans remonter.
 
 ---
 
-## 19. Expiration des sessions
+## 20. Expiration des sessions
 
 1. Se connecter en administrateur, ouvrir `/admin`, puis laisser passer plus
    d'une heure sans naviguer. **Attendu** : au retour, redirection vers
@@ -640,7 +698,7 @@ boutons doivent rester atteignables sans remonter.
 ## Vérifications automatiques
 
 ```bash
-npm run verify             # typecheck + lint + 661 tests
+npm run verify             # typecheck + lint + 678 tests
 npm run db:verify          # migrations rejouées dans un Postgres jetable, RLS partout
 npm run smoke              # contrôles de bout en bout contre le vrai Supabase
 npm run smoke:offre        # la boucle partenaire → modération → catalogue, en réel

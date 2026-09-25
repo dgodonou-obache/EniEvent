@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 
 import { CompanySettingsForm } from "@/components/company/CompanySettingsForm";
+import { DeleteAccount } from "@/components/shared/DeleteAccount";
+import { getDeletionBlockers } from "@/lib/account-deletion";
 import { requireSpace } from "@/lib/auth/session";
 import { getCompanyProfile, getCompanySettings } from "@/lib/company";
 import { getBriefOptions } from "@/lib/quotes";
@@ -23,6 +25,7 @@ export default async function CompanySettingsPage() {
   ]);
 
   if (!profile) notFound();
+  const blockers = await getDeletionBlockers();
 
   return (
     <div>
@@ -39,6 +42,13 @@ export default async function CompanySettingsPage() {
         cities={options.cities}
         canManage={MANAGERS.includes(decision.org.role)}
       />
+
+      {/* ⚠️ Un valideur qui s'en va laisserait les engagements en attente
+          bloqués sans que personne ne comprenne pourquoi. C'est l'un des
+          blocages vérifiés ici. */}
+      <div className="max-w-xl">
+        <DeleteAccount blockers={blockers} />
+      </div>
     </div>
   );
 }
