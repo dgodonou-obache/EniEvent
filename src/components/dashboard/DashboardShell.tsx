@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Menu } from "lucide-react";
 
+import { SessionTimeout } from "@/components/auth/SessionTimeout";
 import { Button } from "@/components/ui/button";
 
 import { Sidebar, type SidebarIdentity } from "./Sidebar";
@@ -31,6 +32,10 @@ export function DashboardShell({ space, identity, children }: DashboardShellProp
 
   return (
     <div className="flex min-h-dvh bg-slate-50">
+      {/* Couvre /pro, /entreprise et /admin d'un seul endroit : la destination
+          de déconnexion est déjà celle de l'espace, règle d'isolation comprise. */}
+      <SessionTimeout signInTo={nav.signOutTo} />
+
       <Sidebar
         space={space}
         identity={identity}

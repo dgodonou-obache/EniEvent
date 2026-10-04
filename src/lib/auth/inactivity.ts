@@ -27,15 +27,44 @@ export const ACTIVITY_COOKIE = "ee-activity";
 
 /** Délais, en secondes. */
 export const INACTIVITY = {
-  /** Espaces courants : deux semaines sans revenir, et il faut se reconnecter. */
-  default: 14 * 24 * 60 * 60,
+  /** Quinze minutes sans le moindre geste, et il faut se reconnecter. */
+  default: 15 * 60,
   /**
-   * Back-office : une heure. C'est là que se décident les validations, les
-   * remboursements et les statuts ; une session d'administration laissée
-   * ouverte est le pire des oublis.
+   * Le back-office suit la même règle. Il a longtemps été le seul espace
+   * sévère — une heure contre deux semaines ailleurs ; la clé reste pour
+   * pouvoir le durcir seul, mais rien ne le justifie tant que le délai commun
+   * est déjà court.
    */
-  admin: 60 * 60,
+  admin: 15 * 60,
 } as const;
+
+/**
+ * Durée de vie du **cookie**, qui n'est pas le délai d'inactivité.
+ *
+ * ⚠️ **C'est le piège qui a rendu l'expiration inopérante pendant des mois.**
+ * Le cookie portait `maxAge = INACTIVITY.default` : le navigateur l'effaçait
+ * donc à l'instant précis où la session aurait dû mourir. À son retour,
+ * l'utilisateur n'envoyait plus d'horodatage du tout — et un horodatage absent
+ * vaut « repose-le », pas « déconnecte ». Le délai était **structurellement
+ * inatteignable** : constaté en production, où `Max-Age=1209600` valait très
+ * exactement les quatorze jours du délai.
+ *
+ * Le cookie doit donc **survivre largement** au délai qu'il mesure : c'est sa
+ * présence, passé l'échéance, qui prouve l'inactivité. Toute valeur très
+ * supérieure au plus long des délais fait l'affaire ; `tests/inactivity.test.ts`
+ * garde l'écart.
+ */
+export const COOKIE_MAX_AGE = 30 * 24 * 60 * 60;
+
+/**
+ * Combien de temps avant la coupure l'écran prévient.
+ *
+ * Couper sans prévenir fait perdre un formulaire à moitié rempli, et donne à
+ * croire à une panne. `SessionTimeout` ouvre une fenêtre à ce moment-là ; une
+ * fois ouverte, **seul un clic explicite** prolonge — un mouvement de souris
+ * suffirait sinon à la faire disparaître sans que personne n'ait rien lu.
+ */
+export const WARN_BEFORE_SECONDS = 2 * 60;
 
 /** Le délai applicable à une route. */
 export function timeoutFor(pathname: string): number {

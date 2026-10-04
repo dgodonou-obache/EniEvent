@@ -3,6 +3,7 @@ import { Search } from "lucide-react";
 
 import { signOut } from "@/app/auth/actions";
 import { AccountNav } from "@/components/account/AccountNav";
+import { SessionTimeout } from "@/components/auth/SessionTimeout";
 import { identityOf, requireSpace } from "@/lib/auth/session";
 
 export default async function AccountLayout({ children }: { children: React.ReactNode }) {
@@ -13,6 +14,11 @@ export default async function AccountLayout({ children }: { children: React.Reac
 
   return (
     <div className="min-h-dvh bg-slate-50">
+      {/* Couvre /compte et /projets, tous deux sous ce groupe de routes.
+          La déconnexion ordinaire ramène à l'accueil ; une session expirée va
+          à la connexion, qui peut en expliquer la raison. */}
+      <SessionTimeout signInTo="/connexion" />
+
       <header className="border-b border-slate-100 bg-white">
         <div className="mx-auto flex h-16 max-w-5xl items-center gap-4 px-4 sm:px-6">
           <Link href="/" className="text-xl font-bold tracking-tight text-slate-900">

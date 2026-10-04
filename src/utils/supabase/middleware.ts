@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import {
   ACTIVITY_COOKIE,
-  INACTIVITY,
+  COOKIE_MAX_AGE,
   REFRESH_AFTER_SECONDS,
   check,
   stamp,
@@ -126,7 +126,16 @@ export async function updateSession(request: NextRequest) {
       const refus = new URL("/acces-refuse", request.url);
       refus.searchParams.set("espace", "admin");
       refus.searchParams.set("motif", "not-admin");
-      return NextResponse.rewrite(refus);
+
+      const reponse = NextResponse.rewrite(refus);
+
+      // ⚠️ Une réponse neuve n'hérite d'aucun `Set-Cookie`. Sans ce report, un
+      // refus jetait l'horodatage d'activité **et** le jeton que Supabase
+      // venait éventuellement de rafraîchir : la session pouvait se dégrader
+      // au seul fait d'avoir tapé /admin par erreur.
+      for (const cookie of supabaseResponse.cookies.getAll()) reponse.cookies.set(cookie);
+
+      return reponse;
     }
   }
 
@@ -183,7 +192,10 @@ async function enforceInactivity(
         sameSite: "lax",
         secure: request.nextUrl.protocol === "https:",
         path: "/",
-        maxAge: INACTIVITY.default,
+        // ⚠️ Surtout pas le délai d'inactivité : un cookie qui meurt à
+        // l'échéance qu'il mesure rend cette échéance inatteignable. Voir le
+        // commentaire de `COOKIE_MAX_AGE`.
+        maxAge: COOKIE_MAX_AGE,
       });
     }
 

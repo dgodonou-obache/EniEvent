@@ -681,14 +681,29 @@ boutons doivent rester atteignables sans remonter.
 
 ## 20. Expiration des sessions
 
-1. Se connecter en administrateur, ouvrir `/admin`, puis laisser passer plus
-   d'une heure sans naviguer. **Attendu** : au retour, redirection vers
-   `/connexion` avec le message « Votre session a expiré ».
-2. La même session reste valable **quinze jours** ailleurs : c'est l'entrée
-   dans `/admin` qui impose l'heure, pas la session elle-même.
-3. Dans les outils du navigateur, modifier le cookie `ee-activity` pour en
+Le délai est de **quinze minutes sans le moindre geste**, dans les cinq espaces.
+
+1. Se connecter, ouvrir n'importe quel espace, puis ne plus toucher ni la
+   souris ni le clavier. **Attendu** : au bout de **13 minutes**, la fenêtre
+   « Toujours là ? » s'ouvre avec un compte à rebours de 2:00.
+2. Laisser le rebours s'achever. **Attendu** : déconnexion, et arrivée sur la
+   page de connexion **de l'espace quitté** avec « Votre session a expiré ».
+3. Refaire l'essai, mais cliquer « Rester connecté » avant la fin. **Attendu** :
+   la fenêtre se ferme et le compteur repart pour quinze minutes.
+4. Pendant que la fenêtre est ouverte, bouger la souris **sans cliquer**.
+   **Attendu** : elle reste ouverte et le rebours continue — une fois averti,
+   seul un clic explicite prolonge.
+5. Taper dans un formulaire pendant plus de quinze minutes sans jamais changer
+   de page. **Attendu** : aucune déconnexion. La saisie appelle `/api/session`,
+   au plus une fois par minute.
+6. Dans les outils du navigateur, modifier le cookie `ee-activity` pour en
    repousser la date. **Attendu** : déconnexion immédiate — l'horodatage est
    signé, une valeur bricolée est traitée comme invalide.
+7. Toujours dans les outils du navigateur, vérifier que `ee-activity` porte un
+   `Max-Age` de **30 jours**, très supérieur au délai. ⚠️ Un `Max-Age` égal au
+   délai rendrait celui-ci inatteignable : le cookie disparaîtrait à l'échéance
+   et son absence vaut « repose-le ». C'est le défaut corrigé en octobre 2026,
+   qui laissait des sessions de deux semaines passer.
 
 > Sans `SESSION_SECRET`, ce chapitre ne s'applique pas : le délai est inactif,
 > et c'est voulu — mieux vaut aucune protection qu'une protection simulée.

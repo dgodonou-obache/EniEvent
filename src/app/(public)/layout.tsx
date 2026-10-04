@@ -1,3 +1,4 @@
+import { SessionTimeout } from "@/components/auth/SessionTimeout";
 import { PublicFooter } from "@/components/layout/PublicFooter";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { headerAccount } from "@/lib/auth/header";
@@ -9,6 +10,10 @@ export default async function PublicLayout({ children }: { children: React.React
 
   return (
     <div className="flex min-h-dvh flex-col">
+      {/* Entretien seul, sans fenêtre — voir le commentaire du groupe
+          (marketplace) : un visiteur connecté qui lit n'est pas inactif. */}
+      {account ? <SessionTimeout /> : null}
+
       <PublicHeader account={account} />
       <div className="flex-1">{children}</div>
       <PublicFooter account={account} />

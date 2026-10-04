@@ -234,10 +234,30 @@ posé n'éteint pas une fonctionnalité qui marchait.
   ⚠️ Le bannissement se pose à une **date lointaine finie**, jamais `'infinity'` : avec
   l'infini, l'API d'administration cesse de rendre le compte, qui disparaît de
   `listUsers` et du tableau de bord alors que la ligne est bien là.
-- Les sessions expirent par inactivité : **14 jours**, et **1 heure sur `/admin`**
+- Les sessions expirent par inactivité : **15 minutes**, dans les cinq espaces
   (`src/lib/auth/inactivity.ts`). Horodatage signé en HMAC, pas d'état en base — le
   proxy s'exécute à chaque requête. Sans `SESSION_SECRET`, le délai est inactif : jamais
   de signature vide, qui simulerait une protection.
+- ⚠️ **La durée de vie du cookie d'activité n'est pas le délai d'inactivité, et ne doit
+  jamais lui être égale.** `ee-activity` portait `maxAge = INACTIVITY.default` : le
+  navigateur l'effaçait à l'instant précis où la session aurait dû mourir, et un
+  horodatage **absent** vaut « repose-le », pas « déconnecte ». Le délai était donc
+  structurellement inatteignable — des sessions de deux semaines passaient, en
+  production, alors que les deux constantes étaient justes prises séparément : c'est
+  leur **égalité** qui tuait. Le cookie doit survivre largement à ce qu'il mesure
+  (`COOKIE_MAX_AGE`), sa présence passé l'échéance étant la seule preuve de
+  l'inactivité. `tests/inactivity.test.ts` garde l'écart.
+- ⚠️ **Une réponse neuve dans le proxy n'hérite d'aucun `Set-Cookie`.** Une
+  `NextResponse.rewrite` ou `redirect` construite après `getUser()` jette l'horodatage
+  d'activité **et** le jeton que Supabase vient éventuellement de rafraîchir. Y reporter
+  `supabaseResponse.cookies`, sauf quand on coupe la session exprès.
+- **Couper une session sans prévenir fait perdre un formulaire à moitié rempli.**
+  `SessionTimeout` (`src/components/auth/SessionTimeout.tsx`) avertit 2 minutes avant et
+  entretient l'horodatage sur geste réel, via `/api/session` — une page lue n'émet aucune
+  requête, et remplir un long formulaire compterait sinon pour de l'inactivité. ⚠️ Cet
+  écran n'est **pas** l'autorité : le proxy décide seul, l'avertissement est une
+  courtoisie. Une fois la fenêtre ouverte, seul un **clic** prolonge — un mouvement de
+  souris la ferait disparaître sans que personne n'ait rien lu.
 - `SUPABASE_SECRET_KEY` : webhooks et tâches planifiées uniquement. Jamais dans un
   composant, jamais dans une Server Action déclenchée par un utilisateur.
 - Les webhooks de paiement sont **idempotents** (contrainte unique sur
