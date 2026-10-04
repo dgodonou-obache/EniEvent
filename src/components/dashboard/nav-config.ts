@@ -185,6 +185,9 @@ export const adminNav: SpaceNav = {
   brand: "ÉniEvent Admin",
   home: "/admin",
   signOutTo: "/admin/connexion",
+  // 23 entrées en 7 sections — le menu le plus long du produit, et celui dont
+  // on se sert le plus vite. Même traitement que `/pro`.
+  collapsible: true,
   sections: [
     {
       items: [{ label: "Vue d'ensemble", href: "/admin", icon: LayoutDashboard, exact: true }],
