@@ -337,6 +337,13 @@ barrière devant quelqu'un qui n'ouvre pas de navigateur.
   case) reste légitime : `BookingBox` et `PlanningBoard` le font correctement.
   `tests/formulaires-server-actions.test.ts` garde la règle — et ce test a lui-même dû
   être éprouvé en réintroduisant le défaut, sa première version ne l'attrapait pas.
+- ⚠️ **Un état qui suit une autre valeur s'ajuste _pendant_ le rendu, pas dans un effet.**
+  `react-hooks/set-state-in-effect` refuse le `setState` en corps d'effet, et il a
+  raison : l'effet peint d'abord l'ancien état puis le corrige sous les yeux. La forme
+  admise est celle que React documente — mémoriser la valeur précédente dans un `useState`
+  et la comparer en cours de rendu, React reprenant la passe avant d'afficher. La barre
+  latérale s'en sert pour ouvrir la section d'arrivée **au changement de page seulement**,
+  sans quoi une section repliée à la main se rouvrirait toute seule.
 - **Un retour optimiste ne se remplace pas par un indicateur de chargement.** Mettre un
   sablier à la place du cœur efface précisément ce que la personne attend : elle a cliqué
   pour le voir changer. On montre l'état d'arrivée, atténué tant qu'il n'est pas

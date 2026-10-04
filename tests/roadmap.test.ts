@@ -74,6 +74,43 @@ describe("attribution des lots", () => {
   });
 });
 
+describe("sections repliables", () => {
+  const ESPACES = { partner: partnerNav, company: companyNav, admin: adminNav, account: accountNav };
+
+  /**
+   * ⚠️ `Sidebar` identifie une section repliable **par son titre**. Deux
+   * sections homonymes dans un même espace partageraient leur état : ouvrir
+   * « Finances » ouvrirait l'autre, et le menu paraîtrait possédé. Rien
+   * d'autre dans le dépôt n'impose cette unicité.
+   */
+  it("ne donne jamais deux fois le même titre de section dans un espace", () => {
+    for (const [espace, nav] of Object.entries(ESPACES)) {
+      const titres = nav.sections.map((s) => s.title).filter(Boolean);
+      expect(new Set(titres).size, `doublon de titre dans ${espace}`).toBe(titres.length);
+    }
+  });
+
+  /**
+   * Le premier groupe n'a pas de titre, donc pas de bouton : il reste toujours
+   * déplié. C'est ce qui garantit qu'un menu replié n'est jamais vide — le
+   * tableau de bord y figure quoi qu'il arrive.
+   */
+  it("laisse une section toujours visible dans un espace repliable", () => {
+    for (const nav of Object.values(ESPACES)) {
+      if (!nav.collapsible) continue;
+      expect(nav.sections.some((s) => !s.title && s.items.length > 0)).toBe(true);
+    }
+  });
+
+  it("ne replie que les menus qui débordent", () => {
+    // Replier un menu court ajoute un clic sans rien gagner.
+    for (const nav of Object.values(ESPACES)) {
+      if (!nav.collapsible) continue;
+      expect(nav.sections.flatMap((s) => s.items).length).toBeGreaterThan(12);
+    }
+  });
+});
+
 describe("titres des entrées", () => {
   it("préfère l'entrée la plus longue en cas de préfixe commun", () => {
     expect(navItemFor("partner", "/pro/finances/versements")?.label).toBe("Versements");

@@ -59,6 +59,20 @@ export interface SpaceNav {
   /** Destination après déconnexion — propre à chaque espace (règle d'isolation). */
   signOutTo: string;
   sections: NavSection[];
+  /**
+   * Replie les sections titrées, n'ouvrant que celle de la page en cours.
+   *
+   * ⚠️ **Un menu qui déborde n'est pas réparé par une barre de défilement.**
+   * La barre dit seulement « il y en a plus », elle ne raccourcit rien et
+   * `.no-scrollbar` la masque de toute façon (design system §5). Replier
+   * ramène les 18 entrées de `/pro` à sept titres plus la section utile, ce
+   * qui tient sans défiler sur un portable.
+   *
+   * N'a de sens qu'au-delà d'une douzaine d'entrées : replier un menu court
+   * ajoute un clic sans rien gagner. Le premier groupe, sans titre, reste
+   * toujours déplié — c'est le tableau de bord, la destination de repli.
+   */
+  collapsible?: boolean;
 }
 
 export type Space = "partner" | "company" | "admin" | "account";
@@ -68,6 +82,9 @@ export const partnerNav: SpaceNav = {
   brand: "ÉniEvent Pro",
   home: "/pro/dashboard",
   signOutTo: "/pro/connexion",
+  // 18 entrées en 7 sections : le menu dépassait l'écran sans que rien ne le
+  // dise, la barre de défilement étant masquée.
+  collapsible: true,
   sections: [
     {
       items: [{ label: "Tableau de bord", href: "/pro/dashboard", icon: LayoutDashboard }],
