@@ -11,6 +11,14 @@ import { entityIsComplete, LAST_UPDATED } from "@/lib/legal";
  * il a affaire. Le dire en haut de page est désagréable, et c'est le but —
  * cela ne se corrige qu'en remplissant les champs.
  *
+ * ⚠️ **Son texte ne nomme aucune mention en particulier.** Il a d'abord dit
+ * que l'immatriculation n'était pas publiée ; le jour où le RCCM et l'IFU ont
+ * été renseignés, il s'est mis à contredire la ligne affichée trois
+ * centimètres plus bas, alors que deux autres mentions manquaient bel et bien.
+ * Un avertissement qui désigne la mauvaise lacune est pire que pas
+ * d'avertissement : il se fait démentir par la page qu'il commente. Les
+ * champs manquants se signalent déjà un par un, en orange, par `Entry`.
+ *
  * Largeur bornée à `max-w-3xl` : un texte juridique en pleine largeur ne se lit
  * pas, et personne ne lit ce qui ne se lit pas.
  */
@@ -35,9 +43,10 @@ export function LegalPage({ title, intro, children }: Props) {
         <p className="mt-6 flex items-start gap-2 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm leading-relaxed text-orange-900">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>
-            <strong>Document en cours de finalisation.</strong> Les informations
-            d&apos;immatriculation de l&apos;éditeur ne sont pas encore publiées. Pour toute
-            question, écrivez-nous — nous répondons sous un jour ouvré.
+            <strong>Document en cours de finalisation.</strong> Quelques mentions de
+            l&apos;éditeur restent à publier ; elles apparaissent ci-dessous comme « à
+            compléter ». Pour toute question, écrivez-nous — nous répondons sous un jour
+            ouvré.
           </span>
         </p>
       ) : null}

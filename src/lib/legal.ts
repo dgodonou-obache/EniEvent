@@ -16,13 +16,20 @@
 export interface LegalEntity {
   /** Dénomination sociale exacte, telle qu'au RCCM. */
   readonly legalName: string;
-  /** SARL, SAS, entreprise individuelle… */
+  /** SARL, SAS, établissement… */
   readonly legalForm: string | null;
-  readonly capital: string | null;
   /** Registre du commerce et du crédit mobilier. */
   readonly rccm: string | null;
   /** Identifiant fiscal unique. */
   readonly ifu: string | null;
+  /**
+   * Voie et numéro, **sans** la ville ni le pays, qui ont leurs propres champs.
+   *
+   * ⚠️ Rester `null` est légitime : un établissement béninois se déclare
+   * couramment à la commune, sans libellé de voie. Le siège social s'affiche
+   * alors « Cotonou, Bénin », ce qui est exact et complet — ce n'est pas une
+   * information manquante, et `entityIsComplete` ne l'exige donc pas.
+   */
   readonly address: string | null;
   readonly city: string;
   readonly country: string;
@@ -32,12 +39,18 @@ export interface LegalEntity {
   readonly publicationDirector: string | null;
 }
 
+/**
+ * ⚠️ **Pas de capital social.** Un établissement n'en a pas : ce n'est pas une
+ * société, son patrimoine est celui de son exploitant. Le champ a été retiré
+ * plutôt que laissé vide — une ligne « Capital social : à compléter » aurait
+ * promis une information qui n'existera jamais, et l'inscrire à 0 F aurait été
+ * un faux.
+ */
 export const ENTITY: LegalEntity = {
   legalName: "ÉniEvent",
-  legalForm: null,
-  capital: null,
-  rccm: null,
-  ifu: null,
+  legalForm: "Établissement",
+  rccm: "RB/COT/21 A 70480",
+  ifu: "0202112931007",
   address: null,
   city: "Cotonou",
   country: "Bénin",
@@ -46,18 +59,29 @@ export const ENTITY: LegalEntity = {
   publicationDirector: null,
 };
 
+/** Le siège social tel qu'il se publie, voie comprise quand il y en a une. */
+export function registeredOffice(entity: LegalEntity = ENTITY): string {
+  return [entity.address, entity.city, entity.country].filter(Boolean).join(", ");
+}
+
 /** Rend la valeur, ou une mention visible quand elle manque. */
 export function orTodo(value: string | null): string {
   return value ?? "à compléter";
 }
 
-/** Vrai quand l'identité légale est complète et publiable telle quelle. */
+/**
+ * Vrai quand l'identité légale est complète et publiable telle quelle.
+ *
+ * `address` n'en fait pas partie : voir le champ, son absence est un cas
+ * normal. `city` et `country` ne sont pas nullables, le siège est donc
+ * toujours énonçable.
+ */
 export function entityIsComplete(entity: LegalEntity = ENTITY): boolean {
   return [
     entity.legalForm,
     entity.rccm,
     entity.ifu,
-    entity.address,
+    entity.phone,
     entity.publicationDirector,
   ].every((v) => v !== null && v.trim() !== "");
 }
@@ -111,4 +135,4 @@ export const PROCESSORS: readonly Processor[] = [
 ];
 
 /** Date de dernière révision des textes, affichée sur chaque page. */
-export const LAST_UPDATED = "22 septembre 2026";
+export const LAST_UPDATED = "5 octobre 2026";

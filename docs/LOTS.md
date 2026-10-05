@@ -59,16 +59,21 @@ place, et ce qui reste relève des avis, de la facturation et du confort.
 écrivant du code, et tant qu'ils tiennent, aucun franc réel ne peut circuler.
 Par ordre de blocage :
 
-### 3.1 L'identité légale n'est pas renseignée — bloque tout le reste
+### 3.1 L'identité légale est presque complète — deux mentions manquent
 
-`src/lib/legal.ts` porte sept valeurs à `null` : forme juridique, capital,
-RCCM, IFU, adresse, téléphone, directeur de publication. Les pages légales les
-affichent honnêtement comme « à compléter » plutôt que d'inventer.
+L'immatriculation est renseignée depuis le 5 octobre 2026 : **Établissement**,
+RCCM `RB/COT/21 A 70480`, IFU `0202112931007`, siège à Cotonou (Bénin). Le
+capital social a été **retiré** du modèle, et non laissé vide : un établissement
+n'en a pas, son patrimoine est celui de son exploitant.
+
+Restent `null` dans `src/lib/legal.ts` : le **téléphone** et le **directeur de
+la publication**. Les pages légales les affichent comme « à compléter » plutôt
+que d'inventer, et le bandeau « document en cours de finalisation » reste donc
+affiché — `entityIsComplete()` dit quand c'est bon.
 
 C'est exactement ce qu'un prestataire de paiement vérifie à l'ouverture d'un
-compte marchand. **Tant que ce fichier n'est pas rempli, le dossier FedaPay ne
-peut pas être déposé**, donc aucun paiement réel n'est possible, donc rien
-d'autre n'a d'effet commercial. `entityIsComplete()` dit quand c'est bon.
+compte marchand. Le dossier FedaPay est désormais **déposable** sur le fond ;
+ces deux mentions achèvent les pages publiques.
 
 ### 3.2 Le compte marchand FedaPay n'est pas validé
 
@@ -211,9 +216,10 @@ Ce que la tranche a demandé, et qui n'était pas prévisible :
   déclencheur » depuis la migration 0002 — ce déclencheur n'a jamais existé, et
   les deux colonnes sont nulles sur **tous** les partenaires en production. Les
   chiffres se recalculent donc depuis `quotes`, qui est la source.
-- **Un reçu n'est pas une facture**, et le document le dit lui-même : sans RCCM
-  ni IFU dans `legal.ts`, émettre une pièce fiscale serait faux. La facture
-  reste au lot B.
+- **Un reçu n'est pas une facture**, et le document le dit lui-même. Le RCCM et
+  l'IFU sont désormais connus, mais cela ne suffit pas : une facture engage un
+  **régime de TVA**, qui est une décision fiscale et non une valeur à recopier.
+  Le reçu reste donc un reçu, et la facture reste au lot B.
 
 **Reste au lot D** : `/pro/promotions` et `/admin/promotions` (codes de
 réduction), et les **créneaux** matin / après-midi / soirée.

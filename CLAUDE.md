@@ -325,10 +325,20 @@ barrière devant quelqu'un qui n'ouvre pas de navigateur.
   vigilance pour un taux de remplissage sans date ouverte : c'est un planning vide, pas
   une mauvaise performance, et l'écran le dit.
 - ⚠️ **Un reçu n'est pas une facture, et le document doit le dire lui-même.** Une facture
-  est une pièce fiscale qui engage un RCCM, un IFU et une mention de TVA ; `legal.ts` les
-  porte encore à `null`. `/compte/documents` émet donc des **reçus**, qui portent la
-  mention en toutes lettres — quelqu'un qui enregistre le PDF et le présente à son
-  comptable ne doit pas avoir à se souvenir d'une phrase lue ailleurs.
+  est une pièce fiscale qui engage un RCCM, un IFU **et une mention de TVA**. Les deux
+  premiers sont renseignés dans `legal.ts` depuis le 5 octobre 2026 ; le régime de TVA,
+  lui, est une **décision fiscale** et ne se devine pas. `/compte/documents` émet donc
+  toujours des **reçus**, qui portent la mention en toutes lettres — quelqu'un qui
+  enregistre le PDF et le présente à son comptable ne doit pas avoir à se souvenir d'une
+  phrase lue ailleurs. Ne pas basculer sur « facture » au seul motif que l'immatriculation
+  existe.
+- ⚠️ **L'identité légale n'a pas de capital social, et ce n'est pas un oubli.** ÉniEvent
+  est un **établissement** : pas de capital, le patrimoine est celui de l'exploitant. Le
+  champ a été **retiré** du modèle plutôt que laissé à `null` — une ligne « Capital
+  social : à compléter » aurait promis une information qui n'existera jamais, et `0 F`
+  aurait été un faux. Même logique pour `address` : un siège déclaré à la commune
+  (« Cotonou, Bénin ») est complet, d'où `registeredOffice()` et son absence de
+  `entityIsComplete()`.
 - **Ne pas promettre ce qui n'existe pas.** L'accueil affichait 39 métiers dont 27 sans
   la moindre annonce ; il ne montre plus que les familles pourvues, avec leurs comptes.
   Un retour muet est du même ordre : une session expirée ou un lien périmé s'expliquent

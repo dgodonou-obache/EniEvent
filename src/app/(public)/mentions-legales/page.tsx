@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { Article, Entry, LegalPage } from "@/components/legal/LegalPage";
-import { ENTITY, orTodo, PROCESSORS } from "@/lib/legal";
+import { ENTITY, orTodo, PROCESSORS, registeredOffice } from "@/lib/legal";
 
 /**
  * Mentions légales.
@@ -25,11 +25,12 @@ export default function LegalNoticePage() {
       <Article title="1. Éditeur du site">
         <Entry label="Dénomination :" value={ENTITY.legalName} />
         <Entry label="Forme juridique :" value={orTodo(ENTITY.legalForm)} />
-        <Entry label="Capital social :" value={orTodo(ENTITY.capital)} />
+        {/* Pas de capital social : un établissement n'en a pas. Voir `legal.ts`. */}
         <Entry label="RCCM :" value={orTodo(ENTITY.rccm)} />
         <Entry label="IFU :" value={orTodo(ENTITY.ifu)} />
-        <Entry label="Siège social :" value={orTodo(ENTITY.address)} />
-        <Entry label="Ville :" value={`${ENTITY.city}, ${ENTITY.country}`} />
+        {/* Une seule ligne pour le siège : la voie, quand il y en a une, la
+            ville et le pays. Deux entrées séparées répétaient « Cotonou ». */}
+        <Entry label="Siège social :" value={registeredOffice()} />
         <Entry label="Adresse électronique :" value={ENTITY.email} />
         <Entry label="Téléphone :" value={orTodo(ENTITY.phone)} />
         <Entry label="Directeur de la publication :" value={orTodo(ENTITY.publicationDirector)} />

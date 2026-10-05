@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Mail, MapPin, MessageSquare } from "lucide-react";
 
-import { ENTITY, orTodo } from "@/lib/legal";
+import { ENTITY, registeredOffice } from "@/lib/legal";
 
 /**
  * Page de contact.
@@ -59,9 +59,10 @@ export default function ContactPage() {
           <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-slate-400" aria-hidden />
           <div>
             <p className="font-bold text-slate-900">Adresse</p>
-            <p className="mt-0.5 text-sm text-slate-600">
-              {orTodo(ENTITY.address)} — {ENTITY.city}, {ENTITY.country}
-            </p>
+            {/* Sans libellé de voie, cette ligne affichait « à compléter —
+                Cotonou, Bénin », ce qui donnait à croire à une adresse
+                manquante là où il n'y en a simplement pas. */}
+            <p className="mt-0.5 text-sm text-slate-600">{registeredOffice()}</p>
           </div>
         </div>
       </div>
