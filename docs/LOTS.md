@@ -59,21 +59,27 @@ place, et ce qui reste relève des avis, de la facturation et du confort.
 écrivant du code, et tant qu'ils tiennent, aucun franc réel ne peut circuler.
 Par ordre de blocage :
 
-### 3.1 L'identité légale est presque complète — deux mentions manquent
+### 3.1 ~~L'identité légale n'est pas renseignée~~ — levé le 7 octobre 2026
 
-L'immatriculation est renseignée depuis le 5 octobre 2026 : **Établissement**,
-RCCM `RB/COT/21 A 70480`, IFU `0202112931007`, siège à Cotonou (Bénin). Le
-capital social a été **retiré** du modèle, et non laissé vide : un établissement
-n'en a pas, son patrimoine est celui de son exploitant.
+L'immatriculation est publiée : **Établissement**, RCCM `RB/COT/21 A 70480`,
+IFU `0202112931007`, siège à Cotonou (Bénin). Les quatre pages légales
+n'affichent plus aucun « à compléter », et le bandeau « document en cours de
+finalisation » a disparu.
 
-Restent `null` dans `src/lib/legal.ts` : le **téléphone** et le **directeur de
-la publication**. Les pages légales les affichent comme « à compléter » plutôt
-que d'inventer, et le bandeau « document en cours de finalisation » reste donc
-affiché — `entityIsComplete()` dit quand c'est bon.
+Deux choix d'exploitation, assumés, à ne pas prendre pour des oublis :
+
+- **Pas de capital social.** Un établissement n'en a pas — son patrimoine est
+  celui de son exploitant. Le champ a été retiré du modèle, pas laissé vide.
+- **Ni téléphone, ni directeur de la publication**, retirés des mentions le
+  7 octobre 2026. L'éditeur reste joignable par courriel, qui est publié. Les
+  champs survivent dans `LegalEntity`, prêts à revenir ; les remettre demande
+  d'ajouter une entrée à `publishedMentions()` **et** d'en renseigner la
+  valeur — `entityIsComplete()` relit cette liste, donc l'une sans l'autre
+  rallume le bandeau.
 
 C'est exactement ce qu'un prestataire de paiement vérifie à l'ouverture d'un
-compte marchand. Le dossier FedaPay est désormais **déposable** sur le fond ;
-ces deux mentions achèvent les pages publiques.
+compte marchand. **Le dossier FedaPay est désormais déposable** — c'est le
+blocage suivant, et il ne dépend plus du code.
 
 ### 3.2 Le compte marchand FedaPay n'est pas validé
 
@@ -247,8 +253,9 @@ sur un produit qui doit d'abord savoir le servir.
 
 ## 5. L'ordre que je recommande
 
-1. **Remplir `src/lib/legal.ts`** puis déposer le dossier FedaPay (§3.1, §3.2).
-   Tant que ce n'est pas fait, tout le reste est du code qui attend.
+1. **Déposer le dossier FedaPay** (§3.2). `src/lib/legal.ts` est rempli depuis
+   le 7 octobre 2026, ce point ne demande plus une ligne de code — et tant
+   qu'il n'est pas fait, tout le reste est du code qui attend.
 2. **Recruter les premiers partenaires** et retirer le catalogue fictif (§3.3).
    Un produit vide ne se teste pas en vrai.
 3. **Lot A — Confiance.** Le seul lot que le client voit.

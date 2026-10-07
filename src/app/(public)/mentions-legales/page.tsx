@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { Article, Entry, LegalPage } from "@/components/legal/LegalPage";
-import { ENTITY, orTodo, PROCESSORS, registeredOffice } from "@/lib/legal";
+import { ENTITY, orTodo, PROCESSORS, publishedMentions } from "@/lib/legal";
 
 /**
  * Mentions légales.
@@ -22,18 +22,13 @@ export default function LegalNoticePage() {
       title="Mentions légales"
       intro="Qui édite ce site, qui l'héberge, et comment nous joindre."
     >
+      {/* La liste vit dans `legal.ts`, et le bandeau d'avertissement la relit :
+          une ligne ne peut pas manquer ici sans qu'il le dise, ni lui annoncer
+          un manque introuvable sur la page. */}
       <Article title="1. Éditeur du site">
-        <Entry label="Dénomination :" value={ENTITY.legalName} />
-        <Entry label="Forme juridique :" value={orTodo(ENTITY.legalForm)} />
-        {/* Pas de capital social : un établissement n'en a pas. Voir `legal.ts`. */}
-        <Entry label="RCCM :" value={orTodo(ENTITY.rccm)} />
-        <Entry label="IFU :" value={orTodo(ENTITY.ifu)} />
-        {/* Une seule ligne pour le siège : la voie, quand il y en a une, la
-            ville et le pays. Deux entrées séparées répétaient « Cotonou ». */}
-        <Entry label="Siège social :" value={registeredOffice()} />
-        <Entry label="Adresse électronique :" value={ENTITY.email} />
-        <Entry label="Téléphone :" value={orTodo(ENTITY.phone)} />
-        <Entry label="Directeur de la publication :" value={orTodo(ENTITY.publicationDirector)} />
+        {publishedMentions().map(({ label, value }) => (
+          <Entry key={label} label={label} value={orTodo(value)} />
+        ))}
       </Article>
 
       <Article title="2. Hébergement">

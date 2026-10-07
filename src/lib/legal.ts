@@ -64,26 +64,58 @@ export function registeredOffice(entity: LegalEntity = ENTITY): string {
   return [entity.address, entity.city, entity.country].filter(Boolean).join(", ");
 }
 
+/**
+ * Les mentions publiées, dans l'ordre d'affichage.
+ *
+ * ⚠️ **C'est la seule liste, et c'est le but.** Les mentions légales la
+ * parcourent, et `entityIsComplete` la relit : il devient impossible qu'une
+ * ligne affiche « à compléter » sans que le bandeau d'avertissement le dise,
+ * ou qu'un bandeau annonce des manques qu'on ne trouve nulle part. La page a
+ * déjà connu les deux travers, à un jour d'intervalle — d'abord un bandeau qui
+ * démentait le RCCM affiché juste en dessous, puis le risque inverse en
+ * retirant deux lignes.
+ *
+ * **Retirer une mention, c'est la retirer d'ici.** Elle cesse alors d'être
+ * affichée *et* d'être exigée, ce qui est cohérent : on ne réclame pas une
+ * information qu'on a décidé de ne pas publier. Le champ reste dans
+ * `LegalEntity`, prêt à revenir.
+ *
+ * ⚠️ Le téléphone et le directeur de la publication en ont été **retirés le
+ * 7 octobre 2026**, sur décision de l'exploitant. L'éditeur reste joignable
+ * par `email`, qui est publié. Les remettre demande d'ajouter une entrée ici
+ * **et** de renseigner la valeur — l'une sans l'autre rallume le bandeau.
+ */
+export function publishedMentions(
+  entity: LegalEntity = ENTITY,
+): readonly { readonly label: string; readonly value: string | null }[] {
+  return [
+    { label: "Dénomination :", value: entity.legalName },
+    { label: "Forme juridique :", value: entity.legalForm },
+    // Pas de capital social : un établissement n'en a pas.
+    { label: "RCCM :", value: entity.rccm },
+    { label: "IFU :", value: entity.ifu },
+    // Une seule ligne pour le siège, la voie comprise quand il y en a une :
+    // deux entrées séparées répétaient « Cotonou ».
+    { label: "Siège social :", value: registeredOffice(entity) },
+    { label: "Adresse électronique :", value: entity.email },
+  ];
+}
+
 /** Rend la valeur, ou une mention visible quand elle manque. */
 export function orTodo(value: string | null): string {
   return value ?? "à compléter";
 }
 
 /**
- * Vrai quand l'identité légale est complète et publiable telle quelle.
+ * Vrai quand toutes les mentions qu'on a choisi de publier le sont réellement.
  *
- * `address` n'en fait pas partie : voir le champ, son absence est un cas
- * normal. `city` et `country` ne sont pas nullables, le siège est donc
- * toujours énonçable.
+ * Il ne liste rien de lui-même : il relit `publishedMentions`, pour que le
+ * bandeau d'avertissement et la page ne puissent jamais se contredire.
  */
 export function entityIsComplete(entity: LegalEntity = ENTITY): boolean {
-  return [
-    entity.legalForm,
-    entity.rccm,
-    entity.ifu,
-    entity.phone,
-    entity.publicationDirector,
-  ].every((v) => v !== null && v.trim() !== "");
+  return publishedMentions(entity).every(
+    ({ value }) => value !== null && value.trim() !== "",
+  );
 }
 
 export interface Processor {
@@ -135,4 +167,4 @@ export const PROCESSORS: readonly Processor[] = [
 ];
 
 /** Date de dernière révision des textes, affichée sur chaque page. */
-export const LAST_UPDATED = "5 octobre 2026";
+export const LAST_UPDATED = "7 octobre 2026";

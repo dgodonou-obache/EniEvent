@@ -5,6 +5,7 @@ import {
   entityIsComplete,
   orTodo,
   PROCESSORS,
+  publishedMentions,
   registeredOffice,
   type LegalEntity,
 } from "@/lib/legal";
@@ -59,27 +60,75 @@ describe("complétude", () => {
    * c'est le dernier garde-fou avant qu'une mention légale incomplète ne passe
    * pour définitive.
    */
-  it("reste incomplète tant qu'il manque une mention obligatoire", () => {
-    for (const manquant of ["legalForm", "rccm", "ifu", "phone", "publicationDirector"] as const) {
+  it("reste incomplète dès qu'une mention publiée manque", () => {
+    for (const manquant of ["legalForm", "rccm", "ifu"] as const) {
       const ampute: LegalEntity = { ...ENTITY, [manquant]: null };
 
       expect(entityIsComplete(ampute), manquant).toBe(false);
     }
   });
 
-  it("n'exige pas de libellé de voie", () => {
-    const complet: LegalEntity = {
-      ...ENTITY,
-      address: null,
-      phone: "+2290100000000",
-      publicationDirector: "Quelqu'un",
-    };
+  it("n'exige pas ce qu'on a choisi de ne pas publier", () => {
+    // Téléphone et directeur de la publication sont retirés de la page : les
+    // réclamer laisserait un bandeau d'alerte que rien ne viendrait éteindre.
+    expect(ENTITY.phone).toBeNull();
+    expect(ENTITY.publicationDirector).toBeNull();
+    expect(entityIsComplete()).toBe(true);
+  });
 
-    expect(entityIsComplete(complet)).toBe(true);
+  it("n'exige pas de libellé de voie", () => {
+    expect(entityIsComplete({ ...ENTITY, address: null })).toBe(true);
   });
 
   it("ne se contente pas d'une chaîne vide", () => {
     expect(entityIsComplete({ ...ENTITY, rccm: "   " })).toBe(false);
+  });
+});
+
+/**
+ * ⚠️ Le défaut de conception que ce bloc interdit.
+ *
+ * Le bandeau d'avertissement et la liste des mentions ont vécu séparément une
+ * journée, et se sont contredits dans les deux sens : un bandeau annonçant une
+ * immatriculation absente **au-dessus du RCCM affiché**, puis le risque
+ * inverse en retirant deux lignes. Une seule liste, relue par les deux.
+ */
+describe("mentions publiées", () => {
+  it("sont exactement ce que la complétude surveille", () => {
+    const manquantes = publishedMentions().filter(({ value }) => value === null);
+
+    expect(manquantes.map((m) => m.label)).toEqual([]);
+    expect(entityIsComplete()).toBe(manquantes.length === 0);
+  });
+
+  it("n'annoncent plus le téléphone ni le directeur de la publication", () => {
+    const libelles = publishedMentions().map((m) => m.label);
+
+    expect(libelles.some((l) => /téléphone/i.test(l))).toBe(false);
+    expect(libelles.some((l) => /directeur/i.test(l))).toBe(false);
+  });
+
+  it("gardent un moyen de joindre l'éditeur", () => {
+    // Retirer le téléphone est une décision ; laisser une page sans aucun
+    // contact n'en serait pas une.
+    expect(publishedMentions().some(({ value }) => value === ENTITY.email)).toBe(true);
+  });
+
+  it("énoncent toujours l'immatriculation", () => {
+    const valeurs = publishedMentions().map((m) => m.value);
+
+    expect(valeurs).toContain(ENTITY.rccm);
+    expect(valeurs).toContain(ENTITY.ifu);
+  });
+
+  it("rendent un bandeau cohérent avec la page", () => {
+    // Une mention listée mais vide doit rallumer l'avertissement, sans quoi la
+    // page afficherait « à compléter » en se disant finalisée.
+    const ampute: LegalEntity = { ...ENTITY, ifu: null };
+    const affichees = publishedMentions(ampute);
+
+    expect(affichees.some(({ value }) => value === null)).toBe(true);
+    expect(entityIsComplete(ampute)).toBe(false);
   });
 });
 
