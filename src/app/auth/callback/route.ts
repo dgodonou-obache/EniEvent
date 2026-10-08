@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { safeInternalPath } from "@/lib/validation/redirect";
 import { createClient } from "@/utils/supabase/server";
 
 /**
@@ -15,8 +16,8 @@ export async function GET(request: NextRequest) {
   const next = searchParams.get("suivant");
 
   // Une destination venue de l'URL ne doit jamais pouvoir sortir du site.
-  const destination =
-    next && next.startsWith("/") && !next.startsWith("//") ? next : "/compte";
+  // ⚠️ Le contrôle à la main qui se trouvait ici laissait passer `/\evil.com`.
+  const destination = safeInternalPath(next, "/compte");
 
   if (!code) {
     return NextResponse.redirect(new URL("/connexion?erreur=lien-invalide", origin));

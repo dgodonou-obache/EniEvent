@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
 import { describeSignIn } from "@/lib/auth/signup-outcome";
+import { safeInternalPath } from "@/lib/validation/redirect";
 import { createClient } from "@/utils/supabase/client";
 
 interface SignInFormProps {
@@ -26,10 +27,10 @@ export function SignInForm({ defaultRedirect, redirectTo }: SignInFormProps) {
   const [isPending, setIsPending] = React.useState(false);
 
   // Une destination venue de l'URL ne doit jamais pouvoir sortir du site.
-  const destination =
-    redirectTo && redirectTo.startsWith("/") && !redirectTo.startsWith("//")
-      ? redirectTo
-      : defaultRedirect;
+  // ⚠️ Le contrôle à la main qui se trouvait ici laissait passer `/\evil.com`,
+  // que `router.push` aurait suivi hors du domaine — après une connexion
+  // réussie, donc au moment où la personne fait le plus confiance à la page.
+  const destination = safeInternalPath(redirectTo, defaultRedirect);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();

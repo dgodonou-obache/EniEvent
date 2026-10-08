@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 
+import { safeInternalPath } from "@/lib/validation/redirect";
 import { createClient } from "@/utils/supabase/server";
 
 /**
@@ -16,8 +17,8 @@ export async function signOut(redirectTo: string) {
   const supabase = await createClient();
   await supabase.auth.signOut();
 
-  const isInternalPath =
-    redirectTo.startsWith("/") && !redirectTo.startsWith("//") && !redirectTo.includes("\\");
-
-  redirect(isInternalPath ? redirectTo : "/connexion");
+  // Ce contrôle était le seul des quatre à refuser l'anti-slash ; il passe
+  // désormais par le filtre commun, pour que la règle ne puisse plus diverger
+  // d'un appelant à l'autre.
+  redirect(safeInternalPath(redirectTo, "/connexion"));
 }

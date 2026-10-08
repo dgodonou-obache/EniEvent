@@ -1,3 +1,4 @@
+import { bearerMatches } from "@/lib/auth/bearer";
 import { publicEnv } from "@/lib/env";
 import { sendEmail } from "@/lib/mail/resend";
 import { renderEmail } from "@/lib/notify/emails";
@@ -43,7 +44,8 @@ export async function GET(request: Request) {
     return Response.json({ error: "CRON_SECRET non configuré" }, { status: 503 });
   }
 
-  if (request.headers.get("authorization") !== `Bearer ${secret}`) {
+  // Comparaison en temps constant : voir `src/lib/auth/bearer.ts`.
+  if (!bearerMatches(request.headers.get("authorization"), secret)) {
     return Response.json({ error: "non autorisé" }, { status: 401 });
   }
 

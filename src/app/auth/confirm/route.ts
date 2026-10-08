@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 
 import { homeFor } from "@/lib/auth/home";
+import { safeInternalPath } from "@/lib/validation/redirect";
 import { createClient } from "@/utils/supabase/server";
 
 /**
@@ -57,8 +58,10 @@ export async function GET(request: NextRequest) {
   }
 
   // Une destination venue de l'URL ne doit jamais pouvoir sortir du site.
-  if (suivant && suivant.startsWith("/") && !suivant.startsWith("//")) {
-    return NextResponse.redirect(new URL(suivant, origin));
+  // ⚠️ Le contrôle à la main qui se trouvait ici laissait passer `/\evil.com`.
+  const interne = safeInternalPath(suivant, "");
+  if (interne) {
+    return NextResponse.redirect(new URL(interne, origin));
   }
 
   const accountType = data.user?.user_metadata?.account_type;
