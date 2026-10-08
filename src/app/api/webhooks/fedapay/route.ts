@@ -40,6 +40,20 @@ const FENETRE_SECONDES = 5 * 60;
 /**
  * Vérifie l'en-tête `x-fedapay-signature`, de forme `t=<horodatage>,s=<hmac>`.
  * Renvoie `null` si tout va bien, un motif sinon.
+ *
+ * Algorithme relevé dans la bibliothèque officielle `fedapay@1.2.5`
+ * (`src/Webhook.ts`), et non dans la documentation, qui ne le précise pas :
+ * HMAC-SHA256 de `<horodatage>.<corps brut>`, en hexadécimal, tolérance de
+ * 300 secondes.
+ *
+ * ⚠️ **L'en-tête peut porter plusieurs `s=`, et il faut toutes les essayer.**
+ * C'est ce que fait la bibliothèque officielle, et c'est ce qui se produit
+ * pendant une **rotation de secret** : FedaPay signe alors avec l'ancien et le
+ * nouveau pour qu'aucun destinataire ne décroche. Une lecture qui ne retient
+ * que la dernière valeur rejetterait des envois parfaitement valides — et
+ * FedaPay **éteint un point de terminaison qui échoue de façon répétée**. La
+ * panne serait silencieuse des deux côtés, au pire moment : celui où l'on
+ * change une clé.
  */
 export function verifySignature(
   raw: string,
@@ -49,29 +63,42 @@ export function verifySignature(
 ): string | null {
   if (!header) return "signature absente";
 
-  const parts = Object.fromEntries(
-    header.split(",").map((p) => {
-      const [k, ...v] = p.trim().split("=");
-      return [k, v.join("=")];
-    }),
-  );
+  let horodatage: string | null = null;
+  const signatures: string[] = [];
 
-  const horodatage = parts.t;
-  const signature = parts.s;
-  if (!horodatage || !signature) return "signature mal formée";
+  for (const morceau of header.split(",")) {
+    const [cle, ...reste] = morceau.trim().split("=");
+    const valeur = reste.join("=");
 
+    if (cle === "t") horodatage = valeur;
+    else if (cle === "s" && valeur) signatures.push(valeur);
+  }
+
+  if (!horodatage || signatures.length === 0) return "signature mal formée";
+
+  // ⚠️ `Math.abs` : on refuse aussi un horodatage **venu du futur**, que la
+  // bibliothèque officielle laisse passer. Une horloge faussée de plus de cinq
+  // minutes est au moins aussi suspecte qu'un envoi trop vieux.
   const age = Math.abs(maintenant / 1000 - Number(horodatage));
   if (!Number.isFinite(age) || age > FENETRE_SECONDES) return "horodatage hors fenêtre";
 
-  const attendu = createHmac("sha256", secret).update(`${horodatage}.${raw}`).digest("hex");
+  const attendu = Buffer.from(
+    createHmac("sha256", secret).update(`${horodatage}.${raw}`).digest("hex"),
+    "utf8",
+  );
 
-  const a = Buffer.from(attendu, "utf8");
-  const b = Buffer.from(signature, "utf8");
   // Comparaison à temps constant : une comparaison ordinaire fuit la signature
-  // attendue, octet par octet, par le temps qu'elle met à échouer.
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return "signature invalide";
+  // attendue, octet par octet, par le temps qu'elle met à échouer. On les
+  // parcourt **toutes**, sans court-circuit sur la première qui correspond —
+  // s'arrêter plus tôt pour une valeur juste que pour une fausse redonnerait
+  // au temps de réponse quelque chose à dire.
+  let trouvee = false;
+  for (const candidate of signatures) {
+    const recue = Buffer.from(candidate, "utf8");
+    if (recue.length === attendu.length && timingSafeEqual(recue, attendu)) trouvee = true;
+  }
 
-  return null;
+  return trouvee ? null : "signature invalide";
 }
 
 /** Retrouve l'identifiant de transaction, quelle que soit la forme de l'envoi. */
