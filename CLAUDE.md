@@ -141,6 +141,29 @@ supabase/migrations/    schéma, une migration par domaine
   même qui obtient 200 sur `/transactions` : virements et remboursements demandent un
   compte marchand validé. Les deux sont donc des **registres** — `mark_payout_sent` et
   `mark_refund_sent` sont les seules fonctions à remplacer le jour où le droit s'ouvre.
+  `npm run fedapay:verifier` dit si ce droit est ouvert, sans rien créer.
+- ⚠️ **Le passage en argent réel est fermé par défaut.** `liveBlocker`
+  (`src/lib/payments/fedapay.ts`) refuse d'**ouvrir** un paiement en production tant que
+  `FEDAPAY_WEBHOOK_SECRET` manque, et le webhook répond alors 401. Le refus porte sur
+  l'ouverture, en amont : une transaction réelle déjà payée que rien chez nous ne saurait
+  dénouer serait bien pire qu'un paiement qui ne s'ouvre pas. Sans ce secret, le corps du
+  webhook n'est authentifié par personne et n'importe qui peut nous faire relire les
+  transactions de son choix — la relecture reste la preuve, mais une garantie qui tient
+  par un seul fil n'en est pas une.
+- ⚠️ **Aucune variable `NEXT_PUBLIC_` pour FedaPay.** Le tunnel est entièrement serveur :
+  la page de règlement est hébergée par FedaPay, et le navigateur n'y va que par une
+  adresse que le serveur a obtenue. Une case « clé publique » à remplir sous une clé
+  secrète est une invitation à se tromper de ligne, et ce qui porte `NEXT_PUBLIC_` est
+  recopié dans le paquet servi à chaque visiteur — donc public **pour toujours**, même
+  après correction. `NEXT_PUBLIC_FEDAPAY_PUBLIC_KEY` a existé dans la documentation sans
+  qu'aucun code ne la lise ; elle a été retirée, et `tests/paiement-production.test.ts`
+  interdit son retour.
+- **Avant tout encaissement réel : `npm run fedapay:verifier`.** Lecture seule — aucune
+  transaction ouverte, aucun webhook créé, pas un franc déplacé. Il vérifie
+  l'environnement résolu, l'étanchéité du secret (historique git, variables publiques,
+  paquet navigateur), la division du XOF, les droits `/payouts` et `/refunds`, et que le
+  webhook déclaré pointe bien chez nous et reste actif. **Il n'affiche jamais la clé** :
+  un secret recopié dans un journal de terminal est un secret compromis.
 
 ### 2. Changements d'état
 Aucune transition d'état (réservation, devis, paiement, séquestre) ne se décide côté

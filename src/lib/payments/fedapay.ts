@@ -42,6 +42,35 @@ export interface FedaPayConfig {
 }
 
 /**
+ * Ce qui empêche d'ouvrir un paiement, ou `null` si tout est en règle.
+ *
+ * ⚠️ **En production, un secret de webhook absent est un refus, pas un
+ * avertissement.** Sans lui, le corps d'un webhook n'est authentifié par
+ * personne : n'importe qui peut nous faire relire une transaction de son
+ * choix, autant de fois qu'il veut. En bac à sable c'est un désagrément ; sur
+ * de l'argent réel, c'est une porte ouverte sur la passerelle de paiement, et
+ * un moyen de nous faire dépasser les limites de débit de FedaPay au moment
+ * précis où un vrai client règle sa réservation.
+ *
+ * La relecture reste notre garantie de fond — rien n'est encaissé sur la foi
+ * d'une requête entrante. Mais une garantie qui tient par un seul fil n'en est
+ * pas une, et on ne lance pas la production avec le second fil coupé.
+ *
+ * **Le refus porte sur l'ouverture**, donc en amont : aucune transaction réelle
+ * n'existe tant que la configuration est incomplète, et il n'y a donc jamais
+ * d'encaissement en suspens à rattraper.
+ */
+export function liveBlocker(config: FedaPayConfig | null): string | null {
+  if (!config || config.sandbox) return null;
+
+  if (!process.env.FEDAPAY_WEBHOOK_SECRET) {
+    return "FEDAPAY_WEBHOOK_SECRET est absente : aucun paiement réel ne sera ouvert tant que le webhook n'est pas authentifié.";
+  }
+
+  return null;
+}
+
+/**
  * Configuration lue dans l'environnement.
  * `null` plutôt qu'une exception : en développement sans clé, le tunnel doit
  * refuser proprement, pas rendre une page en erreur.
@@ -149,6 +178,13 @@ function createProvider(options: Options = {}): PaymentProvider {
           reason: "non-configure",
           message: "FEDAPAY_SECRET_KEY manquante — aucun paiement n'a été ouvert",
         };
+      }
+
+      // ⚠️ Fermé par défaut : une configuration de production incomplète
+      // n'ouvre rien. Voir `liveBlocker`.
+      const blocage = liveBlocker(config);
+      if (blocage) {
+        return { ok: false, reason: "non-configure", message: blocage };
       }
 
       const telephone = fedapayPhone(request.customer.phone);

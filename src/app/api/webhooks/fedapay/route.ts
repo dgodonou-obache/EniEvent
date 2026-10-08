@@ -143,6 +143,18 @@ export async function POST(request: Request) {
   const raw = await request.text();
 
   const secret = process.env.FEDAPAY_WEBHOOK_SECRET;
+
+  // ⚠️ **En production, l'absence de secret est un refus.** Sans lui le corps
+  // n'est authentifié par personne, et accepter reviendrait à laisser le
+  // premier venu nous faire relire les transactions de son choix. Le refus est
+  // sans conséquence : `liveBlocker` empêche déjà d'ouvrir le moindre paiement
+  // réel dans cette configuration, il n'existe donc rien à dénouer. Et un 401
+  // se voit dans le tableau de bord de FedaPay, là où un 200 muet se perdrait.
+  if (!secret && !paymentProvider().sandbox) {
+    console.error("Webhook FedaPay refusé : FEDAPAY_WEBHOOK_SECRET absente en production.");
+    return Response.json({ error: "webhook non authentifié" }, { status: 401 });
+  }
+
   if (secret) {
     const motif = verifySignature(raw, request.headers.get("x-fedapay-signature"), secret);
     if (motif) {

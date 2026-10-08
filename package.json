@@ -34,7 +34,8 @@
     "smoke:paiement": "node --env-file=.env.local node_modules/vitest/vitest.mjs run tests/paiement-reel.test.ts --reporter=verbose",
     "smoke:commande": "node --env-file=.env.local scripts/smoke-commande.mjs",
     "smoke:annulation": "node --env-file=.env.local scripts/smoke-annulation.mjs",
-    "smoke:messagerie": "node --env-file=.env.local scripts/smoke-messagerie.mjs"
+    "smoke:messagerie": "node --env-file=.env.local scripts/smoke-messagerie.mjs",
+    "fedapay:verifier": "node --env-file=.env.local scripts/fedapay-preflight.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

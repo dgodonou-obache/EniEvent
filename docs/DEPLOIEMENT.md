@@ -24,9 +24,8 @@ Vercel → le projet → **Settings → Environment Variables**. Cocher **Produc
 | `SESSION_SECRET` | aléatoire, ≥ 32 octets | Signe l'horodatage d'inactivité — **sans elle, l'expiration de session est inactive** |
 | `CRON_SECRET` | aléatoire | Protège `/api/cron/*` |
 | `FEDAPAY_SECRET_KEY` | `sk_sandbox_…` / `sk_live_…` | Ouverture et relecture des transactions |
-| `NEXT_PUBLIC_FEDAPAY_PUBLIC_KEY` | `pk_…` | Page de paiement côté navigateur |
 | `FEDAPAY_ENVIRONMENT` | `sandbox` ou `live` | Bascule bac à sable / production |
-| `FEDAPAY_WEBHOOK_SECRET` | `wh_…` | Authentifie le corps du webhook — voir l'avertissement ci-dessous |
+| `FEDAPAY_WEBHOOK_SECRET` | relevé au tableau de bord | Authentifie le corps du webhook — **obligatoire en production** |
 | `RESEND_API_KEY` | `re_…` | Notifications e-mail |
 | `EMAIL_FROM` | `ÉniEvent <bonjour@enievent.com>` | Expéditeur — **domaine vérifié obligatoire** |
 | `EMAIL_REPLY_TO` | `contact@enievent.com` | Boîte réellement relevée |
@@ -47,11 +46,26 @@ depuis la migration 0035, tout part par courriel. Ces trois-là ne sont conserv�
 > `NEXT_PUBLIC_` précisément pour ne jamais atteindre le navigateur — ne lui en
 > ajoutez pas un.
 
-> ⚠️ **`FEDAPAY_WEBHOOK_SECRET` est aujourd'hui absente**, FedaPay n'exposant pas ce
-> secret par son API. Le corps reçu n'est donc pas authentifié — ce qui ne compromet
-> rien, car la règle du dépôt ne s'y fie pas : à réception, `settle_payment` **relit la
-> transaction** chez FedaPay avec notre clé secrète, et refuse d'encaisser si le montant
-> constaté diffère de celui ouvert. Le webhook est un signal, la relecture est la preuve.
+> ⚠️ **Aucune variable `NEXT_PUBLIC_` pour FedaPay, et c'est volontaire.** Le tunnel est
+> entièrement serveur : la page de règlement est hébergée par FedaPay, et le navigateur
+> n'y est envoyé que par une adresse que le serveur a obtenue. Une case « clé publique »
+> juste sous une clé secrète est une invitation à se tromper de ligne, et tout ce qui
+> porte `NEXT_PUBLIC_` est recopié dans le paquet servi à chaque visiteur — donc public
+> pour toujours, y compris après correction. La case a existé sans jamais être lue ; elle
+> a été retirée le 8 octobre 2026. Ne pas la remettre.
+
+> ⚠️ **`FEDAPAY_WEBHOOK_SECRET` est obligatoire en production.** Sans elle, le corps du
+> webhook n'est authentifié par personne : n'importe qui peut nous faire relire les
+> transactions de son choix, autant de fois qu'il veut. `liveBlocker` refuse donc
+> d'ouvrir le moindre paiement réel tant qu'elle manque, et le webhook répond 401.
+> **Le refus porte sur l'ouverture**, en amont : aucune transaction réelle n'existe dans
+> cette configuration, il n'y a donc jamais d'encaissement en suspens à rattraper.
+>
+> En bac à sable elle reste facultative, la règle de fond protégeant déjà : le webhook
+> n'est qu'un **signal**, et à réception `settle_payment` **relit la transaction** chez
+> FedaPay avec notre clé secrète, refusant d'encaisser si le montant constaté diffère de
+> celui ouvert. La relecture est la preuve. Mais une garantie qui tient par un seul fil
+> n'en est pas une, et on ne lance pas la production avec le second fil coupé.
 
 ## 1 bis. Où tournent les fonctions
 
