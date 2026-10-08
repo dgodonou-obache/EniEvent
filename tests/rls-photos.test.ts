@@ -152,9 +152,23 @@ describe("suppression", () => {
 });
 
 describe("lecture", () => {
-  it("laisse un visiteur non connecté voir les photos", async () => {
-    // Le seau est public : une vignette d'annonce est vue avant toute
-    // connexion, et une URL signée par image coûterait un aller-retour chacune.
+  /**
+   * ⚠️ **Un seau public ne rend pas son _catalogue_ public**, et ce test
+   * affirmait le contraire jusqu'à la migration 0046.
+   *
+   * Les deux chemins sont distincts : afficher une vignette passe par
+   * `/storage/v1/object/public/…`, qui **ignore la RLS** puisque le seau est
+   * déclaré public ; **énumérer** passe par l'API `list`, qui applique la
+   * politique `select` ci-dessous. Tant que les deux étaient confondus, un
+   * visiteur anonyme remontait tous les dossiers — donc toutes les photos de
+   * tous les partenaires, y compris celles d'annonces en brouillon ou refusées
+   * par la modération, que personne n'avait jamais vues.
+   *
+   * Que les vignettes restent servies ne peut pas se vérifier ici : PGlite n'a
+   * pas de serveur de stockage. C'est `npm run smoke:photos` qui le prouve,
+   * contre le vrai Supabase — « l'URL publique est lisible sans connexion ».
+   */
+  it("refuse l'énumération à un visiteur non connecté", async () => {
     await db.query(
       "insert into storage.objects (bucket_id, name) values ('annonces', $1)",
       [`${orgAlice}/${listingAlice}/publique.jpg`],
@@ -162,6 +176,23 @@ describe("lecture", () => {
 
     const { rows } = await actingAs(db, null, async () =>
       db.query("select name from storage.objects where bucket_id = 'annonces'"),
+    );
+
+    expect(rows).toHaveLength(0);
+  });
+
+  it("refuse aussi l'énumération du dossier d'un concurrent", async () => {
+    const { rows } = await actingAs(db, BOB, async () =>
+      db.query("select name from storage.objects where name like $1", [`${orgAlice}/%`]),
+    );
+
+    expect(rows).toHaveLength(0);
+  });
+
+  it("laisse le propriétaire énumérer son propre dossier", async () => {
+    // Sans quoi le partenaire ne pourrait plus gérer ses propres photos.
+    const { rows } = await actingAs(db, ALICE, async () =>
+      db.query("select name from storage.objects where name like $1", [`${orgAlice}/%`]),
     );
 
     expect(rows.length).toBeGreaterThan(0);

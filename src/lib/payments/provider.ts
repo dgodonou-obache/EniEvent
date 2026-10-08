@@ -85,6 +85,17 @@ export interface PaymentProvider {
    * informe que par courrier. C'est arrivé : quelques minutes d'indisponibilité
    * ont éteint le webhook, et plus rien n'arrivait sans qu'aucun écran ne le
    * montre. La tâche planifiée pose donc la question à chaque passage.
+   *
+   * ⚠️ **« Illisible » n'est pas « tout va bien ».** Cette fonction rendait
+   * `null` en cas d'échec, et l'appelant comptait les désactivés : une liste
+   * qu'on n'a pas pu lire donnait donc zéro, comme une liste saine. Trois
+   * pannes distinctes — aucun webhook déclaré, API injoignable, clé fausse —
+   * se présentaient toutes comme un succès. L'alarme destinée à révéler la
+   * panne la plus sournoise du tunnel était elle-même silencieuse.
    */
-  webhookHealth(): Promise<{ total: number; disabled: string[] } | null>;
+  webhookHealth(): Promise<WebhookHealth>;
 }
+
+export type WebhookHealth =
+  | { lisible: true; actifs: string[]; desactives: string[] }
+  | { lisible: false; motif: string };

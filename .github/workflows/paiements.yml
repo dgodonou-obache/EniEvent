@@ -59,5 +59,15 @@ jobs:
           # FedaPay désactive un point de terminaison qui échoue de façon
           # répétée, et n'en informe que par courrier. Plus rien n'arrive alors,
           # sans qu'aucun écran ne le montre : seul ce contrôle le dit.
-          echo "$reponse" | grep -q '"webhooksDesactives":0' \
-            || echo "::error::Un webhook FedaPay est DÉSACTIVÉ — les paiements ne remontent plus"
+          #
+          # ⚠️ **Assertion positive, et échec dur.** La version précédente
+          # cherchait `"webhooksDesactives":0` — donc comptait des absences.
+          # Trois pannes distinctes rendaient zéro et passaient pour une bonne
+          # santé : aucun webhook déclaré, liste illisible, webhook pointant
+          # ailleurs. On exige désormais le mot « actif », et on **sort en
+          # erreur** : une annotation seule se perd dans un journal que
+          # personne ne relit, alors qu'une exécution rouge se voit.
+          if ! echo "$reponse" | grep -q '"webhook":"actif"'; then
+            echo "::error::Webhook FedaPay hors service — les paiements ne remonteront plus"
+            exit 1
+          fi

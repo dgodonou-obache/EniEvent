@@ -1,5 +1,6 @@
 import { bearerMatches } from "@/lib/auth/bearer";
 import { paymentProvider } from "@/lib/payments/fedapay";
+import type { WebhookHealth } from "@/lib/payments/provider";
 import { createServiceRoleClient } from "@/utils/supabase/server";
 
 /**
@@ -119,14 +120,46 @@ export async function GET(request: Request) {
   // désactive après quelques échecs, n'en informe que par courrier, et plus
   // rien n'arrive sans qu'aucun écran ne le montre. On le vérifie ici, où le
   // résultat remonte dans le résumé de la tâche planifiée.
-  const sante = await provider.webhookHealth();
+  const verdict = verdictWebhook(await provider.webhookHealth());
 
-  if (sante && sante.disabled.length > 0) {
-    console.error(`Webhook FedaPay DÉSACTIVÉ : ${sante.disabled.join(", ")}`);
+  if (verdict !== "actif") {
+    console.error(`Webhook FedaPay : ${verdict} — les paiements ne remonteront plus`);
   }
 
-  return Response.json({
-    ...rapport,
-    webhooksDesactives: sante?.disabled.length ?? 0,
-  });
+  return Response.json({ ...rapport, webhook: verdict });
+}
+
+/** Le chemin que FedaPay doit appeler. Comparé par le chemin, pas par l'hôte :
+ *  la production et son alias `*.vercel.app` sont tous deux légitimes. */
+const CHEMIN_ATTENDU = "/api/webhooks/fedapay";
+
+/**
+ * Le webhook est-il en état de nous prévenir ?
+ *
+ * ⚠️ **Assertion positive.** On ne compte pas les webhooks désactivés — on
+ * exige que **le nôtre** figure parmi les actifs. Compter des absences faisait
+ * passer trois pannes pour une bonne santé : aucun webhook déclaré, liste
+ * illisible, et webhook pointant ailleurs rendaient tous « zéro désactivé ».
+ * Même leçon que les droits de colonne : seule l'énumération positive dit
+ * quelque chose.
+ *
+ * Exporté pour être éprouvé sans réseau.
+ */
+export function verdictWebhook(
+  sante: WebhookHealth,
+): "actif" | "désactivé" | "absent" | "illisible" {
+  if (!sante.lisible) return "illisible";
+
+  const notre = (u: string) => {
+    try {
+      return new URL(u).pathname.replace(/\/$/, "") === CHEMIN_ATTENDU;
+    } catch {
+      return false;
+    }
+  };
+
+  if (sante.actifs.some(notre)) return "actif";
+  if (sante.desactives.some(notre)) return "désactivé";
+
+  return "absent";
 }

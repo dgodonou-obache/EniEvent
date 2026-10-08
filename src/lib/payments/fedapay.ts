@@ -251,20 +251,27 @@ function createProvider(options: Options = {}): PaymentProvider {
     },
 
     async webhookHealth() {
-      if (!config) return null;
+      if (!config) return { lisible: false as const, motif: "FEDAPAY_SECRET_KEY manquante" };
 
       try {
         const lecture = await call("GET", "/webhooks");
-        if (!lecture.ok) return null;
+        if (!lecture.ok) {
+          return { lisible: false as const, motif: `HTTP ${lecture.status} — ${lecture.detail.slice(0, 120)}` };
+        }
 
         const liste = (lecture.data["v1/webhooks"] ?? []) as { url?: string; enabled?: boolean }[];
+        const adresse = (w: { url?: string }) => w.url ?? "(sans adresse)";
 
         return {
-          total: liste.length,
-          disabled: liste.filter((w) => w.enabled === false).map((w) => w.url ?? "(sans adresse)"),
+          lisible: true as const,
+          actifs: liste.filter((w) => w.enabled !== false).map(adresse),
+          desactives: liste.filter((w) => w.enabled === false).map(adresse),
         };
-      } catch {
-        return null;
+      } catch (error) {
+        return {
+          lisible: false as const,
+          motif: error instanceof Error ? error.message : "erreur inconnue",
+        };
       }
     },
 
