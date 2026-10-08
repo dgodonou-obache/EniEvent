@@ -60,7 +60,29 @@ const rate = (message) => {
   echecs += 1;
 };
 
+/**
+ * ⚠️ **Une session par compte, pas une par contrôle.**
+ *
+ * Ce script interroge quatre comptes sur des dizaines de vecteurs. Sans ce
+ * cache, chaque contrôle rouvrait une session et le script finissait par se
+ * faire refuser par Supabase — « Request rate limit reached », 30 vérifications
+ * par heure. Constaté en ajoutant la section 4.
+ *
+ * Amusant et instructif : le plafond qui a cassé ce script est exactement celui
+ * qui protège la connexion du bourrage de mots de passe.
+ */
+const sessions = new Map();
+
 async function session(email) {
+  const dejaOuverte = sessions.get(email);
+  if (dejaOuverte) return dejaOuverte;
+
+  const ouverte = await ouvrirSession(email);
+  sessions.set(email, ouverte);
+  return ouverte;
+}
+
+async function ouvrirSession(email) {
   const client = createClient(url, key, { auth: { persistSession: false } });
   const { data, error } = await client.auth.signInWithPassword({ email, password });
   if (error) throw new Error(`${email} : ${error.message}`);
@@ -204,6 +226,55 @@ for (const compte of COMPTES) {
 
   if (apres?.account_type === "admin") rate(`${compte.titre} s'est promu administrateur !`);
   else console.log(`  ✓ ${compte.titre.padEnd(12)} reste ${apres?.account_type} — ${error ? error.message.slice(0, 42) : "refus silencieux"}`);
+}
+
+// ---------------------------------------------------------------------------
+// 4. Les colonnes sensibles, demandées nommément
+//
+// ⚠️ **C'est ici que ce contrôle doit vivre, et nulle part ailleurs.** PGlite
+// ne reproduit pas les droits par défaut de Supabase (§3 du guide) : un test
+// local « cette colonne n'est pas lisible » passe sans rien prouver. Seule la
+// vraie base répond.
+//
+// Et il faut demander la colonne **par son nom** : un `select *` ne la
+// réclamerait plus une fois retirée du `grant`, et le contrôle serait vert
+// pour la mauvaise raison. Trois fuites ont été refermées ainsi — le téléphone
+// des organisations (0036), le jeton d'invitation (0042), puis le taux de
+// commission et le téléphone du client (0044).
+console.log("\n4. Les colonnes sensibles, demandées nommément");
+
+const SECRETES = [
+  {
+    table: "partner_profiles",
+    colonne: "commission_rate_override",
+    quoi: "taux de commission négocié",
+  },
+  { table: "quote_requests", colonne: "contact_phone", quoi: "téléphone du client" },
+  { table: "organizations", colonne: "phone", quoi: "téléphone du partenaire" },
+  { table: "organizations", colonne: "billing_email", quoi: "adresse de facturation" },
+  { table: "organization_invitations", colonne: "token", quoi: "jeton d'invitation" },
+];
+
+/** Un visiteur, sans la moindre session : le lecteur le plus défavorisé. */
+const visiteur = createClient(url, key, { auth: { persistSession: false } });
+
+for (const { table, colonne, quoi } of SECRETES) {
+  const refus = [];
+
+  for (const compte of [...COMPTES, { titre: "Visiteur", email: null }]) {
+    const client = compte.email ? (await session(compte.email)).client : visiteur;
+    const { data, error } = await client.from(table).select(colonne).limit(1);
+
+    // Un refus de droit lève ; une ligne rendue avec la colonne est une fuite.
+    if (error) refus.push(compte.titre);
+    else if (data?.length && data[0][colonne] !== undefined) {
+      rate(`${compte.titre} lit ${table}.${colonne} (${quoi})`);
+    } else refus.push(compte.titre);
+  }
+
+  if (refus.length === COMPTES.length + 1) {
+    console.log(`  ✓ ${`${table}.${colonne}`.padEnd(44)} refusé à tous — ${quoi}`);
+  }
 }
 
 console.log("");
