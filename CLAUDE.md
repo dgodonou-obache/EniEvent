@@ -204,6 +204,40 @@ posé n'éteint pas une fonctionnalité qui marchait.
   `grant select (col1, col2, …) on T to authenticated`. Corollaire de terrain : `select *`
   cesse alors de fonctionner pour tout le monde, y compris dans les tests — c'est le
   comportement voulu, pas une régression.
+- ⚠️ **Le contrôle d'une colonne refermée se fait en la demandant par son nom.** Une fois
+  retirée du `grant`, elle ne sort plus d'un `select *` — un contrôle écrit ainsi passe au
+  vert **pour la mauvaise raison**, et resterait vert si on la remettait. §4 de
+  `smoke:cloisonnement` interroge donc les cinq colonnes secrètes nommément
+  (`commission_rate_override`, `contact_phone`, `organizations.phone`, `billing_email`,
+  `token`), pour chaque profil **et** pour le visiteur. Ajouter une colonne sensible
+  demande d'ajouter sa ligne là.
+- ⚠️ **Aucune destination venue de l'URL ne se filtre à la main.** Tout passe par
+  `safeInternalPath` (`src/lib/validation/redirect.ts`). Le contrôle
+  `startsWith("/") && !startsWith("//")`, recopié dans **cinq** fichiers, se laissait
+  franchir par `/\evil.com` : le parseur traite `\` comme `/` pour http et https, donc la
+  chaîne change d'hôte tout en commençant par une barre unique. Un lien partant vraiment
+  de `enievent.com` atterrissait sur une fausse page de connexion. **On ne juge pas une
+  URL en lisant ses premiers caractères : on la fait analyser, puis on compare l'origine.**
+  Un parseur connaît les cas tordus qu'une expression régulière redécouvrira un par un,
+  trop tard.
+- ⚠️ **Un plafond de débit vit dans un déclencheur de table** (migration 0045), jamais en
+  tête d'une Server Action — même raison que les interrupteurs, `messages` a trois chemins
+  d'écriture. On **compte les lignes existantes** plutôt que de tenir un compteur : un
+  second état finit par diverger, et un compteur faux ne lève aucune erreur. 5 demandes de
+  devis/heure et 15/jour, 5 demandes d'assistance/heure, 20 invitations/jour,
+  30 messages/heure. `app.hors_plafond()` exempte la clé de service (`auth.uid()` nul :
+  cron, webhooks, seeds, `demo:reset`) et l'administration. ⚠️ Un plafond trop serré est
+  une panne, pas une protection : les tests éprouvent les **deux** bords. Ce qui est déjà
+  couvert par Supabase et qu'on ne refait pas : connexions 30/h, courriels
+  d'authentification 30/h, rafraîchissement 150/h.
+- ⚠️ **Changer de mot de passe depuis une session ouverte redemande l'ancien**
+  (`PasswordForm`, propriété `exigeAncien`). Une session obtenue par lien de courriel
+  prouve l'accès à la boîte ; une session simplement ouverte ne prouve que l'accès à
+  l'appareil. L'arrivée du lien de réinitialisation en est exemptée, par construction. Ne
+  pas activer `security_update_password_require_reauthentication` chez Supabase à la
+  place : elle casserait ces deux écrans, qui n'implémentent pas son code à six chiffres.
+  La protection contre les mots de passe éventés (HaveIBeenPwned) est **refusée en 402**
+  sur le forfait actuel.
 - ⚠️ **`auth.users` n'est pas exposé par PostgREST**, et ne doit pas l'être : cette table
   porte les empreintes de mots de passe. Les adresses e-mail n'existent donc **nulle
   part** dans `public` — `profiles` n'en a pas. `admin_users()` en extrait les quatre
@@ -220,6 +254,13 @@ posé n'éteint pas une fonctionnalité qui marchait.
   par URL signée d'une minute, émise côté serveur. Ne jamais y construire une URL
   `…/object/public/…`. Dans les deux seaux, le cloisonnement tient au **chemin**
   (`{org_id}/…`) ; `justificatifs` exige en plus le rôle `owner` ou `accountant`.
+  ⚠️ **Un seau public ne rend pas son _catalogue_ public.** Les deux chemins sont
+  distincts : `/object/public/…` ignore la RLS, l'API `list` **applique** la politique
+  `select`. `annonces` était énumérable par un anonyme jusqu'à la migration 0046 — on
+  remontait tous les dossiers, donc toutes les photos, y compris celles d'annonces en
+  brouillon ou refusées par la modération. Fermer `list` ne touche pas à l'affichage des
+  vignettes, et le dépôt n'appelle ni `.list()` ni `getPublicUrl()` : les adresses des
+  photos sont stockées en base.
 - ⚠️ **Supprimer un compte, c'est anonymiser — pas effacer.** La chaîne
   `profiles → quote_requests → quote_request_items → quotes` est **en cascade** :
   effacer un client emporterait les devis que ses partenaires ont chiffrés, c'est-à-dire
@@ -394,6 +435,16 @@ barrière devant quelqu'un qui n'ouvre pas de navigateur.
   le signale. Passer une clé (`space="partner"`) et résoudre côté client.
   Corollaire : **rendre réellement une page authentifiée** avant de la déclarer
   livrée ; un test contre la base ne prouve pas que l'écran s'affiche.
+- ⚠️ **Les en-têtes de sécurité vivent dans `next.config.ts`**, qui était vide jusqu'à
+  l'audit du 8 octobre 2026 : la production ne servait que le HSTS de Vercel. `/admin`
+  valide des annonces et déclenche des remboursements — rien n'empêchait de l'encadrer
+  dans une iframe invisible. `frame-ancestors 'none'` et `X-Frame-Options` ferment le
+  détournement de clic ; `nosniff`, `Referrer-Policy` (nos URL portent des références de
+  commande) et `Permissions-Policy` complètent. **Pas de CSP complète, et c'est
+  délibéré** : elle exige un `nonce` propagé à chaque script de Next, se règle dans le
+  proxy et se vérifie écran par écran — posée à l'aveugle elle casse l'hydratation sans
+  qu'aucun test ne le voie, puisque le HTML est rendu. C'est un chantier à part. Avant
+  d'ajouter `frame-ancestors`, on a vérifié qu'aucune iframe n'existe dans le dépôt.
 - Mobile-first, vérifié à 390 px : pas de débordement de modale ni de menu déroulant.
 - Zones défilables : `overflow-y-auto no-scrollbar`.
 - ⚠️ Un `href` n'est qu'une chaîne : **rien ne le confronte à l'arborescence de
