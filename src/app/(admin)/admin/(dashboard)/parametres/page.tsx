@@ -33,7 +33,7 @@ export default async function AdminSettingsPage() {
           une boîte mail.
         </p>
         <div className="mt-4">
-          <PasswordForm apres="/admin" />
+          <PasswordForm apres="/admin" exigeAncien />
         </div>
       </section>
     </div>

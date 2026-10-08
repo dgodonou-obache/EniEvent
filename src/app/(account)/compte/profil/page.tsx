@@ -38,7 +38,7 @@ export default async function ProfilPage() {
           Choisissez-en un nouveau. L&apos;ancien cesse de fonctionner aussitôt.
         </p>
         <div className="mt-4">
-          <PasswordForm apres="/compte/profil" />
+          <PasswordForm apres="/compte/profil" exigeAncien />
         </div>
       </section>
 

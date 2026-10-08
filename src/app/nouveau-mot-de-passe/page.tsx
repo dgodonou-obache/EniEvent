@@ -1,6 +1,7 @@
 import { KeyRound } from "lucide-react";
 
 import { PasswordForm } from "@/components/auth/PasswordForm";
+import { safeInternalPath } from "@/lib/validation/redirect";
 
 export const metadata = { title: "Nouveau mot de passe", robots: { index: false } };
 
@@ -23,7 +24,9 @@ export default async function NewPasswordPage({
   const { retour } = await searchParams;
 
   // Une destination venue de l'URL ne doit jamais sortir du site.
-  const apres = retour && retour.startsWith("/") && !retour.startsWith("//") ? retour : "/compte";
+  // ⚠️ Cinquième exemplaire du contrôle à la main, et le seul que l'audit du
+  // 8 octobre 2026 avait d'abord manqué : il laissait passer `/\evil.com`.
+  const apres = safeInternalPath(retour, "/compte");
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-slate-50 px-4 py-12">

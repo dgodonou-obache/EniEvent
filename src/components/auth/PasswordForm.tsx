@@ -15,8 +15,24 @@ import { createClient } from "@/utils/supabase/client";
  *
  * Sert aux deux cas, qui ne diffèrent que par la manière dont la session a été
  * obtenue : après un lien de réinitialisation, ou depuis un compte déjà
- * connecté. Dans les deux cas Supabase exige une session — c'est elle qui
- * prouve l'identité, pas l'ancien mot de passe.
+ * connecté.
+ *
+ * ⚠️ **Et c'est là que les deux cas cessent de se ressembler.** Une session
+ * obtenue par lien de courriel prouve qu'on a accès à la boîte ; une session
+ * simplement *ouverte* ne prouve que l'accès à l'appareil. Tant que le
+ * changement ne demandait rien, quiconque trouvait un écran déverrouillé —
+ * téléphone prêté, poste de cybercafé — changeait le mot de passe et mettait
+ * le propriétaire dehors de son propre compte. Audit du 8 octobre 2026.
+ *
+ * Depuis `exigeAncien`, le cas « session ouverte » redemande donc le mot de
+ * passe actuel. Le cas « lien de courriel » ne le peut pas, par construction :
+ * on vient précisément de l'oublier.
+ *
+ * Ce contrôle vit ici et non dans un réglage Supabase : son option de
+ * réauthentification envoie un code à six chiffres par courriel, ce qui est
+ * une friction de plus pour une protection équivalente. Vérifié au passage
+ * qu'elle ne casserait pas la réinitialisation par lien — mais elle aurait
+ * cassé ces deux écrans-ci, qui n'implémentent aucun code.
  *
  * La confirmation n'est pas une formalité : sans elle, une faute de frappe
  * enferme dehors quelqu'un qui vient précisément de perdre son accès.
@@ -24,10 +40,16 @@ import { createClient } from "@/utils/supabase/client";
 export function PasswordForm({
   apres,
   libelle = "Changer le mot de passe",
+  exigeAncien = false,
 }: {
   /** Où aller une fois le mot de passe changé. */
   apres: string;
   libelle?: string;
+  /**
+   * Redemande le mot de passe actuel. À poser partout **sauf** sur l'arrivée
+   * d'un lien de réinitialisation, où la personne ne le connaît plus.
+   */
+  exigeAncien?: boolean;
 }) {
   const router = useRouter();
   const [erreur, setErreur] = React.useState<string | null>(null);
@@ -55,6 +77,27 @@ export function PasswordForm({
 
     setIsPending(true);
     const supabase = createClient();
+
+    if (exigeAncien) {
+      const ancien = String(formData.get("ancien") ?? "");
+
+      // ⚠️ On revérifie contre Supabase, pas contre une copie locale : c'est
+      // le seul moyen d'être sûr. Un échec ne touche pas à la session en
+      // cours, et un succès la remplace par une session fraîche — sans effet
+      // visible, puisque c'est la même personne.
+      const { data: moi } = await supabase.auth.getUser();
+      const { error: eAncien } = await supabase.auth.signInWithPassword({
+        email: moi.user?.email ?? "",
+        password: ancien,
+      });
+
+      if (eAncien) {
+        setErreur("Le mot de passe actuel est incorrect.");
+        setIsPending(false);
+        return;
+      }
+    }
+
     const { error } = await supabase.auth.updateUser({ password: motDePasse });
 
     if (error) {
@@ -93,6 +136,23 @@ export function PasswordForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {exigeAncien ? (
+        <div>
+          <Label htmlFor="ancien">Mot de passe actuel</Label>
+          <PasswordInput
+            id="ancien"
+            name="ancien"
+            required
+            autoComplete="current-password"
+            aria-describedby="pourquoi-ancien"
+          />
+          <p id="pourquoi-ancien" className="mt-1.5 text-xs text-slate-400">
+            Nous le redemandons pour que personne ne puisse changer votre mot de passe
+            depuis un écran que vous auriez laissé ouvert.
+          </p>
+        </div>
+      ) : null}
+
       <div>
         <Label htmlFor="password">Nouveau mot de passe</Label>
         <PasswordInput
