@@ -4,9 +4,13 @@ Ce qui est en ligne, ce qui reste, et dans quel ordre. **C'est le seul document 
 lire pour savoir quoi construire ensuite.** Les plans de `~/.claude/plans/`
 décrivent des lots déjà livrés et ne font plus foi.
 
-Dernière mise à jour : 25 septembre 2026, après le lot C, la première tranche du
-lot D et la suppression de compte. 678 tests verts, 43 migrations, production sur
+Dernière mise à jour : 10 octobre 2026, après l'audit de sécurité et le passage
+de FedaPay en argent réel. 754 tests verts, 46 migrations, production sur
 https://enievent.com.
+
+> ⚠️ **Les paiements réels sont ouverts.** Tout ce qui suit s'écrit désormais
+> sur un produit qui encaisse. Voir §3.3 — le catalogue est encore fictif, et
+> cette combinaison demande une décision avant toute autre chose.
 
 ---
 
@@ -81,33 +85,71 @@ C'est exactement ce qu'un prestataire de paiement vérifie à l'ouverture d'un
 compte marchand. **Le dossier FedaPay est désormais déposable** — c'est le
 blocage suivant, et il ne dépend plus du code.
 
-### 3.2 Le compte marchand FedaPay n'est pas validé
+### 3.2 ~~Le compte marchand FedaPay n'est pas validé~~ — levé le 8 octobre 2026
 
-Conséquence directe du point précédent, et mesurée sur l'API réelle : avec la
-clé même qui obtient `200` sur `/transactions`, le compte reçoit **`403` sur
-`/payouts`** et **`401` sur `/refunds`**. Virements et remboursements sont donc
-aujourd'hui des **registres** tenus à la main — les écrans existent, ils
-n'ordonnent aucun mouvement.
+Le compte est validé et la clé de production est en place. Vérifié depuis
+l'extérieur, pas sur parole : la mention « Mode test » a disparu de la
+production alors qu'elle persiste en local, le webhook refuse une fausse
+signature en `401`, et `/api/cron/paiements` lit `"webhook":"actif"` **dans le
+compte live**.
 
-Le jour où le droit s'ouvre, deux fonctions seulement sont à remplacer :
-`mark_payout_sent` et `mark_refund_sent`. Le reste de la chaîne est prêt.
+Garde-fous posés avec : `liveBlocker` refuse d'ouvrir un paiement réel sans
+`FEDAPAY_WEBHOOK_SECRET`, aucune variable `NEXT_PUBLIC_` ne touche à FedaPay,
+et `npm run fedapay:verifier` contrôle tout cela en lecture seule.
 
-### 3.3 Le catalogue est fictif
+**Reste à mesurer** : `/payouts` et `/refunds` devraient être ouverts depuis la
+validation, mais personne ne l'a constaté — le pré-vol tourne avec la clé de
+bac à sable. Tant que ce n'est pas vérifié, `mark_payout_sent` et
+`mark_refund_sent` restent des **registres** tenus à la main. Les transformer
+en virements réels, c'est de l'argent qui sort : plafond par virement, double
+validation et journal avant quoi que ce soit.
 
-6 partenaires inventés, 15 annonces, des numéros séquentiels
-(`+2290197000001`, `+2290197000002`…). Un visiteur qui appelle tombe sur rien.
+### 3.3 ⚠️ Le catalogue est fictif — et il encaisse
 
-Il faut **recruter de vrais partenaires**, puis retirer le jeu de démonstration
-de la production — y compris les quatre comptes de démonstration, dont
+**C'est désormais le point le plus urgent du document**, parce que 3.2 est levé.
+
+Mesuré le 10 octobre 2026 : **3 annonces fictives sont payables en ligne**, en
+réservation immédiate, avec une date ouverte et de l'argent réel.
+
+| Annonce | Prix | Dates ouvertes |
+|---|---|---|
+| Villa Atlantique (Ouidah) | 300 000 F | 74 |
+| Auditorium Cadjèhoun | 250 000 F | 75 |
+| Pack sonorisation & lumière 300 personnes | 120 000 F | 74 |
+
+Un visiteur venu d'une recherche peut réserver et régler par Mobile Money une
+salle qui n'existe pas. L'argent arrive sur le compte marchand, et il faut le
+rembourser — or `/refunds` n'est pas encore constaté ouvert (§3.2).
+
+Six organisations du catalogue viennent du jeu de démonstration (toutes créées
+le 6 septembre 2026, numéros séquentiels `+229019X0000XX`). Trois autres —
+ESDET, BÈZEALL, Essai SARL — sont des inscriptions ultérieures à trier.
+
+**Trois issues, par ordre de douceur :**
+
+1. **Passer les annonces de démonstration en `booking_mode = 'quote'`.** Le
+   catalogue reste vivant et continue de produire des demandes de devis ; plus
+   aucun paiement en ligne n'est possible. Réversible en une commande.
+2. Fermer leurs disponibilités : plus de date réservable, mais les fiches
+   restent.
+3. Dépublier le jeu de démonstration : catalogue vide, vitrine honnête mais
+   déserte.
+
+Et dans tous les cas : **recruter de vrais partenaires**, puis retirer le jeu
+de démonstration ainsi que les quatre comptes de démonstration, dont
 `demo-admin`, qui est de type `admin`.
 
 ### 3.4 Secrets à faire tourner
 
 - Ancienne clé Resend « Full access » — à révoquer.
 - Trois jetons OVH — à révoquer.
-- `FEDAPAY_WEBHOOK_SECRET` — absente. Sans risque immédiat : `settle_payment`
-  relit la transaction chez FedaPay et refuse un montant divergent. À poser dès
-  que FedaPay l'expose.
+- ~~`FEDAPAY_WEBHOOK_SECRET`~~ — posée le 8 octobre 2026, et désormais
+  **obligatoire** en production (`liveBlocker`). Reste à confirmer, par un
+  événement de test depuis le tableau de bord FedaPay, que le secret posé est
+  bien celui du webhook *live* et non celui du bac à sable. Si ce n'était pas
+  le cas, rien ne serait perdu — `/api/cron/paiements` dénoue les paiements
+  indépendamment du webhook, sous ~20 minutes — mais l'exécution GitHub
+  passerait au rouge, ce qui est le comportement voulu.
 
 ### 3.5 Deux réglages à décider
 
@@ -253,18 +295,24 @@ sur un produit qui doit d'abord savoir le servir.
 
 ## 5. L'ordre que je recommande
 
-1. **Déposer le dossier FedaPay** (§3.2). `src/lib/legal.ts` est rempli depuis
-   le 7 octobre 2026, ce point ne demande plus une ligne de code — et tant
-   qu'il n'est pas fait, tout le reste est du code qui attend.
-2. **Recruter les premiers partenaires** et retirer le catalogue fictif (§3.3).
-   Un produit vide ne se teste pas en vrai.
-3. **Lot A — Confiance.** Le seul lot que le client voit.
-4. **Lot B — Facturation.** Débloque le tunnel entreprise.
+0. **Fermer le paiement en ligne sur les annonces fictives** (§3.3). Aujourd'hui
+   un inconnu peut régler 300 000 F pour une salle qui n'existe pas. Une
+   commande suffit, et c'est réversible. **Rien d'autre ne passe avant.**
+1. **Recruter les premiers partenaires**, puis retirer le jeu de démonstration
+   et ses quatre comptes (§3.3). Un produit vide ne se teste pas en vrai, et
+   c'est désormais la seule chose qui sépare ÉniEvent d'un vrai chiffre
+   d'affaires : la chaîne technique, elle, encaisse.
+2. **Confirmer le secret du webhook live** par un événement de test (§3.4), et
+   **mesurer `/payouts` et `/refunds`** (§3.2). Deux contrôles, zéro code.
+3. **Lot A — Confiance.** Le seul lot que le client voit, et il manque
+   précisément là où une place de marché se joue : départager deux prestataires.
+4. **Lot B — Facturation.** Débloque le tunnel entreprise, qui ne peut pas
+   acheter sans pièce comptable.
 5. **Fin du lot D** — promotions et créneaux — puis **lot E**. (Le lot C et la
    première tranche du lot D sont livrés.)
 
-Les points 1 et 2 ne demandent pas une ligne de code, et rien de ce qui suit
-n'a d'effet commercial avant eux.
+Les points 0 à 2 ne demandent pas une ligne de code — ou une seule — et aucun
+écran ne vaut plus qu'eux tant qu'ils tiennent.
 
 ---
 
