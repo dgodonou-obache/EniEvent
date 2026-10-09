@@ -372,6 +372,55 @@ export function renderEmail(
       });
     }
 
+    case "review.received": {
+      // ⚠️ **Le texte de l'avis ne voyage pas**, et la raison n'est pas le
+      // secret : un avis est public. C'est qu'un partenaire qui lit « 2/5 » et
+      // deux lignes d'extrait répond de mémoire, souvent mal. On l'envoie lire
+      // l'avis entier, où il pourra répondre une fois — et une seule.
+      const note = typeof payload.rating === "number" ? payload.rating : 0;
+      const annonce = text(payload.listing);
+      const flatteur = note >= 4;
+
+      return shell({
+        subject: `Vous avez reçu un avis — ${note}/5`,
+        preheader: flatteur
+          ? "Un client satisfait vient de vous noter."
+          : "Un client vous a noté : votre réponse compte.",
+        heading: `Un nouvel avis : ${note}/5`,
+        intro: flatteur
+          ? "Un client vient de laisser son avis sur une prestation. Un mot de " +
+            "remerciement sous un bon avis se lit par tous les suivants."
+          : "Un client vient de laisser son avis sur une prestation. Vous avez " +
+            "un droit de réponse, publié sous le sien — c'est souvent lui, plus " +
+            "que la note, que lisent les clients suivants.",
+        details: [
+          ["Note", `${note} sur 5`],
+          ["Prestation", annonce],
+          ["Client", text(payload.author)],
+          ["Commentaire", payload.hasBody === true ? "Oui, à lire en ligne" : "Aucun"],
+        ],
+        cta: { label: "Lire et répondre", href: `${base}/pro/avis` },
+        outro:
+          "Vous ne pouvez répondre qu'une fois : prenez le temps de lire avant " +
+          "d'écrire. Un avis vous paraît abusif ? Signalez-le depuis la même page.",
+      });
+    }
+
+    case "review.replied": {
+      const partner = text(payload.partner);
+
+      return shell({
+        subject: partner ? `${partner} a répondu à votre avis` : "Votre avis a reçu une réponse",
+        preheader: "Le prestataire vous a répondu publiquement.",
+        heading: partner ? `${partner} vous a répondu` : "Votre avis a reçu une réponse",
+        intro:
+          "Le prestataire a publié une réponse sous votre avis. Elle est visible " +
+          "par tous, au même titre que ce que vous avez écrit.",
+        details: [["Prestataire", partner]],
+        cta: { label: "Lire la réponse", href: `${base}/compte/reservations` },
+      });
+    }
+
     default:
       return null;
   }

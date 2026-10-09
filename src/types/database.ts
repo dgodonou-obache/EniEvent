@@ -2367,6 +2367,113 @@ export type Database = {
           },
         ]
       }
+      reviews: {
+        Row: {
+          author_id: string
+          author_label: string
+          body: string | null
+          created_at: string
+          hidden_at: string | null
+          hidden_by: string | null
+          hidden_reason: string | null
+          id: string
+          listing_id: string | null
+          order_id: string
+          org_id: string
+          rating: number
+          reinstated_at: string | null
+          replied_at: string | null
+          reply: string | null
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          author_label: string
+          body?: string | null
+          created_at?: string
+          hidden_at?: string | null
+          hidden_by?: string | null
+          hidden_reason?: string | null
+          id?: string
+          listing_id?: string | null
+          order_id: string
+          org_id: string
+          rating: number
+          reinstated_at?: string | null
+          replied_at?: string | null
+          reply?: string | null
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          author_label?: string
+          body?: string | null
+          created_at?: string
+          hidden_at?: string | null
+          hidden_by?: string | null
+          hidden_reason?: string | null
+          id?: string
+          listing_id?: string | null
+          order_id?: string
+          org_id?: string
+          rating?: number
+          reinstated_at?: string | null
+          replied_at?: string | null
+          reply?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_hidden_by_fkey"
+            columns: ["hidden_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listing_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings_bookable_now"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_details: {
         Row: {
           attributes: Json
@@ -2673,6 +2780,7 @@ export type Database = {
           published_at: string | null
           rating_avg: number | null
           rating_count: number | null
+          rating_sort: number | null
           search_text: string | null
           slug: string | null
           status: Database["public"]["Enums"]["listing_status"] | null
@@ -2767,6 +2875,25 @@ export type Database = {
           org_id: string
           phone: string
           status: Database["public"]["Enums"]["org_status"]
+        }[]
+      }
+      admin_reviews: {
+        Args: { etat?: string }
+        Returns: {
+          author_label: string
+          body: string
+          created_at: string
+          hidden_at: string
+          hidden_reason: string
+          id: string
+          listing_id: string
+          listing_title: string
+          order_reference: string
+          org_id: string
+          org_name: string
+          rating: number
+          replied_at: string
+          reply: string
         }[]
       }
       admin_users: {
@@ -2926,6 +3053,7 @@ export type Database = {
         Args: { fenetre?: string }
         Returns: number
       }
+      hide_review: { Args: { avis: string; motif: string }; Returns: undefined }
       invitation_preview: {
         Args: { jeton: string }
         Returns: {
@@ -3115,7 +3243,18 @@ export type Database = {
           sender_side: Database["public"]["Enums"]["message_side"]
         }[]
       }
+      reinstate_review: { Args: { avis: string }; Returns: undefined }
       release_stale_orders: { Args: { delai?: string }; Returns: number }
+      reply_to_review: {
+        Args: { avis: string; texte: string }
+        Returns: undefined
+      }
+      request_contact: {
+        Args: { demande: string }
+        Returns: {
+          contact_phone: string
+        }[]
+      }
       request_publication_approval: {
         Args: { target: string }
         Returns: string

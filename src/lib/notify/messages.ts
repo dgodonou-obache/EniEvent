@@ -24,6 +24,8 @@ export const KINDS = [
   "message.new",
   "member.invited",
   "support.new",
+  "review.received",
+  "review.replied",
 ] as const;
 export type NotificationKind = (typeof KINDS)[number];
 
@@ -166,6 +168,28 @@ export function renderSms(
       return toGsmSafe(
         `ÉniEvent : nouveau message au support${sujet ? ` — ${sujet}` : ""}. ` +
           `À traiter sur ${base}/admin`,
+      );
+    }
+
+    case "review.received": {
+      // ⚠️ **Jamais le texte de l'avis.** Pas pour le masquer — un avis est
+      // public — mais parce qu'un segment ne tient pas deux mille caractères,
+      // et qu'un avis tronqué au milieu d'une phrase se lit à l'envers de ce
+      // qu'il dit. La note, elle, tient en un chiffre.
+      const note = typeof payload.rating === "number" ? payload.rating : 0;
+
+      return toGsmSafe(
+        `ÉniEvent : un client vous a noté ${note}/5. ` +
+          `Vous pouvez répondre sur ${base}/pro/avis`,
+      );
+    }
+
+    case "review.replied": {
+      const partner = short(payload.partner);
+
+      return toGsmSafe(
+        `ÉniEvent : ${partner || "le prestataire"} a répondu à votre avis. ` +
+          `À lire sur ${base}/compte/reservations`,
       );
     }
 
