@@ -20,10 +20,8 @@ import { getFilterOptions, getHomeSections } from "@/lib/listings";
 const HERO_IMAGE = "/images/hero-accueil.jpg";
 
 export default async function HomePage() {
-  const [{ cities, categoryGroups, amenities }, { families, bookableNow }] = await Promise.all([
-    getFilterOptions(),
-    getHomeSections(),
-  ]);
+  const [{ cities, categoryGroups, amenities }, { families, bookableNow, trusted }] =
+    await Promise.all([getFilterOptions(), getHomeSections()]);
 
   return (
     <main>
@@ -154,6 +152,49 @@ export default async function HomePage() {
                 <ListingCard key={listing.slug} listing={listing} />
               ))}
             </div>
+          </div>
+        </section>
+      ) : null}
+
+      {/* ------------------------------------------------------------------
+          Les valeurs sûres.
+          La place réservée depuis le lot de l'accueil, qui ne pouvait pas être
+          occupée faute d'avis. Elle l'est au même prix que « Réservez sans
+          attendre » : un **fait vérifiable ligne à ligne** — au moins trois
+          avis réellement déposés par des clients qui ont réservé et réglé.
+          Le seuil de trois est celui du classement : en dessous, une note
+          s'affiche sur la fiche mais ne met personne en avant.
+          Ni « les plus demandés », ni « coup de cœur », ni compteur de
+          favoris : ces mises en avant ne reposeraient sur rien, et la base
+          empêche d'ailleurs de calculer le dernier (`favorites_own`, 0042).
+          La section se vide d'elle-même, et elle est vide aujourd'hui —
+          c'est l'affichage correct, pas un trou à combler.
+         ------------------------------------------------------------------ */}
+      {trusted.length > 0 ? (
+        <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <p className="micro-label text-orange-600">Notés par leurs clients</p>
+              <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
+                Les valeurs sûres
+              </h2>
+              <p className="mt-2 max-w-xl text-slate-500">
+                Ces prestataires ont été notés par au moins trois clients qui ont réservé
+                et réglé chez eux. Personne d&apos;autre ne peut écrire un avis ici.
+              </p>
+            </div>
+            <Link href="/recherche?tri=note" className="hidden sm:block">
+              <Button variant="ghost" size="sm">
+                Tout voir
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+              </Button>
+            </Link>
+          </div>
+
+          <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {trusted.map((listing) => (
+              <ListingCard key={listing.slug} listing={listing} />
+            ))}
           </div>
         </section>
       ) : null}

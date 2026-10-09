@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import type { Database } from "@/types/database";
 
 import { PAGE_SIZE, pageRange, type SearchFilters } from "./search";
+import { RATING_RANK_MIN } from "./validation/review";
 
 /**
  * Accès au catalogue.
@@ -176,13 +177,23 @@ export async function searchListings(filters: SearchFilters): Promise<SearchOutc
       query = query.order("price_from", { ascending: false, nullsFirst: false });
       break;
     case "note":
-      query = query.order("rating_avg", { ascending: false, nullsFirst: false });
+      // ⚠️ `rating_sort`, pas `rating_avg` : la vue la rend **nulle en dessous
+      // de trois avis** (migration 0048), et `nullsFirst: false` range donc
+      // ces annonces après celles qui ont une note établie. Trier sur
+      // `rating_avg` mettrait en tête une annonce notée 5 par un unique
+      // client — son premier, ou son plus complaisant — devant une annonce à
+      // 4,8 sur cinquante avis.
+      query = query
+        .order("rating_sort", { ascending: false, nullsFirst: false })
+        .order("rating_count", { ascending: false, nullsFirst: false });
       break;
     default:
       // À défaut de moteur de pertinence, les mieux notées d'abord, puis les
       // plus récemment publiées : un ordre stable vaut mieux qu'un ordre subi.
+      // Même seuil que ci-dessus — c'est le tri par défaut, donc celui qui
+      // décide de la vitrine.
       query = query
-        .order("rating_avg", { ascending: false, nullsFirst: false })
+        .order("rating_sort", { ascending: false, nullsFirst: false })
         .order("published_at", { ascending: false, nullsFirst: false });
   }
 
@@ -387,16 +398,24 @@ export interface HomeFamily {
  *
  * `bookableNow` s'appuie sur un fait vérifiable — le partenaire accepte la
  * réservation immédiate et a ouvert des dates — et non sur une popularité
- * qu'aucune donnée ne soutient : il n'existe encore ni avis, ni note, ni
- * réservation.
+ * qu'aucune donnée ne soutient.
+ *
+ * `trusted` suit la même règle, et c'est à cette condition qu'elle existe :
+ * **au moins trois avis réels**, le même seuil que le classement
+ * (`RATING_RANK_MIN`). Pas de « les plus demandés », pas de « coup de cœur » :
+ * ces trois avis sont vérifiables ligne à ligne. La section se vide d'elle-même
+ * tant que personne n'a été noté trois fois — ce qui est le cas aujourd'hui, et
+ * c'est l'affichage correct, pas un bloc vide à combler.
  */
 export async function getHomeSections(limit = 6): Promise<{
   families: HomeFamily[];
   bookableNow: ListingSummary[];
+  trusted: ListingSummary[];
 }> {
   const supabase = await createClient();
 
-  const [{ data: categories }, { data: counts }, { data: bookable }] = await Promise.all([
+  const [{ data: categories }, { data: counts }, { data: bookable }, { data: notees }] =
+    await Promise.all([
     supabase
       .from("categories")
       .select("id, slug, name, kind, parent_id")
@@ -408,11 +427,23 @@ export async function getHomeSections(limit = 6): Promise<{
       .select(CARD_COLUMNS)
       .eq("status", "approved")
       .eq("is_paused", false)
-      // Le plus de dates ouvertes d'abord : c'est le partenaire chez qui le
-      // client a le plus de chances de trouver la sienne.
-      .order("dates_ouvertes", { ascending: false })
-      .limit(limit),
-  ]);
+        // Le plus de dates ouvertes d'abord : c'est le partenaire chez qui le
+        // client a le plus de chances de trouver la sienne.
+        .order("dates_ouvertes", { ascending: false })
+        .limit(limit),
+      supabase
+        .from("listing_search")
+        .select(CARD_COLUMNS)
+        .eq("status", "approved")
+        .eq("is_paused", false)
+        // Le seuil est ici **et** dans la vue : `rating_sort` suffirait à
+        // trier, mais il faut aussi exclure les annonces sous le seuil de la
+        // liste, pas seulement les reléguer à la fin.
+        .gte("rating_count", RATING_RANK_MIN)
+        .order("rating_avg", { ascending: false, nullsFirst: false })
+        .order("rating_count", { ascending: false, nullsFirst: false })
+        .limit(limit),
+    ]);
 
   const rows = categories ?? [];
   const parLieu = new Map((counts ?? []).map((c) => [c.category_slug, Number(c.listings ?? 0)]));
@@ -446,5 +477,9 @@ export async function getHomeSections(limit = 6): Promise<{
 
   // Même conversion que `searchListings` : la liste de colonnes est construite
   // à l'exécution, le typage généré ne peut donc pas la rapprocher de la vue.
-  return { families, bookableNow: (bookable ?? []) as unknown as ListingSummary[] };
+  return {
+    families,
+    bookableNow: (bookable ?? []) as unknown as ListingSummary[],
+    trusted: (notees ?? []) as unknown as ListingSummary[],
+  };
 }

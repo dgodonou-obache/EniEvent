@@ -15,8 +15,11 @@ import { galleryPhotos } from "@/lib/media";
 import { DEFAULT_CURRENCY, format, money, type CurrencyCode } from "@/lib/money";
 import type { ListingDetail as Listing, ListingSummary } from "@/lib/listings";
 import type { AvailabilityRow } from "@/lib/pricing";
+import type { ReviewView } from "@/lib/reviews";
 
 import { AskQuestionButton } from "@/components/messaging/AskQuestionButton";
+import { RatingStars, formatRating } from "@/components/reviews/RatingStars";
+import { ReviewList } from "@/components/reviews/ReviewList";
 
 import { BookingBox } from "./BookingBox";
 import { FavoriteButton } from "./FavoriteButton";
@@ -27,6 +30,8 @@ interface ListingDetailProps {
   listing: Listing;
   availabilities: AvailabilityRow[];
   similar: ListingSummary[];
+  /** Avis publiés de cette annonce, les plus récents d'abord. */
+  reviews: ReviewView[];
   /** Vrai si le visiteur a déjà mis cette annonce de côté. */
   isFavorite: boolean;
   /** Faux pour un visiteur non connecté : le cœur devient alors un lien de connexion. */
@@ -37,6 +42,7 @@ export function ListingDetail({
   listing,
   availabilities,
   similar,
+  reviews,
   isFavorite,
   signedIn,
 }: ListingDetailProps) {
@@ -45,6 +51,13 @@ export function ListingDetail({
   const service = listing.service_details;
   const org = listing.organizations;
   const policy = listing.cancellation_policies;
+
+  // `getListingBySlug` ramène le profil partenaire par un alias imbriqué
+  // (`partner_profiles:organizations(partner_profiles(…))`) : d'où ces deux
+  // niveaux. Nul pour une organisation qui n'a pas encore de profil.
+  const profil = listing.partner_profiles?.partner_profiles ?? null;
+  const partnerRating = profil?.rating_avg ?? null;
+  const partnerCount = profil?.rating_count ?? null;
 
   const dayRule = listing.pricing_rules?.find((r) => r.unit === "day") ?? null;
   const mainRule = dayRule ?? listing.pricing_rules?.[0] ?? null;
@@ -91,9 +104,17 @@ export function ListingDetail({
             {listing.district ? `${listing.district}, ${listing.city}` : listing.city}
           </span>
           {listing.rating_avg != null && (listing.rating_count ?? 0) > 0 ? (
-            <span>
-              ★ {Number(listing.rating_avg).toFixed(1)} ({listing.rating_count} avis)
-            </span>
+            // Un lien d'ancre, pas un simple chiffre : quelqu'un qui lit une
+            // note cherche à savoir ce qui la compose.
+            <a href="#avis" className="flex items-center gap-1.5 hover:text-orange-600">
+              <RatingStars rating={listing.rating_avg} size="sm" />
+              <span className="font-bold text-slate-900">
+                {formatRating(listing.rating_avg)}
+              </span>
+              <span className="text-sm underline decoration-slate-300 underline-offset-2">
+                {listing.rating_count} avis
+              </span>
+            </a>
           ) : (
             <span className="text-sm">Pas encore d&apos;avis</span>
           )}
@@ -230,10 +251,29 @@ export function ListingDetail({
                     <BadgeCheck className="h-4 w-4 text-teal-600" aria-hidden />
                   </p>
                   <p className="mt-0.5 text-sm text-slate-500">{org.city}</p>
+
+                  {/* La note du **prestataire**, distincte de celle de cette
+                      annonce : elle agrège toutes ses prestations, y compris
+                      celles passées par devis, qui ne visent aucune fiche. */}
+                  {partnerRating != null && (partnerCount ?? 0) > 0 ? (
+                    <p className="mt-2 flex items-center gap-1.5 text-sm text-slate-500">
+                      <RatingStars rating={partnerRating} size="sm" />
+                      <span className="font-bold text-slate-900">
+                        {formatRating(partnerRating)}
+                      </span>
+                      <span>sur {partnerCount} prestations notées</span>
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </section>
           ) : null}
+
+          <ReviewList
+            reviews={reviews}
+            ratingAvg={listing.rating_avg}
+            ratingCount={listing.rating_count}
+          />
         </div>
 
         <aside className="lg:sticky lg:top-24 lg:self-start">
