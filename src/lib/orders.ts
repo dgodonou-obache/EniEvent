@@ -1,6 +1,6 @@
 import "server-only";
 
-import { canCancel } from "@/lib/cancellation";
+import { canCancel, canReview } from "@/lib/cancellation";
 import { splitPayment } from "@/lib/fees";
 import { money, type CurrencyCode } from "@/lib/money";
 import { createClient } from "@/utils/supabase/server";
@@ -86,6 +86,11 @@ export interface OrderView {
    * bouton que la base refusera ensuite fait passer un produit pour cassé.
    */
   cancellable: boolean;
+  /**
+   * Notable aujourd'hui. Double de `app.guard_review_eligibility` : proposer
+   * un formulaire que la base refusera fait passer un produit pour cassé.
+   */
+  reviewable: boolean;
 }
 
 function toView(
@@ -148,6 +153,11 @@ function toView(
     cancellable: canCancel({
       status: order.status,
       eventEnd: order.end_date ?? order.event_date,
+    }).ok,
+    reviewable: canReview({
+      status: order.status,
+      eventEnd: order.end_date ?? order.event_date,
+      paidAmount,
     }).ok,
   };
 }

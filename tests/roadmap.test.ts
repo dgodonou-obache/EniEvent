@@ -51,10 +51,14 @@ describe("attribution des lots", () => {
     expect(lotFor("/admin/reservations")).toMatch(/Lot B/);
   });
 
-  it("range les avis et les litiges au lot de la confiance", () => {
-    expect(lotFor("/pro/avis")).toMatch(/Lot A/);
-    expect(lotFor("/admin/avis")).toMatch(/Lot A/);
+  it("range ce qui reste du lot de la confiance au bon lot", () => {
+    // ⚠️ **Cette table ne nomme que des lots à venir.** `/pro/avis` et
+    // `/admin/avis` sont livrés : les y laisser ferait annoncer « arrive au
+    // lot A » sur un écran qui existe, c'est-à-dire exactement le défaut que
+    // le garde-fou suivant interdit. Seuls les litiges et les signalements
+    // restent.
     expect(lotFor("/admin/litiges")).toMatch(/Lot A/);
+    expect(lotFor("/admin/signalements")).toMatch(/Lot A/);
   });
 
   /**

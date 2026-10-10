@@ -6,11 +6,14 @@ import { OrderPayment } from "@/components/account/OrderPayment";
 import { OrderRow } from "@/components/money/OrderRow";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ReviewForm } from "@/components/reviews/ReviewForm";
 import { requireUser } from "@/lib/auth/session";
+import { daysUntil } from "@/lib/cancellation";
 import type { CurrencyCode } from "@/lib/money";
 import { getMyOrders } from "@/lib/orders";
 import { paymentProvider } from "@/lib/payments/fedapay";
 import { previewCancellation, type CancellationPreview } from "@/lib/refunds";
+import { getMyReviewsByOrder } from "@/lib/reviews";
 
 /**
  * Réservations du client.
@@ -19,6 +22,12 @@ import { previewCancellation, type CancellationPreview } from "@/lib/refunds";
  * qu'il me reste à payer**, et **puis-je encore annuler ?** Les réservations
  * qui attendent un règlement passent donc devant, avec de quoi régler **sur
  * place** : une réservation immédiate n'a pas de projet où renvoyer le client.
+ *
+ * Un quatrième groupe, « Passées », porte le dépôt d'avis. Il est à part et non
+ * fondu dans « À venir » : une prestation terminée et une réservation future
+ * n'appellent pas la même chose, et un formulaire d'avis glissé au milieu de
+ * dates à venir n'aurait aucun sens. Le découpage est **calendaire**, comme en
+ * base — aucun état de commande ne dit qu'une prestation a eu lieu.
  *
  * La retenue en cas d'annulation est calculée **ici, avant l'affichage** : la
  * découvrir après avoir cliqué se lirait comme un prélèvement abusif.
@@ -38,7 +47,25 @@ export default async function AccountBookingsPage() {
   // Ce qui attend un règlement d'abord : c'est la seule chose qui demande une
   // action. Le reste est une archive.
   const aRegler = vivantes.filter((o) => o.next !== null);
-  const confirmees = vivantes.filter((o) => o.next === null);
+  const reglees = vivantes.filter((o) => o.next === null);
+
+  // ⚠️ **« Passées » est un groupe à part, et pas une nuance d'affichage.**
+  // Une prestation terminée et une réservation à venir n'appellent pas du tout
+  // la même chose : l'une se prépare, l'autre se raconte. Sans cette
+  // séparation, le formulaire d'avis se serait glissé au milieu de
+  // réservations futures, où il n'a aucun sens.
+  //
+  // Le découpage est **calendaire**, comme en base : aucun état de commande ne
+  // dit qu'une prestation a eu lieu.
+  const passees = reglees.filter((o) => {
+    const jours = daysUntil(o.endDate ?? o.eventDate);
+    return jours !== null && jours < 0;
+  });
+  const confirmees = reglees.filter((o) => !passees.includes(o));
+
+  // Les avis déjà déposés, en une requête : afficher « Donner mon avis » sur
+  // une réservation déjà notée se termine par une erreur de clé dupliquée.
+  const avis = await getMyReviewsByOrder(passees.map((o) => o.id));
 
   // Une seule salve, et seulement pour ce qui est encore annulable : calculer
   // un barème sur une réservation passée serait du travail pour rien.
@@ -102,7 +129,7 @@ export default async function AccountBookingsPage() {
 
           {confirmees.length > 0 ? (
             <section>
-              <h2 className="mb-3 text-lg font-bold text-slate-900">Confirmées</h2>
+              <h2 className="mb-3 text-lg font-bold text-slate-900">À venir</h2>
               <ul className="space-y-3">
                 {confirmees.map((order) => (
                   <li key={order.id}>
@@ -113,6 +140,30 @@ export default async function AccountBookingsPage() {
                         currency={order.currency as CurrencyCode}
                         preview={apercus.get(order.id) ?? null}
                         perspective="client"
+                      />
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          {passees.length > 0 ? (
+            <section>
+              <h2 className="mb-1 text-lg font-bold text-slate-900">Passées</h2>
+              <p className="mb-3 text-sm text-slate-500">
+                Votre avis aide les prochains clients à choisir — et le prestataire à
+                s&apos;améliorer. Seul quelqu&apos;un qui a réservé et réglé peut en écrire un.
+              </p>
+              <ul className="space-y-3">
+                {passees.map((order) => (
+                  <li key={order.id}>
+                    <OrderRow order={order} perspective="client" />
+                    {order.reviewable ? (
+                      <ReviewForm
+                        orderId={order.id}
+                        existing={avis.get(order.id) ?? null}
+                        listingTitle={order.listingTitle ?? order.partnerName}
                       />
                     ) : null}
                   </li>

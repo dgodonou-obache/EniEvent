@@ -153,6 +153,62 @@ export function canCancel(
 }
 
 /**
+ * Une prestation est-elle notable ?
+ *
+ * Double de `app.guard_review_eligibility` (migration 0048), pour la même
+ * raison que `canCancel` : proposer un formulaire que la base refusera ensuite
+ * fait passer un produit pour cassé. Les trois conditions sont celles du
+ * déclencheur, dans le même ordre, et le message dit **quand** ce sera
+ * possible plutôt que « non ».
+ *
+ * ⚠️ `order_status` ne dit nulle part qu'une prestation a eu lieu : la seule
+ * notion de passé est calendaire. Une commande sans aucune date n'est donc
+ * jamais notable — la base le refuse aussi, et pour la même raison.
+ */
+export type ReviewRefusal = "annulee" | "impayee" | "a-venir" | "sans-date";
+
+export function canReview(
+  order: { status: string; eventEnd: string | null; paidAmount: number },
+  on: Date = new Date(),
+): { ok: true } | { ok: false; reason: ReviewRefusal; message: string } {
+  if (order.status === "cancelled" || order.status === "refunded") {
+    return {
+      ok: false,
+      reason: "annulee",
+      message: "Cette réservation a été annulée : la prestation n'a pas eu lieu.",
+    };
+  }
+
+  if (order.paidAmount <= 0) {
+    return {
+      ok: false,
+      reason: "impayee",
+      message: "Vous pourrez donner votre avis une fois votre règlement encaissé.",
+    };
+  }
+
+  const restant = daysUntil(order.eventEnd, on);
+
+  if (restant === null) {
+    return {
+      ok: false,
+      reason: "sans-date",
+      message: "Cette réservation n'a pas encore de date : son avis n'est pas ouvert.",
+    };
+  }
+
+  if (restant >= 0) {
+    return {
+      ok: false,
+      reason: "a-venir",
+      message: "Votre avis sera possible dès le lendemain de la prestation.",
+    };
+  }
+
+  return { ok: true };
+}
+
+/**
  * Formulation destinée au client, avant confirmation.
  *
  * Règle du projet : pas de jargon, et pas de mauvaise surprise au moment de

@@ -23,7 +23,7 @@ export { NAV_BY_SPACE, type Space };
 /** Lot livrant chaque préfixe de route. Du plus spécifique au plus général. */
 const LOT_BY_PREFIX: { prefix: string; lot: string }[] = [
   // — Espace partenaire —
-  { prefix: "/pro/avis", lot: "Lot A — Confiance" },
+  // `/pro/avis` est livré (lot A).
   { prefix: "/pro/finances/factures", lot: "Lot B — Facturation" },
   { prefix: "/pro/finances/commissions", lot: "Lot B — Facturation" },
   { prefix: "/pro/promotions", lot: "Lot D — Confort" },
@@ -40,7 +40,7 @@ const LOT_BY_PREFIX: { prefix: string; lot: string }[] = [
   // — Back-office —
   // Le lot C a livré comptes, référentiel, journal, rapports et interrupteurs.
   // Ce qui reste ici ne relève plus de l'administration des comptes.
-  { prefix: "/admin/avis", lot: "Lot A — Confiance" },
+  // `/admin/avis` est livré (lot A).
   { prefix: "/admin/litiges", lot: "Lot A — Confiance" },
   { prefix: "/admin/signalements", lot: "Lot A — Confiance" },
   { prefix: "/admin/reservations", lot: "Lot B — Facturation" },

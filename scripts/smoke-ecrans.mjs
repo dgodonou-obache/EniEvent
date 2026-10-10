@@ -87,6 +87,7 @@ const PARCOURS = [
       "/pro/demandes",
       "/pro/devis",
       "/pro/reservations",
+      "/pro/avis",
       "/pro/finances/revenus",
       "/pro/finances/versements",
       "/pro/statistiques",
@@ -117,6 +118,7 @@ const PARCOURS = [
     routes: [
       "/admin",
       "/admin/moderation",
+      "/admin/avis",
       "/admin/demandes",
       "/admin/demandes?etat=open",
       "/admin/demandes?etat=awarded",
