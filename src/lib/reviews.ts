@@ -172,3 +172,144 @@ export async function getAdminReviews(
     orderReference: row.order_reference,
   }));
 }
+
+// -----------------------------------------------------------------------------
+// Signalements et litiges (migration 0049)
+// -----------------------------------------------------------------------------
+
+export interface AdminReport {
+  id: string;
+  reference: string;
+  createdAt: string;
+  targetType: "review" | "listing";
+  reason: string;
+  status: "open" | "upheld" | "dismissed";
+  resolution: string | null;
+  reviewId: string | null;
+  reviewRating: number | null;
+  reviewBody: string | null;
+  reviewAuthor: string | null;
+  reviewHiddenAt: string | null;
+  listingId: string | null;
+  listingTitle: string | null;
+  orgName: string | null;
+  reporterLabel: string;
+  /**
+   * Le signaleur appartient-il à l'organisation visée ?
+   *
+   * C'est ce qui a provoqué — ou non — le retrait automatique de l'avis. Sans
+   * cette information à l'écran, un administrateur ne comprendrait pas pourquoi
+   * un avis signalé est encore en ligne et un autre non.
+   */
+  reporterIsParty: boolean;
+}
+
+/** Signalements, pour `/admin/signalements`. */
+export async function getAdminReports(
+  etat: "ouverts" | "traites" | "tous" = "ouverts",
+): Promise<AdminReport[]> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.rpc("admin_reports", { etat });
+
+  if (error) throw new Error(`Signalements illisibles : ${error.message}`);
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    reference: row.reference,
+    createdAt: row.created_at,
+    targetType: row.target_type,
+    reason: row.reason,
+    status: row.status,
+    resolution: row.resolution,
+    reviewId: row.review_id,
+    reviewRating: row.review_rating,
+    reviewBody: row.review_body,
+    reviewAuthor: row.review_author,
+    reviewHiddenAt: row.review_hidden_at,
+    listingId: row.listing_id,
+    listingTitle: row.listing_title,
+    orgName: row.org_name,
+    reporterLabel: row.reporter_label,
+    reporterIsParty: row.reporter_is_party ?? false,
+  }));
+}
+
+export interface AdminDispute {
+  id: string;
+  reference: string;
+  createdAt: string;
+  side: "client" | "partner";
+  reason: string;
+  status: "open" | "under_review" | "resolved_refund" | "resolved_partner" | "withdrawn";
+  resolution: string | null;
+  refundId: string | null;
+  refundReference: string | null;
+  refundAmount: number | null;
+  orderId: string;
+  orderReference: string;
+  orderTotal: number;
+  orderCurrency: string;
+  orderStatus: string;
+  /** Somme réellement encaissée : c'est elle qui est en jeu, pas le total. */
+  paidAmount: number;
+  eventDate: string | null;
+  listingTitle: string | null;
+  orgId: string;
+  orgName: string;
+  clientLabel: string;
+}
+
+/** Litiges, pour `/admin/litiges`. */
+export async function getAdminDisputes(
+  etat: "ouverts" | "clos" | "tous" = "ouverts",
+): Promise<AdminDispute[]> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.rpc("admin_disputes", { etat });
+
+  if (error) throw new Error(`Litiges illisibles : ${error.message}`);
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    reference: row.reference,
+    createdAt: row.created_at,
+    side: row.side as "client" | "partner",
+    reason: row.reason,
+    status: row.status,
+    resolution: row.resolution,
+    refundId: row.refund_id,
+    refundReference: row.refund_reference,
+    refundAmount: row.refund_amount,
+    orderId: row.order_id,
+    orderReference: row.order_reference,
+    orderTotal: row.order_total,
+    orderCurrency: row.order_currency,
+    orderStatus: row.order_status,
+    paidAmount: row.paid_amount,
+    eventDate: row.event_date,
+    listingTitle: row.listing_title,
+    orgId: row.org_id,
+    orgName: row.org_name,
+    clientLabel: row.client_label,
+  }));
+}
+
+/** Les litiges d'une commande, tels que la RLS les laisse voir à l'appelant. */
+export async function getOrderDisputes(orderIds: string[]) {
+  if (orderIds.length === 0) return new Map<string, { id: string; reference: string; status: string; side: string }>();
+
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("disputes")
+    .select("id, reference, status, side, order_id")
+    .in("order_id", orderIds);
+
+  return new Map(
+    (data ?? []).map((row) => [
+      row.order_id,
+      { id: row.id, reference: row.reference, status: row.status, side: row.side },
+    ]),
+  );
+}

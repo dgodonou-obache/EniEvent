@@ -40,9 +40,7 @@ const LOT_BY_PREFIX: { prefix: string; lot: string }[] = [
   // — Back-office —
   // Le lot C a livré comptes, référentiel, journal, rapports et interrupteurs.
   // Ce qui reste ici ne relève plus de l'administration des comptes.
-  // `/admin/avis` est livré (lot A).
-  { prefix: "/admin/litiges", lot: "Lot A — Confiance" },
-  { prefix: "/admin/signalements", lot: "Lot A — Confiance" },
+  // Le lot A est intégralement livré : avis, signalements, litiges.
   { prefix: "/admin/reservations", lot: "Lot B — Facturation" },
   { prefix: "/admin/commissions", lot: "Lot B — Facturation" },
   { prefix: "/admin/cms", lot: "Lot E — Éditorial & SEO" },

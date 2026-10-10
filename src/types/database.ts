@@ -612,6 +612,83 @@ export type Database = {
           },
         ]
       }
+      disputes: {
+        Row: {
+          created_at: string
+          id: string
+          opened_by: string
+          order_id: string
+          reason: string
+          reference: string
+          refund_id: string | null
+          resolution: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          side: string
+          status: Database["public"]["Enums"]["dispute_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          opened_by: string
+          order_id: string
+          reason: string
+          reference?: string
+          refund_id?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          side: string
+          status?: Database["public"]["Enums"]["dispute_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          opened_by?: string
+          order_id?: string
+          reason?: string
+          reference?: string
+          refund_id?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          side?: string
+          status?: Database["public"]["Enums"]["dispute_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "disputes_opened_by_fkey"
+            columns: ["opened_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "disputes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "disputes_refund_id_fkey"
+            columns: ["refund_id"]
+            isOneToOne: false
+            referencedRelation: "refunds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "disputes_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       favorites: {
         Row: {
           created_at: string
@@ -2367,6 +2444,94 @@ export type Database = {
           },
         ]
       }
+      reports: {
+        Row: {
+          created_at: string
+          id: string
+          listing_id: string | null
+          reason: string
+          reference: string
+          reporter_id: string
+          resolution: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          review_id: string | null
+          status: Database["public"]["Enums"]["report_status"]
+          target_type: Database["public"]["Enums"]["report_target"]
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          listing_id?: string | null
+          reason: string
+          reference?: string
+          reporter_id: string
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          review_id?: string | null
+          status?: Database["public"]["Enums"]["report_status"]
+          target_type: Database["public"]["Enums"]["report_target"]
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          listing_id?: string | null
+          reason?: string
+          reference?: string
+          reporter_id?: string
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          review_id?: string | null
+          status?: Database["public"]["Enums"]["report_status"]
+          target_type?: Database["public"]["Enums"]["report_target"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listing_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings_bookable_now"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reviews: {
         Row: {
           author_id: string
@@ -2877,6 +3042,54 @@ export type Database = {
           status: Database["public"]["Enums"]["org_status"]
         }[]
       }
+      admin_disputes: {
+        Args: { etat?: string }
+        Returns: {
+          client_label: string
+          created_at: string
+          event_date: string
+          id: string
+          listing_title: string
+          order_currency: string
+          order_id: string
+          order_reference: string
+          order_status: Database["public"]["Enums"]["order_status"]
+          order_total: number
+          org_id: string
+          org_name: string
+          paid_amount: number
+          reason: string
+          reference: string
+          refund_amount: number
+          refund_id: string
+          refund_reference: string
+          resolution: string
+          side: string
+          status: Database["public"]["Enums"]["dispute_status"]
+        }[]
+      }
+      admin_reports: {
+        Args: { etat?: string }
+        Returns: {
+          created_at: string
+          id: string
+          listing_id: string
+          listing_title: string
+          org_name: string
+          reason: string
+          reference: string
+          reporter_is_party: boolean
+          reporter_label: string
+          resolution: string
+          review_author: string
+          review_body: string
+          review_hidden_at: string
+          review_id: string
+          review_rating: number
+          status: Database["public"]["Enums"]["report_status"]
+          target_type: Database["public"]["Enums"]["report_target"]
+        }[]
+      }
       admin_reviews: {
         Args: { etat?: string }
         Returns: {
@@ -3207,6 +3420,18 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      open_dispute: {
+        Args: { commande: string; motif: string }
+        Returns: string
+      }
+      open_report: {
+        Args: {
+          cible: string
+          genre: Database["public"]["Enums"]["report_target"]
+          motif: string
+        }
+        Returns: string
+      }
       org_contact: {
         Args: { org: string }
         Returns: {
@@ -3260,6 +3485,23 @@ export type Database = {
         Returns: string
       }
       request_quote_approval: { Args: { target: string }; Returns: string }
+      resolve_dispute: {
+        Args: {
+          issue: Database["public"]["Enums"]["dispute_status"]
+          litige: string
+          note: string
+          remboursement?: string
+        }
+        Returns: undefined
+      }
+      resolve_report: {
+        Args: {
+          issue: Database["public"]["Enums"]["report_status"]
+          note?: string
+          signalement: string
+        }
+        Returns: undefined
+      }
       save_payment_schedule: {
         Args: { lignes: Json; org: string }
         Returns: {
@@ -3492,6 +3734,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      withdraw_dispute: {
+        Args: { litige: string; note?: string }
+        Returns: undefined
+      }
     }
     Enums: {
       account_type: "particulier" | "entreprise" | "partenaire" | "admin"
@@ -3501,6 +3747,12 @@ export type Database = {
       availability_status: "open" | "closed" | "booked"
       booking_mode: "instant" | "quote" | "both"
       category_kind: "venue" | "service"
+      dispute_status:
+        | "open"
+        | "under_review"
+        | "resolved_refund"
+        | "resolved_partner"
+        | "withdrawn"
       event_type:
         | "mariage"
         | "anniversaire"
@@ -3569,6 +3821,8 @@ export type Database = {
         | "withdrawn"
         | "expired"
       refund_status: "pending" | "sent" | "failed" | "cancelled"
+      report_status: "open" | "upheld" | "dismissed"
+      report_target: "review" | "listing"
       schedule_amount: "percent" | "fixed" | "balance"
       schedule_trigger: "booking" | "before_event"
     }
@@ -3717,6 +3971,13 @@ export const Constants = {
       availability_status: ["open", "closed", "booked"],
       booking_mode: ["instant", "quote", "both"],
       category_kind: ["venue", "service"],
+      dispute_status: [
+        "open",
+        "under_review",
+        "resolved_refund",
+        "resolved_partner",
+        "withdrawn",
+      ],
       event_type: [
         "mariage",
         "anniversaire",
@@ -3792,6 +4053,8 @@ export const Constants = {
         "expired",
       ],
       refund_status: ["pending", "sent", "failed", "cancelled"],
+      report_status: ["open", "upheld", "dismissed"],
+      report_target: ["review", "listing"],
       schedule_amount: ["percent", "fixed", "balance"],
       schedule_trigger: ["booking", "before_event"],
     },

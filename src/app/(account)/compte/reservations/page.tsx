@@ -6,6 +6,7 @@ import { OrderPayment } from "@/components/account/OrderPayment";
 import { OrderRow } from "@/components/money/OrderRow";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { DisputeBox } from "@/components/account/DisputeBox";
 import { ReviewForm } from "@/components/reviews/ReviewForm";
 import { requireUser } from "@/lib/auth/session";
 import { daysUntil } from "@/lib/cancellation";
@@ -13,7 +14,7 @@ import type { CurrencyCode } from "@/lib/money";
 import { getMyOrders } from "@/lib/orders";
 import { paymentProvider } from "@/lib/payments/fedapay";
 import { previewCancellation, type CancellationPreview } from "@/lib/refunds";
-import { getMyReviewsByOrder } from "@/lib/reviews";
+import { getMyReviewsByOrder, getOrderDisputes } from "@/lib/reviews";
 
 /**
  * Réservations du client.
@@ -65,7 +66,12 @@ export default async function AccountBookingsPage() {
 
   // Les avis déjà déposés, en une requête : afficher « Donner mon avis » sur
   // une réservation déjà notée se termine par une erreur de clé dupliquée.
-  const avis = await getMyReviewsByOrder(passees.map((o) => o.id));
+  // Les litiges de même — y compris ceux ouverts par le prestataire, que le
+  // client doit voir pour pouvoir y répondre.
+  const [avis, litiges] = await Promise.all([
+    getMyReviewsByOrder(passees.map((o) => o.id)),
+    getOrderDisputes(vivantes.map((o) => o.id)),
+  ]);
 
   // Une seule salve, et seulement pour ce qui est encore annulable : calculer
   // un barème sur une réservation passée serait du travail pour rien.
@@ -166,6 +172,14 @@ export default async function AccountBookingsPage() {
                         listingTitle={order.listingTitle ?? order.partnerName}
                       />
                     ) : null}
+                    {/* Le litige est à côté de l'avis, et non à sa place : un
+                        client mécontent commence par noter, et c'est seulement
+                        quand l'argent est en jeu qu'il conteste. */}
+                    <DisputeBox
+                      orderId={order.id}
+                      existing={litiges.get(order.id) ?? null}
+                      perspective="client"
+                    />
                   </li>
                 ))}
               </ul>

@@ -421,6 +421,89 @@ export function renderEmail(
       });
     }
 
+    case "report.new": {
+      // Le motif **voyage ici**, comme pour `support.new` et pour la même
+      // raison : le destinataire est l'équipe, qui a par ailleurs accès à la
+      // table. Le cacher obligerait à ouvrir le back-office pour savoir s'il
+      // faut s'y mettre tout de suite.
+      const genre = payload.genre === "listing" ? "une annonce" : "un avis";
+
+      return shell({
+        subject: `Signalement : ${genre}`,
+        preheader: "Un contenu vient d'être signalé.",
+        heading: `Un signalement sur ${genre}`,
+        intro:
+          payload.genre === "listing"
+            ? "Une annonce vient d'être signalée. Rien n'a été retiré automatiquement : " +
+              "une annonce validée reste en ligne jusqu'à votre décision."
+            : "Un avis vient d'être signalé. S'il l'a été par le prestataire concerné, " +
+              "il est déjà retiré du public en attendant votre examen — et il manque " +
+              "donc à sa note pendant ce temps.",
+        details: [
+          ["Référence", text(payload.reference)],
+          ["Motif invoqué", text(payload.reason)],
+        ],
+        cta: { label: "Examiner le signalement", href: `${base}/admin/signalements` },
+        outro:
+          "Un avis écarté devient définitivement intouchable par un nouveau signalement : " +
+          "tranchez-le une fois, proprement.",
+      });
+    }
+
+    case "dispute.opened": {
+      // ⚠️ Trois destinataires, trois lectures. Celui qui ouvre le litige ne
+      // reçoit rien : il le sait.
+      const pour = payload.pour;
+      const ref = text(payload.orderReference);
+      const partner = text(payload.partner);
+
+      if (pour === "equipe") {
+        return shell({
+          subject: `Litige ouvert sur ${ref || "une réservation"}`,
+          preheader: "Une réservation payée est contestée.",
+          heading: "Un litige vous attend",
+          intro:
+            "Une des deux parties conteste une réservation déjà réglée. Les deux " +
+            "versions comptent : la seconde n'a pas encore été écrite.",
+          details: [
+            ["Litige", text(payload.reference)],
+            ["Réservation", ref],
+            ["Prestataire", partner],
+          ],
+          cta: { label: "Arbitrer le litige", href: `${base}/admin/litiges` },
+        });
+      }
+
+      const partenaire = pour === "partner";
+
+      return shell({
+        subject: `La réservation ${ref || "en cours"} est contestée`,
+        preheader: "Votre version nous est nécessaire.",
+        heading: partenaire
+          ? "Un client conteste cette réservation"
+          : "Le prestataire conteste cette réservation",
+        intro: partenaire
+          ? "Un client a ouvert un litige sur une réservation qu'il a réglée. " +
+            "Nous n'avons entendu qu'une version : la vôtre compte autant. " +
+            "Répondez-nous avant que nous tranchions."
+          : "Le prestataire a ouvert un litige sur votre réservation. " +
+            "Nous n'avons entendu qu'une version : la vôtre compte autant. " +
+            "Répondez-nous avant que nous tranchions.",
+        details: [
+          ["Litige", text(payload.reference)],
+          ["Réservation", ref],
+          ["Prestataire", partner],
+        ],
+        cta: {
+          label: "Voir la réservation",
+          href: `${base}${partenaire ? "/pro" : "/compte"}/reservations`,
+        },
+        outro:
+          "Aucune somme ne bouge tant que nous n'avons pas tranché, et la décision " +
+          "vous sera écrite en clair.",
+      });
+    }
+
     default:
       return null;
   }

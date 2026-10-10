@@ -26,6 +26,8 @@ export const KINDS = [
   "support.new",
   "review.received",
   "review.replied",
+  "report.new",
+  "dispute.opened",
 ] as const;
 export type NotificationKind = (typeof KINDS)[number];
 
@@ -190,6 +192,38 @@ export function renderSms(
       return toGsmSafe(
         `ÉniEvent : ${partner || "le prestataire"} a répondu à votre avis. ` +
           `À lire sur ${base}/compte/reservations`,
+      );
+    }
+
+    case "report.new": {
+      // Destinataire : l'équipe. Le motif ne tient pas dans un segment, et
+      // c'est de toute façon à l'écran qu'on le lit pour trancher.
+      const genre = payload.genre === "listing" ? "une annonce" : "un avis";
+
+      return toGsmSafe(
+        `ÉniEvent : ${genre} vient d'être signalé. ` +
+          `À examiner sur ${base}/admin/signalements`,
+      );
+    }
+
+    case "dispute.opened": {
+      // ⚠️ Trois destinataires possibles, trois textes. Celui qui ouvre le
+      // litige le sait déjà : il n'est jamais destinataire.
+      const pour = payload.pour;
+      const ref = short(payload.orderReference, 20);
+
+      if (pour === "equipe") {
+        return toGsmSafe(
+          `ÉniEvent : litige ouvert sur ${ref}. À arbitrer sur ${base}/admin/litiges`,
+        );
+      }
+
+      return toGsmSafe(
+        pour === "partner"
+          ? `ÉniEvent : un client conteste la réservation ${ref}. ` +
+              `Donnez votre version sur ${base}/pro/reservations`
+          : `ÉniEvent : le prestataire conteste la réservation ${ref}. ` +
+              `Donnez votre version sur ${base}/compte/reservations`,
       );
     }
 

@@ -4,6 +4,7 @@ import type { ReviewView } from "@/lib/reviews";
 import { RATING_RANK_MIN } from "@/lib/validation/review";
 
 import { RatingStars, formatRating } from "./RatingStars";
+import { ReportButton } from "./ReportButton";
 
 /**
  * Les avis d'une annonce, sur sa fiche publique.
@@ -28,10 +29,13 @@ export function ReviewList({
   reviews,
   ratingAvg,
   ratingCount,
+  signedIn,
 }: {
   reviews: ReviewView[];
   ratingAvg: number | null;
   ratingCount: number | null;
+  /** Faux pour un visiteur : le signalement devient un lien de connexion. */
+  signedIn: boolean;
 }) {
   const nombre = ratingCount ?? 0;
 
@@ -110,6 +114,10 @@ export function ReviewList({
                 </p>
               </div>
             ) : null}
+
+            {/* Discret, sous l'avis : un bouton aussi visible que la note
+                serait pris pour un « je ne suis pas d'accord ». */}
+            <ReportButton genre="review" cible={avis.id} signedIn={signedIn} />
           </li>
         ))}
       </ul>

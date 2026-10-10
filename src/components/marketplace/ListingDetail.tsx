@@ -19,6 +19,7 @@ import type { ReviewView } from "@/lib/reviews";
 
 import { AskQuestionButton } from "@/components/messaging/AskQuestionButton";
 import { RatingStars, formatRating } from "@/components/reviews/RatingStars";
+import { ReportButton } from "@/components/reviews/ReportButton";
 import { ReviewList } from "@/components/reviews/ReviewList";
 
 import { BookingBox } from "./BookingBox";
@@ -273,6 +274,19 @@ export function ListingDetail({
             reviews={reviews}
             ratingAvg={listing.rating_avg}
             ratingCount={listing.rating_count}
+            signedIn={signedIn}
+          />
+
+          {/* Tout en bas de la fiche, et volontairement effacé : signaler une
+              annonce est un recours, pas une action courante. Contrairement à
+              un avis, elle n'est **jamais** retirée automatiquement — cela
+              couperait les réservations d'un partenaire sur la parole d'un
+              inconnu. */}
+          <ReportButton
+            genre="listing"
+            cible={listing.id}
+            signedIn={signedIn}
+            label="Signaler cette annonce"
           />
         </div>
 

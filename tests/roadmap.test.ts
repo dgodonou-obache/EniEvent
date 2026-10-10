@@ -51,14 +51,15 @@ describe("attribution des lots", () => {
     expect(lotFor("/admin/reservations")).toMatch(/Lot B/);
   });
 
-  it("range ce qui reste du lot de la confiance au bon lot", () => {
-    // ⚠️ **Cette table ne nomme que des lots à venir.** `/pro/avis` et
-    // `/admin/avis` sont livrés : les y laisser ferait annoncer « arrive au
-    // lot A » sur un écran qui existe, c'est-à-dire exactement le défaut que
-    // le garde-fou suivant interdit. Seuls les litiges et les signalements
-    // restent.
-    expect(lotFor("/admin/litiges")).toMatch(/Lot A/);
-    expect(lotFor("/admin/signalements")).toMatch(/Lot A/);
+  it("ne nomme plus le lot de la confiance, qui est livré", () => {
+    // ⚠️ **Cette table ne nomme que des lots à venir.** Les quatre écrans du
+    // lot A existent : les y laisser ferait annoncer « arrive au lot A » sur
+    // des pages qui s'affichent, c'est-à-dire exactement le défaut que le
+    // garde-fou suivant interdit. La table se vide à mesure des livraisons, et
+    // ce contrôle est ce qui l'y oblige.
+    for (const route of ["/pro/avis", "/admin/avis", "/admin/litiges", "/admin/signalements"]) {
+      expect(lotFor(route), route).not.toMatch(/Lot A/);
+    }
   });
 
   /**

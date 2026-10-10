@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CalendarCheck } from "lucide-react";
 
 import { CancelBooking } from "@/components/account/CancelBooking";
+import { DisputeBox } from "@/components/account/DisputeBox";
 import { OrderRow } from "@/components/money/OrderRow";
 import { StatTile } from "@/components/money/StatTile";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { requireSpace } from "@/lib/auth/session";
 import type { CurrencyCode } from "@/lib/money";
 import { getPartnerOrders } from "@/lib/orders";
+import { getOrderDisputes } from "@/lib/reviews";
 
 /**
  * Réservations reçues par un partenaire.
@@ -25,6 +27,11 @@ export default async function PartnerBookingsPage() {
   if (!decision.granted || !decision.org) return null;
 
   const orders = await getPartnerOrders(decision.org.orgId);
+
+  // Y compris les litiges ouverts par le client : le prestataire doit les voir
+  // pour pouvoir donner sa version. Ne lui montrer que les siens ferait de la
+  // notification le seul endroit où il apprend qu'on le met en cause.
+  const litiges = await getOrderDisputes(orders.map((o) => o.id));
   const devise = orders[0]?.currency ?? "XOF";
 
   const encours = orders.filter((o) => o.status === "pending_payment" || o.status === "deposit_paid");
@@ -92,6 +99,11 @@ export default async function PartnerBookingsPage() {
                     perspective="partner"
                   />
                 ) : null}
+                <DisputeBox
+                  orderId={order.id}
+                  existing={litiges.get(order.id) ?? null}
+                  perspective="partner"
+                />
               </li>
             ))}
           </ul>
