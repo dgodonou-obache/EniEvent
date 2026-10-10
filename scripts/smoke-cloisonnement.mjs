@@ -253,6 +253,33 @@ const SECRETES = [
   { table: "organizations", colonne: "phone", quoi: "téléphone du partenaire" },
   { table: "organizations", colonne: "billing_email", quoi: "adresse de facturation" },
   { table: "organization_invitations", colonne: "token", quoi: "jeton d'invitation" },
+  // Migration 0048 : un motif de modération cite souvent celui qui a signalé.
+  // Lecture par `admin_reviews()`, qui sait distinguer un administrateur d'un
+  // simple `authenticated` — ce qu'un droit de colonne ne peut pas.
+  { table: "reviews", colonne: "hidden_reason", quoi: "motif de retrait d'un avis" },
+];
+
+/**
+ * Colonnes qu'un compte connecté ne doit pas pouvoir **écrire**.
+ *
+ * ⚠️ Même raison d'être que ci-dessus, verbe différent — et c'est le défaut que
+ * la migration 0047 a dû refermer : `0003_catalogue.sql:597` accordait
+ * `insert, update, delete` sur treize tables d'un coup, dont `listings`, et un
+ * partenaire s'attribuait donc cinq étoiles en un appel. Un `update` refusé par
+ * un droit de colonne **lève** ; un `update` masqué par la RLS ne lève rien et
+ * touche zéro ligne. On distingue donc les deux.
+ */
+const INECRIVABLES = [
+  { table: "listings", cle: "id", colonne: "rating_avg", valeur: 4.99, quoi: "note d'une annonce" },
+  { table: "listings", cle: "id", colonne: "rating_count", valeur: 9997, quoi: "nombre d'avis" },
+  { table: "listings", cle: "id", colonne: "price_from", valeur: 7, quoi: "prix d'appel" },
+  {
+    table: "partner_profiles",
+    cle: "org_id",
+    colonne: "rating_avg",
+    valeur: 4.98,
+    quoi: "note d'un partenaire",
+  },
 ];
 
 /** Un visiteur, sans la moindre session : le lecteur le plus défavorisé. */
@@ -275,6 +302,41 @@ for (const { table, colonne, quoi } of SECRETES) {
   if (refus.length === COMPTES.length + 1) {
     console.log(`  ✓ ${`${table}.${colonne}`.padEnd(44)} refusé à tous — ${quoi}`);
   }
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n5. Les colonnes qu'on ne doit pas pouvoir écrire");
+
+for (const { table, cle, colonne, valeur, quoi } of INECRIVABLES) {
+  // ⚠️ **On ne se contente pas de `if (error)`.** Un refus de droit lève, mais
+  // un `update` que la RLS masque réussit en touchant zéro ligne : pour un
+  // compte client, toutes les annonces sont hors de portée, et l'absence
+  // d'erreur ne prouverait donc rien. La seule question qui tranche est
+  // **est-ce que la valeur a atterri quelque part**, posée avec la clé de
+  // service qui voit tout.
+  const compter = async () =>
+    (
+      await admin.client
+        .from(table)
+        .select(cle, { count: "exact", head: true })
+        .eq(colonne, valeur)
+    ).count ?? 0;
+
+  const avant = await compter();
+
+  for (const compte of COMPTES) {
+    const { client } = await session(compte.email);
+
+    // Sans filtre de ligne : si le droit de colonne existait, l'ordre porterait
+    // sur tout ce que la RLS laisse voir — c'est exactement le geste de la
+    // faille 0047.
+    await client.from(table).update({ [colonne]: valeur }).not(cle, "is", null);
+  }
+
+  const apres = await compter();
+
+  if (apres > avant) rate(`${table}.${colonne} a été écrite depuis un compte (${quoi})`);
+  else console.log(`  ✓ ${`${table}.${colonne}`.padEnd(44)} refusé à tous — ${quoi}`);
 }
 
 console.log("");

@@ -4,9 +4,8 @@ Ce qui est en ligne, ce qui reste, et dans quel ordre. **C'est le seul document 
 lire pour savoir quoi construire ensuite.** Les plans de `~/.claude/plans/`
 décrivent des lots déjà livrés et ne font plus foi.
 
-Dernière mise à jour : 10 octobre 2026, après l'audit de sécurité et le passage
-de FedaPay en argent réel. 754 tests verts, 46 migrations, production sur
-https://enievent.com.
+Dernière mise à jour : 10 octobre 2026, après le lot A — Confiance. 831 tests
+verts, 49 migrations, production sur https://enievent.com.
 
 > ⚠️ **Les paiements réels sont ouverts.** Tout ce qui suit s'écrit désormais
 > sur un produit qui encaisse. Voir §3.3 — le catalogue est encore fictif, et
@@ -35,25 +34,28 @@ chiffrer, encaisser et être versé ; l'administration voit passer l'argent.
 | Espace entreprise : budgets, validations, équipe | En ligne |
 | Back-office : comptes, référentiel, journal, rapports, interrupteurs | En ligne |
 | Partenaire : équipe, invitations, pièces justificatives, statistiques, support | En ligne |
+| Avis après prestation, notes, droit de réponse | En ligne |
+| Signalements de contenu, litiges sur réservation | En ligne |
 | Client : favoris et reçus de paiement | En ligne |
 | Suppression de compte, sous conditions (client, partenaire, entreprise) | En ligne |
 | Pages légales | En ligne, **à compléter** (§3) |
 
 ## 2. Le décompte des écrans
 
-61 entrées de menu, **46 construites, 15 en attente**. Chaque entrée non
+61 entrées de menu, **50 construites, 11 en attente**. Chaque entrée non
 construite affiche un écran nommant son lot, jamais un 404
 (`src/components/dashboard/roadmap.ts`).
 
 | Espace | Livrés | Reste |
 |---|---|---|
-| Partenaire — `/pro` | 14 / 18 | 4 |
+| Partenaire — `/pro` | 15 / 18 | 3 |
 | Entreprise — `/entreprise` | 9 / 12 | 3 |
-| Back-office — `/admin` | 15 / 23 | 8 |
+| Back-office — `/admin` | 18 / 23 | 5 |
 | Particulier — `/compte` | **8 / 8** | — |
 
-Le déséquilibre initial est résorbé : le back-office d'exploitation est en
-place, et ce qui reste relève des avis, de la facturation et du confort.
+Le déséquilibre initial est résorbé : le back-office d'exploitation et la
+confiance sont en place, et ce qui reste relève de la facturation, du confort et
+de l'éditorial.
 
 ---
 
@@ -163,29 +165,60 @@ de démonstration ainsi que les quatre comptes de démonstration, dont
 
 ---
 
-## 4. Les cinq lots restants
+## 4. Les quatre lots restants
 
 Lettrés, et non numérotés : les lots 1 à 8 du plan d'origine sont livrés ou
 dissous, et un écran annonçant « arrive au lot 2 » alors que le lot 2 est en
 production depuis des semaines dit au lecteur que le produit est à l'arrêt.
 `tests/roadmap.test.ts` interdit désormais le retour de l'ancienne numérotation.
 
-### Lot A — Confiance · 4 écrans
+### ~~Lot A — Confiance~~ · **livré** (migrations 0047, 0048 et 0049)
 
 `/pro/avis` · `/admin/avis` · `/admin/signalements` · `/admin/litiges`
 
-Avis et notes après prestation, modération de ces avis, traitement des litiges.
+Avis et notes après prestation, droit de réponse, signalements, litiges.
 
-**Pourquoi en premier.** C'est le seul lot qui manque à la **vitrine**, pas à
-l'exploitation. Aujourd'hui aucune annonce ne porte de note, et le dépôt
-s'interdit d'en fabriquer (`CLAUDE.md` §5) : un premier client n'a donc rien
-pour départager deux salles. C'est aussi ce qui fait revenir un partenaire —
-une note gagnée se défend.
+Ce qu'il a fallu trancher, et qui n'était pas évident :
 
-**Le piège à éviter.** Un avis n'est légitime que s'il suit une prestation
-réellement payée. Le lien se fait sur `orders`, pas sur un formulaire ouvert,
-sinon la première salle venue s'auto-note. Et la section « Les valeurs sûres »
-de l'accueil ne s'allume qu'une fois des notes réelles en base.
+- **Une faille d'écriture, refermée d'abord.** `0003_catalogue.sql:597` accordait
+  `insert, update, delete` sur treize tables d'un coup, dont `listings` :
+  combiné à `listings_update`, qui ouvre la ligne entière au propriétaire, un
+  partenaire écrivait sa propre note. Cela ne se voyait pas faute d'affichage —
+  mais le tri par défaut du catalogue est `rating_avg desc`, et ce lot allumait
+  l'affichage. La migration 0047 énumère les colonnes écrivables et en retire
+  les **cinq colonnes dérivées**. `partner_profiles` avait été protégé pour ces
+  colonnes exactement en 2021 ; `listings` porte les deux mêmes et avait été
+  oubliée.
+- **Rien dans les données ne dit qu'une prestation a eu lieu.** Aucun état de
+  commande ne signifie « réalisée », et on n'en a pas ajouté un que personne ne
+  marquerait — `acceptance_rate` a passé un an en colonne morte pour cette
+  raison. L'éligibilité se déduit de trois faits vérifiables — la commande est
+  celle de l'auteur, un règlement est encaissé, la dernière date est passée —
+  imposés par un déclencheur et non par la RLS, qui dit quelles lignes et jamais
+  à quelles conditions.
+- **Le premier avis déposé réordonnait tout le catalogue.** Le tri par défaut
+  étant `rating_avg desc`, un unique « 5 » battait une annonce notée 4,8 sur
+  cinquante avis. `listing_search.rating_sort` est donc nulle sous **trois
+  avis** : la note s'affiche sans classer, et l'écran le dit — une note visible
+  qui ne compte pas doit s'expliquer.
+- **La signature d'un avis ne vient pas de `profiles`**, qui n'est lisible que
+  par son propriétaire. Elle est calculée à l'écriture et stockée (« Clara G. »),
+  et un déclencheur la ramène à « Un client » dès qu'un compte est anonymisé.
+- **« Retrait immédiat sur signalement » est une arme**, bornée par trois
+  verrous : retrait réservé à une partie concernée, immunité d'un avis rétabli,
+  plafond de débit. Ce qui reste possible — faire masquer **une fois** chacun de
+  ses mauvais avis — est écrit dans `CLAUDE.md` §5 plutôt que prétendu résolu.
+  Une **annonce** signalée, elle, n'est jamais retirée automatiquement.
+- **Un litige ne déplace pas d'argent.** Il existe un chemin vers le
+  remboursement, `cancel_order`, qui applique le barème figé sur la commande ;
+  en ouvrir un second dans un lot sur la confiance aurait été le mauvais
+  endroit. On rattache le remboursement produit par l'annulation.
+
+⚠️ **Le lot est livré sans une seule donnée** : zéro prestation réalisée en
+production. C'était la raison de le faire maintenant — la plomberie doit exister
+avant les premières vraies réservations, sinon la première vague d'avis, la plus
+difficile à obtenir, se perd. `npm run smoke:avis` joue le parcours entier contre
+le vrai Supabase et nettoie derrière lui.
 
 ### Lot B — Facturation · 7 écrans
 
@@ -304,12 +337,10 @@ sur un produit qui doit d'abord savoir le servir.
    d'affaires : la chaîne technique, elle, encaisse.
 2. **Confirmer le secret du webhook live** par un événement de test (§3.4), et
    **mesurer `/payouts` et `/refunds`** (§3.2). Deux contrôles, zéro code.
-3. **Lot A — Confiance.** Le seul lot que le client voit, et il manque
-   précisément là où une place de marché se joue : départager deux prestataires.
-4. **Lot B — Facturation.** Débloque le tunnel entreprise, qui ne peut pas
+3. **Lot B — Facturation.** Débloque le tunnel entreprise, qui ne peut pas
    acheter sans pièce comptable.
-5. **Fin du lot D** — promotions et créneaux — puis **lot E**. (Le lot C et la
-   première tranche du lot D sont livrés.)
+4. **Fin du lot D** — promotions et créneaux — puis **lot E**. (Les lots A et C
+   et la première tranche du lot D sont livrés.)
 
 Les points 0 à 2 ne demandent pas une ligne de code — ou une seule — et aucun
 écran ne vaut plus qu'eux tant qu'ils tiennent.

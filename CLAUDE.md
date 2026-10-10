@@ -57,6 +57,7 @@ Mise en ligne, variables à poser, lecture des pannes : `docs/DEPLOIEMENT.md`.
 | `npm run smoke:paiement` | **Ouvre un vrai paiement** chez FedaPay — refuse de tourner sur une clé de production |
 | `npm run smoke:messagerie` | Ouvre un fil, écrit des deux côtés, vérifie le masquage — **seul endroit où se teste l'absence de droit direct** |
 | `npm run smoke:annulation` | Réserve, encaisse, annule et rembourse contre le vrai Supabase — nettoie derrière lui |
+| `npm run smoke:avis` | Dépose un avis, y répond, le signale, le rétablit, ouvre un litige — **seul endroit où se vérifient les droits de colonne de `reviews`** ; nettoie derrière lui |
 | `npm run smoke:cloisonnement` | Rejoue l'attaque du §4 : chaque compte contre chaque écran d'administration, **puis sans navigateur** |
 | `npm run smoke:ecrans` | Rend réellement chaque route avec une session — le seul contrôle qui attrape une erreur de sérialisation RSC |
 | `npm run admin:creer` | Crée un compte d'administration sur le vrai projet |
@@ -230,10 +231,31 @@ posé n'éteint pas une fonctionnalité qui marchait.
 - ⚠️ **Le contrôle d'une colonne refermée se fait en la demandant par son nom.** Une fois
   retirée du `grant`, elle ne sort plus d'un `select *` — un contrôle écrit ainsi passe au
   vert **pour la mauvaise raison**, et resterait vert si on la remettait. §4 de
-  `smoke:cloisonnement` interroge donc les cinq colonnes secrètes nommément
+  `smoke:cloisonnement` interroge donc les six colonnes secrètes nommément
   (`commission_rate_override`, `contact_phone`, `organizations.phone`, `billing_email`,
-  `token`), pour chaque profil **et** pour le visiteur. Ajouter une colonne sensible
-  demande d'ajouter sa ligne là.
+  `token`, `reviews.hidden_reason`), pour chaque profil **et** pour le visiteur. Ajouter
+  une colonne sensible demande d'ajouter sa ligne là.
+- ⚠️ **Le même piège existe au verbe `update`, et il y est pire.** `0003_catalogue.sql:597`
+  accordait `insert, update, delete` sur **treize tables d'un coup**, dont `listings`.
+  Combiné à `listings_update`, qui ouvre la ligne entière au propriétaire, un partenaire
+  écrivait sa propre note : `update listings set rating_avg = 5` passait, sans erreur et
+  sans trace. `partner_profiles` avait été protégé pour ces colonnes exactement par la
+  migration 0021 ; `listings` porte les deux mêmes et avait été oubliée. La migration 0047
+  énumère donc ses colonnes écrivables et en retire les **cinq colonnes dérivées** —
+  `rating_avg`, `rating_count`, `price_from`, `price_from_unit`, `published_at` — toutes
+  écrites par un déclencheur et par rien dans `src/`. **Une colonne qu'un déclencheur
+  calcule n'est jamais dans un `grant update`** : ce n'est pas une donnée de l'utilisateur,
+  c'est un jugement porté sur lui ou une dérivée de ses tarifs. §5 de
+  `smoke:cloisonnement` tente l'écriture depuis chaque compte et vérifie, **avec la clé de
+  service**, que la valeur n'a atterri nulle part — un `update` masqué par la RLS ne lève
+  rien et un `if (error)` seul ne prouverait donc rien.
+- ⚠️ **Un déclencheur qui écrit une colonne refermée doit pouvoir passer.**
+  `app.refresh_ratings` est `security definer` et ignore les droits de colonne, mais
+  **pas** le déclencheur de garde : `auth.uid()` ne change pas en entrant dans une
+  fonction `security definer`, il vaut toujours l'identifiant du client qui dépose son
+  avis. D'où `app.recalcul_en_cours()`, un drapeau de session (`set local app.recalcul`)
+  posé par le recalcul et par lui seul. Ne pas le remplacer par `app.is_admin()` : le
+  recalcul n'est pas une action d'administration.
 - ⚠️ **Aucune destination venue de l'URL ne se filtre à la main.** Tout passe par
   `safeInternalPath` (`src/lib/validation/redirect.ts`). Le contrôle
   `startsWith("/") && !startsWith("//")`, recopié dans **cinq** fichiers, se laissait
@@ -373,15 +395,64 @@ barrière devant quelqu'un qui n'ouvre pas de navigateur.
   « Non remboursable », pas « Annulation stricte » ; « Annulation gratuite jusqu'à 48 h
   avant », pas « Politique flexible ». Interface en français.
 - **Aucune preuve sociale fabriquée.** Ni note, ni avis, ni « les plus demandés » tant
-  que la donnée n'existe pas : il n'y a aujourd'hui aucun avis en base, et inventer un
-  classement tromperait le client autant que le partenaire arbitrairement désigné comme
-  meilleur. Une mise en avant se fonde sur un **fait vérifiable ligne à ligne** — la
-  section « Réservez sans attendre » de l'accueil s'appuie sur des dates réellement
-  ouvertes, et se vide d'elle-même si elles se referment.
+  que la donnée n'existe pas : inventer un classement tromperait le client autant que le
+  partenaire arbitrairement désigné comme meilleur. Une mise en avant se fonde sur un
+  **fait vérifiable ligne à ligne** — la section « Réservez sans attendre » de l'accueil
+  s'appuie sur des dates réellement ouvertes, et se vide d'elle-même si elles se
+  referment ; « Les valeurs sûres » exige **au moins trois avis réels** et est vide
+  aujourd'hui, ce qui est l'affichage correct et non un trou à combler.
   **Les favoris suivent la même règle, et la base la rend indiscutable** : aucun compteur
   « 42 personnes ont aimé » n'existe, et `favorites_own` (migration 0042) empêche
   l'agrégat d'être calculé, même par quelqu'un qui écrirait la requête exprès. Ne pas
   ajouter de fonction rendant un nombre de favoris par annonce.
+- ⚠️ **Un avis exige une prestation réellement rendue, et rien dans les données ne dit
+  qu'elle l'a été.** `order_status` ne connaît que `pending_payment`, `deposit_paid`,
+  `paid`, `cancelled`, `refunded` : aucun état ne signifie « réalisée », et **on n'en
+  ajoute pas un que personne ne marquerait** — `acceptance_rate` a passé un an en colonne
+  morte pour cette raison. L'éligibilité se déduit donc de trois faits vérifiables (la
+  commande est celle de l'auteur, un règlement est encaissé,
+  `coalesce(end_date, event_date)` est dépassée), imposés par
+  `app.guard_review_eligibility` — un **déclencheur**, parce que la RLS dit quelles lignes
+  et jamais à quelles conditions. `canReview` (`src/lib/cancellation.ts`) le double à
+  l'écran, comme `canCancel` : proposer un formulaire que la base refusera fait passer un
+  produit pour cassé.
+- ⚠️ **Une note ne pèse sur le classement qu'à partir de trois avis.** Le tri par défaut du
+  catalogue est `rating_avg desc` **depuis toujours** : au premier avis déposé, tout le
+  catalogue se réordonnait sur une seule opinion, et un unique « 5 » battait une annonce
+  notée 4,8 sur cinquante avis. `listing_search.rating_sort` est donc nulle sous le seuil,
+  et `nullsFirst: false` range ces annonces après celles qui ont une note établie. La note
+  **s'affiche** quand même, et l'écran dit qu'elle ne classe pas encore — une note visible
+  qui ne compte pas doit s'expliquer, sinon le partenaire croit à un défaut et le client à
+  une note truquée. `RATING_RANK_MIN` ne commande rien : c'est la vue qui tranche, et
+  `tests/reviews.test.ts` lit la migration pour vérifier qu'elles disent le même nombre.
+- ⚠️ **La signature d'un avis est calculée à l'écriture et stockée.** `profiles` n'est
+  lisible que par son propriétaire (`profiles_select_own`, 0002) et il n'est pas question
+  de l'ouvrir pour afficher un prénom : `reviews.author_label` porte « Clara G. », jamais
+  le nom complet. Elle survit donc à un changement de nom — et un déclencheur sur
+  `profiles.deleted_at` la ramène à « Un client » dès qu'un compte est anonymisé, sans
+  quoi quelqu'un qui a demandé à être oublié continuerait de signer.
+- ⚠️ **« Retrait immédiat sur signalement » est une arme, et trois bornes l'en empêchent.**
+  C'est une décision d'exploitation justifiée — un propos diffamatoire laissé trois jours
+  sur une fiche coûte des clients qu'aucune modération tardive ne rendra. Mais pris tel
+  quel, un partenaire effacerait chacun de ses mauvais avis et un concurrent éteindrait
+  les **bons** avis d'un rival. D'où, dans la migration 0049 : le retrait n'opère que pour
+  **une partie concernée** ; un avis **rétabli est immunisé** (`reviews.reinstated_at`),
+  ce qui ferme la boucle du resignalement perpétuel ; et un **plafond de débit** borne la
+  rafale. Ce qui reste possible est dit plutôt que prétendu résolu — un partenaire peut
+  faire masquer **une fois** chacun de ses mauvais avis, le temps de l'examen, et le coût
+  retombe sur lui. Une **annonce** signalée, elle, n'est jamais retirée automatiquement :
+  cela couperait les réservations d'un partenaire sur la parole d'un inconnu.
+- ⚠️ **Un litige ne déplace pas d'argent, et `resolve_dispute` n'en déplacera jamais.** Il
+  existe un chemin vers le remboursement — `cancel_order` — qui applique le barème figé
+  sur la commande et borne le rendu à l'encaissé (§1). En ouvrir un second serait un
+  second endroit où se tromper, et celui-là n'aurait ni barème ni plafond. Trancher en
+  faveur du client veut donc dire : annuler depuis `/admin/reservations`, puis **rattacher**
+  le remboursement produit, que la fonction vérifie comme portant bien sur cette commande.
+  Un litige exige par ailleurs un **règlement encaissé** : sans argent déplacé, le recours
+  est l'annulation ou le support, sinon `/admin/litiges` devient une seconde boîte de
+  réclamations. Et contrairement à un signalement — caché à sa cible, sans quoi plus
+  personne ne signalerait — un litige **se montre aux deux parties** : on ne demande pas à
+  quelqu'un de se défendre d'un reproche qu'il ne lit pas.
 - ⚠️ **« Pas encore de donnée » et « zéro » ne s'écrivent pas pareil.** Un taux
   d'acceptation à `0 %` se lit comme un jugement — « vous ne convertissez rien » — alors
   que le vrai message est qu'aucun devis n'a encore été tranché. Les statistiques
@@ -575,6 +646,18 @@ qui appelle une réponse doit déclencher une notification.**
   si le message précédent venait de l'autre partie : dix allers-retours font un seul
   courriel, et la réponse d'en face rouvre le droit d'alerter. Règle sans état, donc sans
   dérive. Ne pas la remplacer par un compteur de non-lus, plus fragile.
+- ⚠️ **Le texte d'un avis ne voyage pas non plus, et pour une autre raison.** Un avis est
+  public : ce n'est pas le secret qui l'en empêche, c'est qu'un partenaire qui lit « 2/5 »
+  et deux lignes d'extrait répond de mémoire, souvent mal — et il n'a droit qu'à **une**
+  réponse. `review.received` porte donc la note, l'annonce et un bouton, rien de plus. Un
+  signalement, lui, **transporte son motif** : son destinataire est l'équipe, qui a par
+  ailleurs accès à la table, et le cacher obligerait à ouvrir le back-office pour savoir
+  s'il faut s'y mettre tout de suite — même raisonnement que `support.new`.
+- ⚠️ **`dispute.opened` a trois destinataires et trois rédactions, et jamais celui qui
+  l'ouvre.** La charge utile porte `pour` (`client`, `partner` ou `equipe`) et tout le
+  texte en dépend : la partie mise en cause doit pouvoir donner sa version, et apprendre
+  par surprise qu'une décision a été prise sans elle serait le pire parcours possible.
+  Celui qui ouvre le litige, lui, le sait déjà.
 - Premux est isolé dans `src/lib/sms/premux.ts` — seul fichier du dépôt à le connaître.
   `X-Premux-Domain` attend **le domaine de la clé** (`enievent.com`), pas `premux.bj`
   comme le montre leur documentation.
