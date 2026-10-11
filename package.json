@@ -36,7 +36,8 @@
     "smoke:annulation": "node --env-file=.env.local scripts/smoke-annulation.mjs",
     "smoke:messagerie": "node --env-file=.env.local scripts/smoke-messagerie.mjs",
     "fedapay:verifier": "node --env-file=.env.local scripts/fedapay-preflight.mjs",
-    "smoke:avis": "node --env-file=.env.local scripts/smoke-avis.mjs"
+    "smoke:avis": "node --env-file=.env.local scripts/smoke-avis.mjs",
+    "smoke:inactivite": "node --env-file=.env.local scripts/smoke-inactivite.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

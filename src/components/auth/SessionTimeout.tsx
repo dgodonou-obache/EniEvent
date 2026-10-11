@@ -4,7 +4,6 @@ import * as React from "react";
 import { usePathname } from "next/navigation";
 import { Clock } from "lucide-react";
 
-import { signOut } from "@/app/auth/actions";
 import { Button } from "@/components/ui/button";
 import {
   REFRESH_AFTER_SECONDS,
@@ -58,7 +57,38 @@ export function SessionTimeout({ signInTo }: { signInTo?: string }) {
    * fois pour toutes et liraient sinon un état figé au premier rendu.
    */
   const avertit = React.useRef(false);
-  const formulaire = React.useRef<HTMLFormElement>(null);
+
+  /**
+   * Quitte l'espace, par **navigation** et non par Server Action.
+   *
+   * ⚠️ **C'est la correction d'un défaut mesuré.** La coupure passait par la
+   * Server Action `signOut` ; son POST était intercepté par le proxy, qui
+   * répondait un 307. Un 307 conserve la méthode : le navigateur rejouait le
+   * POST sur la page de connexion, qui ne connaît pas cette action, et Next
+   * affichait « This page couldn't load » — lu comme une panne d'ÉniEvent.
+   *
+   * Et le cas n'était pas rare : c'était le chemin **nominal**. Le proxy ne
+   * repose l'horodatage qu'une fois par minute, et ce composant n'appelle
+   * `/api/session` qu'une fois par minute : la référence du serveur est donc
+   * toujours un peu plus ancienne que la nôtre, et quand ce compte à rebours
+   * atteint zéro, le proxy a déjà coupé.
+   *
+   * `assign` et non `replace` : revenir en arrière doit ramener où l'on était,
+   * pas retenter une page devenue inaccessible.
+   */
+  const quitter = React.useCallback(() => {
+    if (!signInTo) return;
+    const suivant = encodeURIComponent(`${signInTo}?raison=inactivite`);
+
+    // ⚠️ **Un chargement de document, délibérément — pas `router.push`.** Le
+    // linter de Next suggère le routeur, mais sa prémisse ne tient pas ici : la
+    // cible est un **gestionnaire de route**, pas une page. Une navigation côté
+    // client n'y mènerait pas, et surtout elle ne laisserait pas le navigateur
+    // appliquer les `Set-Cookie` d'effacement ni suivre la redirection qui
+    // suit. C'est précisément ce détour par le client qu'on cherche à éviter.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.assign(`/auth/deconnexion?suivant=${suivant}`);
+  }, [signInTo]);
 
   const prolonger = React.useCallback(() => {
     const maintenant = Date.now();
@@ -102,7 +132,7 @@ export function SessionTimeout({ signInTo }: { signInTo?: string }) {
 
       if (reste <= 0) {
         avertit.current = true;
-        formulaire.current?.requestSubmit();
+        quitter();
         return;
       }
 
@@ -115,7 +145,7 @@ export function SessionTimeout({ signInTo }: { signInTo?: string }) {
     }, 1000);
 
     return () => clearInterval(battement);
-  }, [delai, pathname, signInTo]);
+  }, [delai, pathname, quitter, signInTo]);
 
   if (!signInTo) return null;
 
@@ -124,16 +154,6 @@ export function SessionTimeout({ signInTo }: { signInTo?: string }) {
 
   return (
     <>
-      {/*
-        La déconnexion passe par le même chemin que le bouton « Déconnexion » :
-        une Server Action, pas un appel depuis le navigateur. Le `?raison=`
-        fait afficher l'explication par `SignInNotice` à l'arrivée, sans quoi
-        la page de connexion ressemblerait à une panne.
-      */}
-      <form ref={formulaire} action={signOut.bind(null, `${signInTo}?raison=inactivite`)} hidden>
-        <button type="submit" tabIndex={-1} aria-hidden />
-      </form>
-
       {restant !== null ? (
         <div
           role="alertdialog"
@@ -167,7 +187,7 @@ export function SessionTimeout({ signInTo }: { signInTo?: string }) {
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => formulaire.current?.requestSubmit()}
+                onClick={quitter}
                 className="sm:flex-1"
               >
                 Se déconnecter

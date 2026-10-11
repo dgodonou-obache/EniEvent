@@ -1,21 +1,34 @@
+import { createClient } from "@/utils/supabase/server";
+
 /**
- * Prolonger la session après un geste réel de l'utilisateur.
+ * Prolonger la session après un geste réel, et dire si elle tient encore.
  *
- * **Cette route ne fait rien, et c'est voulu.** L'horodatage d'activité est
- * posé par le proxy, qui s'exécute avant tout gestionnaire : il suffit qu'une
- * requête passe pour que la session soit repoussée. Écrire la logique ici
- * l'aurait dupliquée — avec la garantie qu'elle finirait par diverger de celle
+ * **L'horodatage n'est pas posé ici, et c'est voulu.** C'est le proxy qui
+ * l'écrit, avant tout gestionnaire : il suffit qu'une requête passe pour que la
+ * session soit repoussée. Dupliquer la logique ici la ferait diverger de celle
  * du proxy, seule à faire autorité.
  *
- * Elle existe parce qu'une page lue sans être quittée n'émet aucune requête :
- * `SessionTimeout` appelle donc celle-ci, au plus une fois par minute, quand il
+ * Cette route existe parce qu'une page lue sans être quittée n'émet aucune
+ * requête : `SessionTimeout` l'appelle, au plus une fois par minute, quand il
  * constate une activité. Sans elle, remplir un long formulaire compterait pour
  * de l'inactivité.
  *
- * Aucune donnée, aucun corps de réponse : un `204` est la réponse complète.
- * Une session absente ou expirée n'est pas un cas d'erreur à traiter ici — le
- * proxy a déjà tranché avant d'arriver jusqu'ici.
+ * ⚠️ **Le code de retour, lui, porte une information** — et c'est nouveau. Il
+ * répondait 204 en toutes circonstances, y compris sur une session déjà
+ * coupée : personne ne pouvait donc distinguer « tout va bien » de « vous êtes
+ * déjà dehors ». `SessionExpiree` s'en sert pour savoir quoi écrire quand une
+ * action échoue — dire « votre session a expiré » sur une vraie panne serait
+ * un mensonge, et dire « une erreur est survenue » sur une session tombée
+ * envoie chercher un problème qui n'existe pas.
+ *
+ *   204  la session tient
+ *   401  il n'y en a plus
  */
 export async function POST() {
-  return new Response(null, { status: 204 });
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  return new Response(null, { status: user ? 204 : 401 });
 }

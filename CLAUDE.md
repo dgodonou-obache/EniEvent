@@ -58,6 +58,7 @@ Mise en ligne, variables à poser, lecture des pannes : `docs/DEPLOIEMENT.md`.
 | `npm run smoke:messagerie` | Ouvre un fil, écrit des deux côtés, vérifie le masquage — **seul endroit où se teste l'absence de droit direct** |
 | `npm run smoke:annulation` | Réserve, encaisse, annule et rembourse contre le vrai Supabase — nettoie derrière lui |
 | `npm run smoke:avis` | Dépose un avis, y répond, le signale, le rétablit, ouvre un litige — **seul endroit où se vérifient les droits de colonne de `reviews`** ; nettoie derrière lui |
+| `npm run smoke:inactivite` | Rejoue la déconnexion par inactivité dans les cinq espaces, horodatage expiré forgé — **le seul contrôle qui attrape une Server Action rompue par le proxy** |
 | `npm run smoke:cloisonnement` | Rejoue l'attaque du §4 : chaque compte contre chaque écran d'administration, **puis sans navigateur** |
 | `npm run smoke:ecrans` | Rend réellement chaque route avec une session — le seul contrôle qui attrape une erreur de sérialisation RSC |
 | `npm run admin:creer` | Crée un compte d'administration sur le vrai projet |
@@ -358,6 +359,31 @@ posé n'éteint pas une fonctionnalité qui marchait.
   écran n'est **pas** l'autorité : le proxy décide seul, l'avertissement est une
   courtoisie. Une fois la fenêtre ouverte, seul un **clic** prolonge — un mouvement de
   souris la ferait disparaître sans que personne n'ait rien lu.
+- ⚠️ **Une déconnexion est une _navigation_, jamais une Server Action.** La coupure pour
+  inactivité passait par la Server Action `signOut`, et produisait en production l'écran
+  intégré de Next — « This page couldn't load » —, que l'utilisateur lit comme une panne
+  d'ÉniEvent. Mesuré en forgeant un horodatage expiré mais correctement signé :
+
+      navigation classique   307 → /pro/connexion?raison=inactivite  puis 200, explication affichée
+      Server Action (POST)   307 → rePOST → 404 « Server action not found. »
+
+  **Un 307 conserve la méthode** : le navigateur rejoue le POST sur la page de connexion,
+  en-tête `Next-Action` compris, et elle ne connaît pas cette action. Et ce n'était pas un
+  cas rare, c'était le **chemin nominal** — le proxy ne repose l'horodatage qu'une fois
+  par minute (`REFRESH_AFTER_SECONDS`) et `SessionTimeout` n'appelle `/api/session` qu'une
+  fois par minute, si bien que la référence du serveur est structurellement plus ancienne
+  que celle du navigateur : quand le compte à rebours atteint zéro, le proxy a déjà
+  tranché. La coupure passe donc par `GET /auth/deconnexion?suivant=…`, hors de tout
+  espace protégé, ce qui **supprime la course** au lieu de la réduire : le gestionnaire
+  s'exécute que la session soit vivante ou déjà coupée. Même raison pour **tout** geste
+  qui doit aboutir alors que la session peut être tombée.
+- ⚠️ **Chaque espace protégé a son `error.tsx`, et il ne devine pas la cause.** Sans lui,
+  c'est l'écran intégré de Next qui s'affiche. `SessionExpiree` interroge `/api/session`
+  — `401` signifie qu'il n'y a plus de session — **avant** d'écrire quoi que ce soit :
+  annoncer une session expirée sur une vraie panne serait reproduire le défaut dans
+  l'autre sens. L'écran renvoie vers la connexion de **son** espace (§4) et **n'annonce
+  aucune durée** : le délai se règle en base, une phrase qui le cite finirait par mentir.
+  `npm run smoke:inactivite` rejoue tout cela dans les cinq espaces.
 - `SUPABASE_SECRET_KEY` : webhooks et tâches planifiées uniquement. Jamais dans un
   composant, jamais dans une Server Action déclenchée par un utilisateur.
 - Les webhooks de paiement sont **idempotents** (contrainte unique sur
