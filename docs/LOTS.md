@@ -4,13 +4,14 @@ Ce qui est en ligne, ce qui reste, et dans quel ordre. **C'est le seul document 
 lire pour savoir quoi construire ensuite.** Les plans de `~/.claude/plans/`
 décrivent des lots déjà livrés et ne font plus foi.
 
-Dernière mise à jour : 11 octobre 2026, après le lot A — Confiance et le retour
-sur sa règle de modération. 833 tests verts, 50 migrations, production sur
-https://enievent.com.
+Dernière mise à jour : 11 octobre 2026, après le lot A — Confiance, le retour sur
+sa règle de modération, et la fermeture du paiement sur le catalogue fictif.
+835 tests verts, 51 migrations, production sur https://enievent.com.
 
 > ⚠️ **Les paiements réels sont ouverts.** Tout ce qui suit s'écrit désormais
-> sur un produit qui encaisse. Voir §3.3 — le catalogue est encore fictif, et
-> cette combinaison demande une décision avant toute autre chose.
+> sur un produit qui encaisse. Le catalogue reste fictif, mais il n'est plus
+> payable depuis le 11 octobre 2026 (§3.3) : il ne produit que des demandes de
+> devis. Ce qui bloque maintenant est le recrutement, pas le code.
 
 ---
 
@@ -26,7 +27,7 @@ chiffrer, encaisser et être versé ; l'administration voit passer l'argent.
 | Double tunnel : réservation immédiate **et** appel d'offres | En ligne |
 | Boucle de l'offre : publication → modération → catalogue | En ligne |
 | Planning, tarifs, prix plancher | En ligne |
-| Commande, échéancier, paiement FedaPay | **Bac à sable** (voir §3) |
+| Commande, échéancier, paiement FedaPay | **Argent réel en production** ; `.env.local` garde la clé de bac à sable |
 | Annulation, barème, remboursement | En ligne, **exécution manuelle** (§3) |
 | Versements aux partenaires | En ligne, **exécution manuelle** (§3) |
 | Commission par partenaire, depuis `/admin/partenaires` | En ligne |
@@ -108,40 +109,58 @@ bac à sable. Tant que ce n'est pas vérifié, `mark_payout_sent` et
 en virements réels, c'est de l'argent qui sort : plafond par virement, double
 validation et journal avant quoi que ce soit.
 
-### 3.3 ⚠️ Le catalogue est fictif — et il encaisse
+### 3.3 ~~Le catalogue fictif encaisse~~ — levé le 11 octobre 2026
 
-**C'est désormais le point le plus urgent du document**, parce que 3.2 est levé.
+**Ce qui était ouvert.** Sept annonces du jeu de démonstration portaient
+`booking_mode` à `instant` ou `both`. Trois avaient des dates ouvertes au tarif
+du jour :
 
-Mesuré le 10 octobre 2026 : **3 annonces fictives sont payables en ligne**, en
-réservation immédiate, avec une date ouverte et de l'argent réel.
-
-| Annonce | Prix | Dates ouvertes |
+| Annonce | Semaine | Week-end |
 |---|---|---|
-| Villa Atlantique (Ouidah) | 300 000 F | 74 |
-| Auditorium Cadjèhoun | 250 000 F | 75 |
-| Pack sonorisation & lumière 300 personnes | 120 000 F | 74 |
+| Villa Atlantique (Ouidah) | 300 000 F | 450 000 F |
+| Paillote de Grand-Popo | 180 000 F | 252 000 F |
+| Pack sonorisation & lumière 300 personnes | 120 000 F | 144 000 F |
 
-Un visiteur venu d'une recherche peut réserver et régler par Mobile Money une
-salle qui n'existe pas. L'argent arrive sur le compte marchand, et il faut le
-rembourser — or `/refunds` n'est pas encore constaté ouvert (§3.2).
+Un visiteur venu d'une recherche pouvait régler par Mobile Money une villa qui
+n'existe pas. Les six organisations du jeu de démonstration **n'ont aucun
+membre** : personne n'aurait honoré la prestation, ni même vu la commande
+arriver. Et rien dans le code ne s'y opposait — du point de vue de
+`book_listing`, tout était en règle : annonce publiée, date ouverte, tarif
+renseigné, barème d'annulation présent.
 
-Six organisations du catalogue viennent du jeu de démonstration (toutes créées
-le 6 septembre 2026, numéros séquentiels `+229019X0000XX`). Trois autres —
-ESDET, BÈZEALL, Essai SARL — sont des inscriptions ultérieures à trier.
+**Ce qui a été fait** (migration 0051, et c'est en trois endroits, pas un) :
 
-**Trois issues, par ordre de douceur :**
+1. Les annonces des six organisations fictives passent sur **devis**.
+   `book_listing` lève « Cette prestation se réserve sur devis » — c'est la
+   fonction qui refuse, pas un écran.
+2. **`supabase/seed.sql` aussi**, sans quoi le prochain `npm run demo:reset`
+   rouvrait la porte. Une correction que le prochain seed défait n'est pas une
+   correction.
+3. `tests/seed.test.ts` refuse le retour de `instant` ou `both`, et vérifie que
+   la base refuse réellement une réservation sur une annonce du seed.
 
-1. **Passer les annonces de démonstration en `booking_mode = 'quote'`.** Le
-   catalogue reste vivant et continue de produire des demandes de devis ; plus
-   aucun paiement en ligne n'est possible. Réversible en une commande.
-2. Fermer leurs disponibilités : plus de date réservable, mais les fiches
-   restent.
-3. Dépublier le jeu de démonstration : catalogue vide, vitrine honnête mais
-   déserte.
+Les dates restent **ouvertes**, et c'est voulu : elles font vivre le calendrier
+des fiches et le filtre par dates de la recherche, sans permettre d'encaisser.
+Conséquence assumée : la section « Réservez sans attendre » de l'accueil se vide
+et `/recherche?reservation=instant` ne rend plus rien. C'est exact — cette
+section s'appuie sur un fait vérifiable, et ce fait est devenu faux.
 
-Et dans tous les cas : **recruter de vrais partenaires**, puis retirer le jeu
-de démonstration ainsi que les quatre comptes de démonstration, dont
-`demo-admin`, qui est de type `admin`.
+⚠️ **`smoke:annulation` a besoin du tunnel immédiat** : il l'ouvre lui-même avec
+la clé de service sur une seule annonce, et le referme dans un `finally` — y
+compris si le contrôle échoue en route. Ne pas remettre `instant` dans le seed
+pour faire marcher un contrôle.
+
+**Ce qui reste, et qui n'est pas de notre ressort.** Une seule annonce porte
+encore le tunnel immédiat : `salle-de-fete`, de **BÈZEALL** — un vrai partenaire
+inscrit le 21 septembre 2026. Elle est en `rejected` et sans date ouverte, donc
+non réservable, et la migration ne l'a pas touchée : le tunnel qu'un vrai
+partenaire choisit est sa décision commerciale. ⚠️ **Mais le jour où elle est
+validée, elle devient payable** — à vérifier que BÈZEALL accepte réellement la
+réservation immédiate et peut honorer la prestation.
+
+Et dans tous les cas : **recruter de vrais partenaires**, puis retirer le jeu de
+démonstration ainsi que les quatre comptes de démonstration, dont `demo-admin`,
+qui est de type `admin`.
 
 ### 3.4 Secrets à faire tourner
 
@@ -340,9 +359,12 @@ sur un produit qui doit d'abord savoir le servir.
 
 ## 5. L'ordre que je recommande
 
-0. **Fermer le paiement en ligne sur les annonces fictives** (§3.3). Aujourd'hui
-   un inconnu peut régler 300 000 F pour une salle qui n'existe pas. Une
-   commande suffit, et c'est réversible. **Rien d'autre ne passe avant.**
+0. ~~**Fermer le paiement en ligne sur les annonces fictives**~~ — **fait le
+   11 octobre 2026** (migration 0051). Sept annonces du jeu de démonstration
+   portaient le tunnel immédiat, dont trois avec des dates ouvertes jusqu'à
+   450 000 F. Les six organisations fictives sont désormais toutes sur devis,
+   le seed aussi — sans quoi le prochain `demo:reset` rouvrait la porte — et
+   `tests/seed.test.ts` refuse le retour de `instant` ou `both`.
 1. **Recruter les premiers partenaires**, puis retirer le jeu de démonstration
    et ses quatre comptes (§3.3). Un produit vide ne se teste pas en vrai, et
    c'est désormais la seule chose qui sépare ÉniEvent d'un vrai chiffre

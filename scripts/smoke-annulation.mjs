@@ -77,24 +77,71 @@ async function menage(commandeId, annonceId, jour) {
 }
 
 let commande = null;
+/** Annonce dont ce script a ouvert le tunnel immédiat, et le mode à lui rendre. */
+let ouverte = null;
+
+/**
+ * Remet l'annonce sur devis.
+ *
+ * ⚠️ **Appelée dans tous les cas, y compris sur échec.** Une annonce fictive
+ * laissée réservable est précisément le défaut que la migration 0051 a
+ * refermé : un inconnu pourrait régler une villa qui n'existe pas.
+ */
+async function refermer() {
+  if (!ouverte) return;
+
+  await admin
+    .from("listings")
+    .update({ booking_mode: ouverte.mode })
+    .eq("id", ouverte.id);
+
+  const { data } = await admin
+    .from("listings")
+    .select("booking_mode")
+    .eq("id", ouverte.id)
+    .single();
+
+  check(
+    "l'annonce est rendue à son tunnel sur devis",
+    data?.booking_mode === "quote",
+    data?.booking_mode ?? "ILLISIBLE",
+  );
+}
 
 try {
   const client = await signIn("demo-particulier@enievent.bj");
   const intrus = await signIn("demo-entreprise@enievent.bj");
 
-  // --- 1. Une annonce réservable immédiatement ------------------------------
+  // --- 1. Une annonce réservable, que ce script ouvre lui-même --------------
+  //
+  // ⚠️ **Le jeu de démonstration n'en contient plus aucune** (migration 0051) :
+  // ses annonces sont fictives, et les laisser payables permettait à un inconnu
+  // de régler jusqu'à 450 000 F pour une villa inventée. Ce contrôle a besoin
+  // du tunnel immédiat, il l'ouvre donc lui-même, sur une seule annonce, et le
+  // referme en partant — plutôt que de dépendre d'un état du seed que personne
+  // n'a plus le droit de poser.
   const { data: annonce } = await admin
     .from("listings")
-    .select("id, title, org_id, cancellation_policy_id")
+    .select("id, title, org_id, cancellation_policy_id, booking_mode")
     .eq("status", "approved")
     .eq("is_paused", false)
-    .in("booking_mode", ["instant", "both"])
+    .not("cancellation_policy_id", "is", null)
     .limit(1)
     .maybeSingle();
 
   if (!annonce) {
-    console.log("Aucune annonce en réservation immédiate : lancez npm run demo:reset.");
+    console.log("Aucune annonce publiée : lancez npm run demo:reset.");
     process.exit(0);
+  }
+
+  if (annonce.booking_mode === "quote") {
+    ouverte = { id: annonce.id, mode: annonce.booking_mode };
+    const { error } = await admin
+      .from("listings")
+      .update({ booking_mode: "both" })
+      .eq("id", annonce.id);
+
+    check("le tunnel immédiat est ouvert pour la durée du contrôle", !error, annonce.title);
   }
 
   check(
@@ -244,6 +291,10 @@ try {
 } catch (error) {
   console.error("\nInterrompu :", error.message);
   failures += 1;
+} finally {
+  // ⚠️ Dans un `finally` : une interruption au milieu du parcours ne doit pas
+  // laisser une annonce fictive payable derrière elle.
+  await refermer();
 }
 
 console.log(failures === 0 ? "\nTout est conforme." : `\n${failures} contrôle(s) en échec.`);

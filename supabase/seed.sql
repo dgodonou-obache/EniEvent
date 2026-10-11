@@ -41,6 +41,29 @@ on conflict (org_id) do nothing;
 -- présence d'un utilisateur authentifié, pas aux écritures de service.
 -- Les slugs sont choisis, pas dérivés : ce sont des URL publiques.
 -- Les coordonnées alimentent la vue carte de la recherche.
+--
+-- ⚠️ **Toutes sur devis, et aucune exception** (11 octobre 2026). Ces annonces
+-- sont **fictives** : les salles n'existent pas, les prestataires non plus.
+-- Depuis l'ouverture des paiements réels, un `booking_mode` à `instant` ou
+-- `both` signifiait qu'un inconnu pouvait régler jusqu'à 450 000 F pour une
+-- villa inventée — et `book_listing` n'avait aucune raison de le refuser : de
+-- son point de vue tout était en règle, annonce publiée, date ouverte, tarif
+-- renseigné.
+--
+-- `quote` ferme ce chemin **en base** : `book_listing` lève « Cette prestation
+-- se réserve sur devis », quel que soit l'appelant et quel que soit l'écran.
+-- Les dates restent ouvertes plus bas, et c'est voulu : elles font vivre le
+-- calendrier des fiches et le filtre par dates de la recherche, sans permettre
+-- d'encaisser quoi que ce soit.
+--
+-- Conséquence assumée : la section « Réservez sans attendre » de l'accueil se
+-- vide, et `/recherche?reservation=instant` ne rend plus rien. C'est exact —
+-- cette section s'appuie sur un fait vérifiable, et ce fait est devenu faux.
+--
+-- ⚠️ **Ne pas remettre `instant` ou `both` ici pour faire marcher un contrôle.**
+-- `smoke:annulation` a besoin d'une annonce réservable : il s'en fabrique une
+-- lui-même avec la clé de service, et la remet sur devis en partant.
+-- `tests/seed.test.ts` refuse le retour de ces deux valeurs.
 -- -----------------------------------------------------------------------------
 
 insert into listings (
@@ -55,32 +78,32 @@ select
 from (values
   ('espaces-cotonou', 'salle-de-reception', 'salle-etoile-haie-vive', 'Salle Étoile — Haie Vive',
    'Salle de réception climatisée au cœur de la Haie Vive, idéale pour les mariages et les soirées d''entreprise. Groupe électrogène et parking gardé sur place.',
-   'Cotonou', 'Haie Vive', 6.358000::numeric, 2.400000::numeric, 'both', 150000::bigint, 'moderee',
+   'Cotonou', 'Haie Vive', 6.358000::numeric, 2.400000::numeric, 'quote', 150000::bigint, 'moderee',
    'Un acompte de 50 % bloque la date. Le solde est à régler au plus tard 3 jours avant l''événement.'),
 
   ('espaces-cotonou', 'salle-de-conference', 'auditorium-cadjehoun', 'Auditorium Cadjèhoun',
    'Auditorium de 180 places en configuration théâtre, sonorisation et vidéoprojection incluses. Proche de l''aéroport.',
-   'Cotonou', 'Cadjèhoun', 6.353000::numeric, 2.383000::numeric, 'instant', 250000::bigint, 'flexible',
+   'Cotonou', 'Cadjèhoun', 6.353000::numeric, 2.383000::numeric, 'quote', 250000::bigint, 'flexible',
    'Acompte de 30 % à la réservation.'),
 
   ('espaces-cotonou', 'espace-vert', 'jardin-fidjrosse', 'Jardin de Fidjrossè',
    'Grand jardin arboré de 2 000 m² à deux pas de la plage, jusqu''à 500 invités. Chapiteau montable sur demande.',
-   'Cotonou', 'Fidjrossè', 6.352000::numeric, 2.353000::numeric, 'both', 100000::bigint, 'flexible',
+   'Cotonou', 'Fidjrossè', 6.352000::numeric, 2.353000::numeric, 'quote', 100000::bigint, 'flexible',
    'Acompte de 30 % à la réservation, solde le jour de l''événement.'),
 
   ('residences-ouidah', 'villa', 'villa-atlantique-ouidah', 'Villa Atlantique',
    'Villa les pieds dans l''eau sur la route des pêches, piscine et jardin privatif. Jusqu''à 100 personnes en cocktail.',
-   'Ouidah', 'Route des pêches', 6.336000::numeric, 2.070000::numeric, 'instant', 300000::bigint, 'non-remboursable',
+   'Ouidah', 'Route des pêches', 6.336000::numeric, 2.070000::numeric, 'quote', 300000::bigint, 'non-remboursable',
    'Paiement intégral à la réservation.'),
 
   ('residences-ouidah', 'plage', 'paillote-grand-popo', 'Paillote de Grand-Popo',
    'Espace de réception face à l''océan, sous paillote traditionnelle. Cadre privilégié pour les mariages en petit comité.',
-   'Grand-Popo', 'Bord de mer', 6.283300::numeric, 1.823600::numeric, 'both', 180000::bigint, 'moderee',
+   'Grand-Popo', 'Bord de mer', 6.283300::numeric, 1.823600::numeric, 'quote', 180000::bigint, 'moderee',
    'Un acompte de 50 % bloque la date.'),
 
   ('espaces-cotonou', 'salle-de-reception', 'espace-tokpa-porto-novo', 'Espace Tokpa',
    'Salle de réception de 300 places à Porto-Novo, avec cuisine professionnelle et espace traiteur dédié.',
-   'Porto-Novo', 'Centre', 6.496900::numeric, 2.628900::numeric, 'both', 200000::bigint, 'moderee',
+   'Porto-Novo', 'Centre', 6.496900::numeric, 2.628900::numeric, 'quote', 200000::bigint, 'moderee',
    'Un acompte de 50 % bloque la date, le solde est dû 7 jours avant.'),
 
   ('saveurs-du-benin', 'traiteur', 'buffet-beninois-200-couverts', 'Buffet béninois — 200 couverts',
@@ -90,7 +113,7 @@ from (values
 
   ('saveurs-du-benin', 'traiteur', 'cocktail-dinatoire-premium', 'Cocktail dînatoire premium',
    'Pièces cocktail chaudes et froides, 12 pièces par personne, service à l''assiette possible.',
-   'Cotonou', null, null::numeric, null::numeric, 'both', null::bigint, 'flexible',
+   'Cotonou', null, null::numeric, null::numeric, 'quote', null::bigint, 'flexible',
    'Acompte de 40 % à la commande.'),
 
   ('decor-ahossi', 'decoration', 'decoration-mariage-complete', 'Décoration de mariage complète',
@@ -100,22 +123,22 @@ from (values
 
   ('decor-ahossi', 'fleuriste', 'compositions-florales-evenementielles', 'Compositions florales événementielles',
    'Bouquets, centres de table et arches en fleurs fraîches, livrés et installés le jour J.',
-   'Cotonou', null, null::numeric, null::numeric, 'both', null::bigint, 'moderee',
+   'Cotonou', null, null::numeric, null::numeric, 'quote', null::bigint, 'moderee',
    'Paiement intégral 48 h avant la livraison.'),
 
   ('sono-calavi', 'location-equipement', 'pack-sono-lumiere-300', 'Pack sonorisation & lumière 300 personnes',
    'Système son 4 000 W, table de mixage, 8 projecteurs LED, machine à fumée. Technicien inclus.',
-   'Abomey-Calavi', null, null::numeric, null::numeric, 'instant', 120000::bigint, 'moderee',
+   'Abomey-Calavi', null, null::numeric, null::numeric, 'quote', 120000::bigint, 'moderee',
    'Acompte de 50 % à la réservation, caution restituée après retour du matériel.'),
 
   ('sono-calavi', 'dj-sonorisation', 'dj-evenementiel-soiree', 'DJ événementiel — soirée complète',
    'DJ expérimenté : afrobeat, coupé-décalé, zouk, variété internationale. Six heures de prestation.',
-   'Abomey-Calavi', null, null::numeric, null::numeric, 'both', 80000::bigint, 'flexible',
+   'Abomey-Calavi', null, null::numeric, null::numeric, 'quote', 80000::bigint, 'flexible',
    'Acompte de 30 % à la réservation.'),
 
   ('ceremonies-golfe', 'maitre-de-ceremonie', 'maitre-ceremonie-bilingue', 'Maître de cérémonie bilingue',
    'Animation et conduite de cérémonie en français et en fon. Coordination du déroulé avec les prestataires.',
-   'Porto-Novo', null, null::numeric, null::numeric, 'both', 75000::bigint, 'moderee',
+   'Porto-Novo', null, null::numeric, null::numeric, 'quote', 75000::bigint, 'moderee',
    'Acompte de 30 % à la réservation, solde le jour de l''événement.'),
 
   ('ceremonies-golfe', 'troupe-traditionnelle', 'troupe-zangbeto', 'Troupe traditionnelle Zangbéto',

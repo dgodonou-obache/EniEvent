@@ -105,6 +105,20 @@ supabase/migrations/    schéma, une migration par domaine
   à ligne perd des francs.
 - Les modules à risque financier (`pricing`, `fees`, `promo`, `cancellation`, `escrow`)
   sont couverts par des tests unitaires. Une modification sans test est un refus de revue.
+- ⚠️ **Une annonce qu'aucun humain ne peut honorer ne porte jamais `booking_mode`
+  `instant` ou `both`.** Sept annonces du jeu de démonstration les portaient après
+  l'ouverture des paiements réels, dont trois avec des dates ouvertes jusqu'à 450 000 F —
+  pour des villas qui n'existent pas, chez des organisations **sans aucun membre** :
+  personne n'aurait honoré la prestation ni même vu la commande arriver. Rien dans le
+  code ne s'y opposait, et c'est le point : du point de vue de `book_listing` tout était
+  en règle — annonce publiée, date ouverte, tarif renseigné, barème présent. La
+  migration 0051 les a passées sur **devis**, ce qui ferme le chemin vers l'argent sans
+  vider la vitrine, **et `supabase/seed.sql` avec elles** : une correction que le prochain
+  `demo:reset` défait n'est pas une correction. `tests/seed.test.ts` refuse le retour de
+  ces deux valeurs et vérifie que la base refuse réellement une réservation. Les dates
+  restent ouvertes exprès — elles font vivre le calendrier et le filtre par dates.
+  `smoke:annulation`, qui a besoin du tunnel immédiat, l'ouvre lui-même et le referme
+  dans un `finally`.
 - ⚠️ **Le client paie le prix affiché. Aucun frais, jamais.** La plateforme se rémunère
   uniquement sur la **commission du partenaire**, prélevée sur sa part à l'encaissement
   et donc invisible côté client. Les frais acheteur de la migration 0029 ont été
@@ -398,9 +412,11 @@ barrière devant quelqu'un qui n'ouvre pas de navigateur.
   que la donnée n'existe pas : inventer un classement tromperait le client autant que le
   partenaire arbitrairement désigné comme meilleur. Une mise en avant se fonde sur un
   **fait vérifiable ligne à ligne** — la section « Réservez sans attendre » de l'accueil
-  s'appuie sur des dates réellement ouvertes, et se vide d'elle-même si elles se
-  referment ; « Les valeurs sûres » exige **au moins trois avis réels** et est vide
-  aujourd'hui, ce qui est l'affichage correct et non un trou à combler.
+  s'appuie sur des dates réellement ouvertes **et sur le tunnel immédiat**, et elle est
+  donc vide depuis que le catalogue fictif est passé sur devis (0051) ; « Les valeurs
+  sûres » exige **au moins trois avis réels** et est vide aussi. Les deux le sont pour la
+  même raison, qui est la bonne : leur fait est devenu faux, et un bloc vide vaut mieux
+  qu'un bloc rempli de rien.
   **Les favoris suivent la même règle, et la base la rend indiscutable** : aucun compteur
   « 42 personnes ont aimé » n'existe, et `favorites_own` (migration 0042) empêche
   l'agrégat d'être calculé, même par quelqu'un qui écrirait la requête exprès. Ne pas

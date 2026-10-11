@@ -90,13 +90,69 @@ describe("jeu de démonstration", () => {
     expect(rows[0].total).toBe(0);
   });
 
-  it("ouvre des dates réservables sur les six prochains mois", async () => {
+  it("ouvre des dates sur les six prochains mois", async () => {
+    // Les dates restent ouvertes même si rien n'est payable : elles font vivre
+    // le calendrier des fiches et le filtre par dates de la recherche.
     const { rows } = await db.query(`
       select count(*)::int as total
       from availabilities
       where status = 'open' and date > current_date
     `);
     expect(rows[0].total).toBeGreaterThan(500);
+  });
+
+  /**
+   * ⚠️ **Aucune annonce fictive n'est payable, et ce test est le seul gardien
+   * de cette règle.**
+   *
+   * Sept annonces du jeu de démonstration portaient `instant` ou `both`, dont
+   * trois avec des dates ouvertes à 120 000, 180 000 et 300 000 F — jusqu'à
+   * 450 000 F le week-end. Ces lieux n'existent pas, et les six organisations
+   * du seed n'ont aucun membre : personne n'aurait honoré la prestation ni même
+   * vu la commande arriver. Rien dans le code ne s'y opposait, puisque du point
+   * de vue de `book_listing` tout était en règle.
+   *
+   * Remettre `instant` dans le seed pour faire marcher un contrôle rouvrirait
+   * la porte en silence. `smoke:annulation`, qui a besoin d'une annonce
+   * réservable, s'en fabrique une lui-même et la remet sur devis en partant.
+   */
+  it("ne rend aucune annonce de démonstration payable", async () => {
+    const { rows } = await db.query(`
+      select l.slug, l.booking_mode
+      from listings l
+      where l.booking_mode in ('instant', 'both')
+      order by l.slug
+    `);
+
+    expect(rows.map((r) => `${r.slug} (${r.booking_mode})`)).toEqual([]);
+  });
+
+  it("refuse une réservation immédiate sur une annonce du seed", async () => {
+    // Le contrôle qui compte : pas « l'écran ne propose pas », mais « la base
+    // refuse ». C'est `book_listing` qui tranche, quel que soit l'appelant.
+    const { rows: cible } = await db.query(`
+      select a.listing_id, a.date
+      from availabilities a
+      join listings l on l.id = a.listing_id
+      where a.status = 'open' and a.date > current_date and l.status = 'approved'
+      order by a.date
+      limit 1
+    `);
+
+    const users = await db.query(
+      `insert into auth.users (id, email, raw_user_meta_data)
+       values (gen_random_uuid(), 'acheteur-seed@exemple.bj', '{"account_type":"particulier"}')
+       returning id`,
+    );
+
+    await actingAs(db, users.rows[0].id as string, async () => {
+      await expect(
+        db.query("select id from book_listing($1, array[$2::date])", [
+          cible[0].listing_id,
+          cible[0].date,
+        ]),
+      ).rejects.toThrow(/se réserve sur devis/i);
+    });
   });
 
   it("majore les tarifs du week-end", async () => {
