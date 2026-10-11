@@ -83,9 +83,13 @@ export function ReportButton({
       <p className="text-xs font-bold text-slate-900">
         {genre === "review" ? "Signaler cet avis" : "Signaler cette annonce"}
       </p>
+      {/* ⚠️ **Ne laisse pas croire que signaler fait disparaître.** C'est la
+          première chose qu'un partenaire espère en cliquant, et le lui laisser
+          croire ferait du signalement un bouton de suppression — ce que la
+          décision du 11 octobre 2026 a précisément défait. */}
       <p className="mt-1 text-xs leading-relaxed text-slate-500">
         {genre === "review"
-          ? "Dites ce qui pose problème : propos injurieux, contenu sans rapport, tentative de chantage. Un avis sévère mais sincère n'est pas un abus."
+          ? "Un avis ne se retire pas, même sévère : seul un texte illicite — insulte nominative, coordonnées, données personnelles — peut être retiré, et la note restera comptée. Dites ce qui pose problème."
           : "Dites ce qui pose problème : photos qui ne correspondent pas, prestation inexistante, contenu interdit. L'annonce reste en ligne jusqu'à l'examen."}
       </p>
 

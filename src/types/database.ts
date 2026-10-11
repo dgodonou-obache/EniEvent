@@ -2537,16 +2537,15 @@ export type Database = {
           author_id: string
           author_label: string
           body: string | null
+          body_redacted_at: string | null
           created_at: string
-          hidden_at: string | null
-          hidden_by: string | null
-          hidden_reason: string | null
           id: string
           listing_id: string | null
           order_id: string
           org_id: string
           rating: number
-          reinstated_at: string | null
+          redacted_by: string | null
+          redaction_reason: string | null
           replied_at: string | null
           reply: string | null
           updated_at: string
@@ -2555,16 +2554,15 @@ export type Database = {
           author_id: string
           author_label: string
           body?: string | null
+          body_redacted_at?: string | null
           created_at?: string
-          hidden_at?: string | null
-          hidden_by?: string | null
-          hidden_reason?: string | null
           id?: string
           listing_id?: string | null
           order_id: string
           org_id: string
           rating: number
-          reinstated_at?: string | null
+          redacted_by?: string | null
+          redaction_reason?: string | null
           replied_at?: string | null
           reply?: string | null
           updated_at?: string
@@ -2573,16 +2571,15 @@ export type Database = {
           author_id?: string
           author_label?: string
           body?: string | null
+          body_redacted_at?: string | null
           created_at?: string
-          hidden_at?: string | null
-          hidden_by?: string | null
-          hidden_reason?: string | null
           id?: string
           listing_id?: string | null
           order_id?: string
           org_id?: string
           rating?: number
-          reinstated_at?: string | null
+          redacted_by?: string | null
+          redaction_reason?: string | null
           replied_at?: string | null
           reply?: string | null
           updated_at?: string
@@ -2597,7 +2594,7 @@ export type Database = {
           },
           {
             foreignKeyName: "reviews_hidden_by_fkey"
-            columns: ["hidden_by"]
+            columns: ["redacted_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -3083,7 +3080,7 @@ export type Database = {
           resolution: string
           review_author: string
           review_body: string
-          review_hidden_at: string
+          review_body_redacted_at: string
           review_id: string
           review_rating: number
           status: Database["public"]["Enums"]["report_status"]
@@ -3095,9 +3092,8 @@ export type Database = {
         Returns: {
           author_label: string
           body: string
+          body_redacted_at: string
           created_at: string
-          hidden_at: string
-          hidden_reason: string
           id: string
           listing_id: string
           listing_title: string
@@ -3105,6 +3101,7 @@ export type Database = {
           org_id: string
           org_name: string
           rating: number
+          redaction_reason: string
           replied_at: string
           reply: string
         }[]
@@ -3266,7 +3263,6 @@ export type Database = {
         Args: { fenetre?: string }
         Returns: number
       }
-      hide_review: { Args: { avis: string; motif: string }; Returns: undefined }
       invitation_preview: {
         Args: { jeton: string }
         Returns: {
@@ -3468,7 +3464,10 @@ export type Database = {
           sender_side: Database["public"]["Enums"]["message_side"]
         }[]
       }
-      reinstate_review: { Args: { avis: string }; Returns: undefined }
+      redact_review_body: {
+        Args: { avis: string; motif: string }
+        Returns: undefined
+      }
       release_stale_orders: { Args: { delai?: string }; Returns: number }
       reply_to_review: {
         Args: { avis: string; texte: string }
@@ -3502,6 +3501,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      restore_review_body: { Args: { avis: string }; Returns: undefined }
       save_payment_schedule: {
         Args: { lignes: Json; org: string }
         Returns: {

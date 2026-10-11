@@ -15,8 +15,9 @@ import { createClient } from "@supabase/supabase-js";
  * - **les fonctions sont appelables par PostgREST** : `reply_to_review`,
  *   `open_report`, `resolve_report`, `open_dispute`, `admin_reviews`. Une
  *   signature qui se sérialise mal compile parfaitement et casse à l'exécution.
- * - **le retrait sur signalement opère réellement**, et la note du partenaire
- *   baisse dans la seconde — c'est un déclencheur, pas du code applicatif.
+ * - ⚠️ **signaler un avis ne le retire pas**, et sa note ne bouge pas d'un
+ *   dixième. C'était l'inverse la veille (migration 0049) : ce contrôle est ce
+ *   qui empêche le retrait de revenir par mégarde.
  *
  * ⚠️ **Ce script écrit sur une annonce réelle**, le temps de son exécution :
  * une commande, un paiement encaissé, un avis, un signalement, un litige. Tout
@@ -113,6 +114,10 @@ try {
   const partenaire = await signIn("demo-partenaire@enievent.bj");
   const administration = await signIn("demo-admin@enievent.bj");
   const intrus = await signIn("demo-entreprise@enievent.bj");
+
+  // Sans aucune session : le lecteur le plus défavorisé, et celui qui compte —
+  // un avis doit lui rester visible.
+  const visiteur = createClient(url, publishable, { auth: { persistSession: false } });
 
   const { data: moi } = await client.auth.getUser();
   const clientId = moi.user.id;
@@ -335,16 +340,20 @@ try {
     refusReecriture ? refusReecriture.message.slice(0, 50) : `note = ${inchange.rating}`,
   );
 
-  // --- 7. Le motif de modération, hors de toute lecture directe ------------
-  const { error: refusMotif } = await administration
+  // --- 7. Le nom du modérateur, hors de toute lecture directe --------------
+  //
+  // ⚠️ Le **motif** est public depuis la migration 0050 — c'est lui qui rend
+  // une modération assumée plutôt qu'un effacement. C'est `redacted_by` qui
+  // reste fermé, et le contrôle se fait en le demandant par son nom.
+  const { error: refusModerateur } = await administration
     .from("reviews")
-    .select("hidden_reason")
+    .select("redacted_by")
     .eq("id", depose.id);
 
   check(
-    "hidden_reason est refusée même à l'administration",
-    Boolean(refusMotif),
-    refusMotif?.message?.slice(0, 60) ?? "AUCUNE ERREUR — la colonne est lisible",
+    "redacted_by est refusée même à l'administration",
+    Boolean(refusModerateur),
+    refusModerateur?.message?.slice(0, 60) ?? "AUCUNE ERREUR — la colonne est lisible",
   );
 
   const { data: parFonction, error: erreurFonction } = await administration.rpc("admin_reviews", {
@@ -352,7 +361,7 @@ try {
   });
 
   check(
-    "admin_reviews() la rend à l'administration",
+    "admin_reviews() rend l'avis à l'administration",
     !erreurFonction && (parFonction ?? []).some((a) => a.id === depose.id),
     erreurFonction?.message ?? `${(parFonction ?? []).length} avis lus`,
   );
@@ -360,7 +369,12 @@ try {
   const { data: refusee } = await client.rpc("admin_reviews", { etat: "tous" });
   check("et à personne d'autre", (refusee ?? []).length === 0, `${(refusee ?? []).length} lignes`);
 
-  // --- 8. Le retrait sur signalement ---------------------------------------
+  // --- 8. Signaler ne retire rien ------------------------------------------
+  //
+  // ⚠️ **Le contrôle qui porte la décision du 11 octobre 2026.** La veille, ce
+  // même geste masquait l'avis et le faisait sortir de la note. Si l'un des
+  // trois constats ci-dessous redevient faux, un partenaire peut effacer ses
+  // mauvais avis — et rien n'échouera : le produit continuera de fonctionner.
   const { data: reference, error: erreurSignalement } = await partenaire.rpc("open_report", {
     genre: "review",
     cible: depose.id,
@@ -369,26 +383,37 @@ try {
 
   check("le prestataire signale l'avis", !erreurSignalement, reference ?? erreurSignalement?.message);
 
-  const { data: masque } = await admin
+  const { data: apresSignalement } = await admin
     .from("reviews")
-    .select("hidden_at")
+    .select("body, body_redacted_at")
     .eq("id", depose.id)
     .single();
 
   check(
-    "l'avis est retiré sur-le-champ",
-    masque.hidden_at !== null,
-    masque.hidden_at ?? "TOUJOURS VISIBLE",
+    "l'avis n'est pas retiré",
+    apresSignalement.body_redacted_at === null && apresSignalement.body !== null,
+    apresSignalement.body_redacted_at ?? "texte intact",
   );
 
   const apresRetrait = await lireNotes();
   check(
-    "et il sort aussitôt de la note",
-    apresRetrait.rating_count === 0 && apresRetrait.rating_avg === null,
+    "et sa note n'a pas bougé",
+    Number(apresRetrait.rating_avg) === 4 && apresRetrait.rating_count === 1,
     `${apresRetrait.rating_avg ?? "aucune"} sur ${apresRetrait.rating_count} avis`,
   );
 
-  // --- 9. L'examen, et l'immunité ------------------------------------------
+  const { data: vuParVisiteur } = await visiteur
+    .from("reviews")
+    .select("id")
+    .eq("id", depose.id);
+
+  check(
+    "il reste lisible par un visiteur",
+    (vuParVisiteur ?? []).length === 1,
+    `${(vuParVisiteur ?? []).length} ligne(s)`,
+  );
+
+  // --- 9. Trancher ne touche pas davantage à l'avis ------------------------
   const { data: signalement } = await admin
     .from("reports")
     .select("id")
@@ -410,23 +435,67 @@ try {
 
   const { error: erreurArbitrage } = await administration.rpc("resolve_report", {
     signalement: signalement.id,
-    issue: "dismissed",
-    note: "Contrôle automatique — avis légitime, rétabli et désormais immunisé.",
+    issue: "upheld",
+    note: "Contrôle automatique — signalement retenu, mais l'avis reste en ligne.",
   });
 
-  check("l'administration écarte le signalement", !erreurArbitrage, erreurArbitrage?.message ?? "");
+  check("l'administration tranche le signalement", !erreurArbitrage, erreurArbitrage?.message ?? "");
 
-  const { data: retabli } = await admin
+  const { data: apresArbitrage } = await admin
     .from("reviews")
-    .select("hidden_at, reinstated_at")
+    .select("body, body_redacted_at")
     .eq("id", depose.id)
     .single();
 
   check(
-    "l'avis est rétabli et marqué immunisé",
-    retabli.hidden_at === null && retabli.reinstated_at !== null,
-    retabli.reinstated_at ?? "PAS D'IMMUNITÉ",
+    "même retenu, le signalement n'a rien retiré",
+    apresArbitrage.body_redacted_at === null && apresArbitrage.body !== null,
+    apresArbitrage.body_redacted_at ?? "texte intact",
   );
+
+  // --- 9 bis. Le seul geste qui subsiste : retirer le texte ----------------
+  const { error: refusRedactionTiers } = await partenaire.rpc("redact_review_body", {
+    avis: depose.id,
+    motif: "Nous souhaitons retirer ce commentaire nous-mêmes.",
+  });
+
+  check(
+    "un partenaire ne retire pas un commentaire",
+    Boolean(refusRedactionTiers),
+    refusRedactionTiers?.message?.slice(0, 60) ?? "AUCUNE ERREUR",
+  );
+
+  const { error: erreurRedaction } = await administration.rpc("redact_review_body", {
+    avis: depose.id,
+    motif: "Contrôle automatique — retrait d'essai du commentaire.",
+  });
+
+  check("l'administration retire le commentaire", !erreurRedaction, erreurRedaction?.message ?? "");
+
+  const notesApresRedaction = await lireNotes();
+  check(
+    "la note reste comptée malgré le retrait du texte",
+    Number(notesApresRedaction.rating_avg) === 4 && notesApresRedaction.rating_count === 1,
+    `${notesApresRedaction.rating_avg ?? "aucune"} sur ${notesApresRedaction.rating_count} avis`,
+  );
+
+  const { data: motifPublic } = await visiteur
+    .from("reviews")
+    .select("rating, redaction_reason")
+    .eq("id", depose.id)
+    .single();
+
+  check(
+    "le motif est publié à la place du texte",
+    motifPublic?.rating === 4 && /retrait d'essai/.test(motifPublic?.redaction_reason ?? ""),
+    motifPublic?.redaction_reason ?? "AUCUN MOTIF VISIBLE",
+  );
+
+  const { error: erreurRetablissement } = await administration.rpc("restore_review_body", {
+    avis: depose.id,
+  });
+
+  check("et il se rétablit", !erreurRetablissement, erreurRetablissement?.message ?? "");
 
   // --- 10. Le litige -------------------------------------------------------
   const { error: refusLitigeTiers } = await intrus.rpc("open_dispute", {

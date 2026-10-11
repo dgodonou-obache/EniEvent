@@ -7,17 +7,18 @@ import { getAdminReports } from "@/lib/reviews";
 /**
  * Signalements de contenu.
  *
- * **Deux régimes, et l'écran doit les expliquer** — sans quoi il paraît
- * incohérent d'une ligne à l'autre :
+ * ⚠️ **Un signalement ne retire plus rien**, depuis la décision du 11 octobre
+ * 2026 : il est redevenu ce qu'il aurait dû être — un signal adressé à
+ * l'équipe, comme une demande d'assistance. Ni l'avis, ni l'annonce signalés ne
+ * bougent, et aucune note ne change. L'écran doit le dire, sinon quelqu'un qui
+ * se souvient de l'ancien comportement cherchera l'avis masqué.
  *
- * - un **avis** signalé par une partie concernée est déjà retiré, en attente
- *   d'examen, et il manque donc à la note du prestataire pendant ce temps ;
- * - une **annonce** signalée reste en ligne : la retirer sur simple
- *   signalement couperait les réservations d'un partenaire sur la parole d'un
- *   inconnu.
+ * Trancher consigne donc une décision, et c'est tout. Retirer le *texte* d'un
+ * avis illicite est un **second geste**, explicite, depuis `/admin/avis` — les
+ * enchaîner ferait du signalement un bouton de suppression.
  *
- * Les ouverts d'abord, les plus anciens en tête : chaque jour d'attente sur un
- * avis masqué est un jour où la note de quelqu'un est fausse.
+ * Les ouverts d'abord, les plus anciens en tête : non parce qu'il y a urgence à
+ * agir, mais parce qu'un signalement sans réponse est quelqu'un qu'on ignore.
  *
  * ⚠️ Lecture par `admin_reports()` : l'écran a besoin du texte de l'avis
  * signalé et du nom du signaleur, qui vivent dans des tables fermées à
@@ -31,7 +32,6 @@ export default async function AdminReportsPage() {
 
   const ouverts = signalements.filter((s) => s.status === "open");
   const traites = signalements.filter((s) => s.status !== "open");
-  const masques = ouverts.filter((s) => s.reviewHiddenAt !== null);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -42,23 +42,19 @@ export default async function AdminReportsPage() {
           : `${ouverts.length} à examiner · ${traites.length} tranché${traites.length > 1 ? "s" : ""}`}
       </p>
 
-      {masques.length > 0 ? (
-        <p className="mt-4 rounded-2xl border border-orange-200 bg-orange-50/60 px-4 py-3 text-sm leading-relaxed text-slate-700">
-          <strong>
-            {masques.length} avis {masques.length > 1 ? "sont retirés" : "est retiré"} du public
-          </strong>{" "}
-          en attendant votre décision, et {masques.length > 1 ? "manquent" : "manque"} donc à la
-          note de {masques.length > 1 ? "leurs prestataires" : "son prestataire"}. Chaque jour
-          d&apos;attente est un jour où cette note est fausse.
-        </p>
-      ) : null}
+      <p className="mt-4 rounded-2xl border border-slate-100 bg-slate-50/60 px-4 py-3 text-sm leading-relaxed text-slate-700">
+        <strong>Un signalement ne retire rien.</strong> Ni l&apos;avis, ni l&apos;annonce
+        visés ne bougent, et aucune note ne change — trancher ici consigne votre décision,
+        rien de plus. Si le <em>texte</em> d&apos;un avis est illicite, retirez-le depuis{" "}
+        <span className="font-semibold">Avis</span> : sa note continuera de compter.
+      </p>
 
       {signalements.length === 0 ? (
         <div className="mt-6">
           <EmptyState
             icon={Flag}
             title="Aucun signalement"
-            description="N'importe quel compte connecté peut signaler un avis ou une annonce. Un avis signalé par le prestataire concerné est retiré sur-le-champ et apparaîtra ici en priorité ; une annonce signalée reste en ligne jusqu'à votre décision."
+            description="N'importe quel compte connecté peut signaler un avis ou une annonce. Rien n'est retiré automatiquement : un signalement vous alerte, et c'est vous qui décidez. Un partenaire qui conteste un avis a d'abord son droit de réponse."
           />
         </div>
       ) : (

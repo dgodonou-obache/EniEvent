@@ -253,10 +253,10 @@ const SECRETES = [
   { table: "organizations", colonne: "phone", quoi: "téléphone du partenaire" },
   { table: "organizations", colonne: "billing_email", quoi: "adresse de facturation" },
   { table: "organization_invitations", colonne: "token", quoi: "jeton d'invitation" },
-  // Migration 0048 : un motif de modération cite souvent celui qui a signalé.
-  // Lecture par `admin_reviews()`, qui sait distinguer un administrateur d'un
-  // simple `authenticated` — ce qu'un droit de colonne ne peut pas.
-  { table: "reviews", colonne: "hidden_reason", quoi: "motif de retrait d'un avis" },
+  // Migration 0050 : le **motif** de modération est public — c'est lui qui
+  // rend une modération assumée plutôt qu'un effacement. C'est le nom du
+  // modérateur qui reste fermé.
+  { table: "reviews", colonne: "redacted_by", quoi: "qui a retiré un commentaire" },
 ];
 
 /**

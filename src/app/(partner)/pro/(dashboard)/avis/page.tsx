@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { EyeOff, Star } from "lucide-react";
+import { ShieldAlert, Star } from "lucide-react";
 
 import { RatingStars, formatRating } from "@/components/reviews/RatingStars";
 import { ReplyForm } from "@/components/reviews/ReplyForm";
@@ -12,20 +12,20 @@ import { RATING_RANK_MIN } from "@/lib/validation/review";
 /**
  * Les avis reçus par un partenaire.
  *
- * Ce qu'il vient chercher ici tient en une question : **à quoi dois-je
- * répondre ?** Les avis sans réponse passent donc devant, les plus anciens en
- * tête — un avis sévère resté sans réponse pendant deux mois coûte plus cher
- * que l'avis lui-même.
+ * ⚠️ **Aucun avis ne se retire, et cet écran est donc construit autour d'une
+ * seule question : à quoi dois-je répondre ?** La décision d'exploitation du
+ * 11 octobre 2026 a supprimé le retrait sur signalement — un avis qui disparaît
+ * se lit comme un avis étouffé, et c'est la plateforme qui en paie le prix.
+ * La réponse publique est le recours, et c'est elle que l'écran met devant.
  *
- * Les avis masqués par la modération figurent dans la liste, **sans leur
- * motif** : le prestataire a le droit de savoir ce qui a été dit de lui et
- * qu'un signalement a été retenu, mais un motif de modération cite souvent
- * celui qui a signalé.
+ * Les avis sans réponse passent donc en premier, les plus anciens en tête : un
+ * avis sévère resté deux mois sans réponse coûte plus cher que l'avis lui-même,
+ * parce que le silence se lit comme un aveu.
  *
  * ⚠️ **Pas de note moyenne calculée ici.** Elle vit dans `partner_profiles`,
- * recalculée par déclencheur sur les avis non masqués : la recalculer à
- * l'écran ferait deux vérités, et c'est celle de l'écran qui finirait par
- * divorcer du classement.
+ * recalculée par déclencheur sur **tous** les avis : la recalculer à l'écran
+ * ferait deux vérités, et c'est celle de l'écran qui finirait par divorcer du
+ * classement.
  */
 
 export const metadata = { title: "Avis reçus" };
@@ -36,23 +36,20 @@ export default async function PartnerReviewsPage() {
 
   const avis = await getPartnerReviews(decision.org.orgId);
 
-  const visibles = avis.filter((a) => a.hiddenAt === null);
-  const aRepondre = visibles.filter((a) => a.reply === null);
-  const traites = avis.filter((a) => a.hiddenAt !== null || a.reply !== null);
+  const aRepondre = avis.filter((a) => a.reply === null);
+  const repondus = avis.filter((a) => a.reply !== null);
+  const severes = avis.filter((a) => a.rating <= 2);
 
-  // Même calcul que la base, sur les mêmes lignes : les avis masqués sortent
-  // de la moyenne. Affiché seulement pour que le partenaire lise la même chose
-  // que son client.
+  // Même calcul que la base, sur les mêmes lignes — c'est-à-dire sur toutes.
+  // Affiché pour que le partenaire lise exactement ce que lit son client.
   const moyenne =
-    visibles.length > 0
-      ? visibles.reduce((total, a) => total + a.rating, 0) / visibles.length
-      : null;
+    avis.length > 0 ? avis.reduce((total, a) => total + a.rating, 0) / avis.length : null;
 
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Avis reçus</h1>
-        {visibles.length === 0 ? (
+        {avis.length === 0 ? (
           <p className="mt-1 text-sm text-slate-500">Aucun avis pour l&apos;instant.</p>
         ) : (
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -61,10 +58,8 @@ export default async function PartnerReviewsPage() {
               <span className="font-bold text-slate-900">{formatRating(moyenne)}</span>
             </span>
             <span className="text-sm text-slate-500">
-              sur {visibles.length} avis
-              {aRepondre.length > 0
-                ? ` · ${aRepondre.length} sans réponse`
-                : " · tous traités"}
+              sur {avis.length} avis
+              {aRepondre.length > 0 ? ` · ${aRepondre.length} sans réponse` : " · tous répondus"}
             </span>
           </div>
         )}
@@ -83,6 +78,22 @@ export default async function PartnerReviewsPage() {
         />
       ) : (
         <div className="space-y-8">
+          {/* La règle, dite une fois et en haut. Un partenaire qui découvre un
+              1/5 cherche d'abord comment le faire enlever : autant qu'il
+              trouve immédiatement ce qu'il peut faire à la place. */}
+          {severes.length > 0 ? (
+            <p className="flex items-start gap-2 rounded-2xl border border-slate-100 bg-slate-50/60 px-4 py-3 text-sm leading-relaxed text-slate-700">
+              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+              <span>
+                <strong>Un avis ne se retire pas</strong>, même sévère, même contesté — une
+                vitrine qui n&apos;affiche que des éloges ne rassure personne. Ce que vous
+                pouvez faire, et qui pèse souvent plus que l&apos;avis : y{" "}
+                <strong>répondre publiquement</strong>. Une réponse posée se lit par tous les
+                clients suivants.
+              </span>
+            </p>
+          ) : null}
+
           {aRepondre.length > 0 ? (
             <section>
               <h2 className="mb-1 text-lg font-bold text-slate-900">À répondre</h2>
@@ -104,11 +115,11 @@ export default async function PartnerReviewsPage() {
             </section>
           ) : null}
 
-          {traites.length > 0 ? (
+          {repondus.length > 0 ? (
             <section>
-              <h2 className="mb-3 text-lg font-bold text-slate-900">Déjà traités</h2>
+              <h2 className="mb-3 text-lg font-bold text-slate-900">Répondus</h2>
               <ul className="space-y-4">
-                {traites.map((a) => (
+                {repondus.map((a) => (
                   <li key={a.id}>
                     <ReviewCard review={a} />
                   </li>
@@ -117,7 +128,7 @@ export default async function PartnerReviewsPage() {
             </section>
           ) : null}
 
-          {visibles.length > 0 && visibles.length < RATING_RANK_MIN ? (
+          {avis.length < RATING_RANK_MIN ? (
             <p className="rounded-2xl border border-slate-100 px-4 py-3 text-xs leading-relaxed text-slate-500">
               Votre note est affichée sur vos annonces mais ne compte pas encore dans le
               classement des résultats, qui attend {RATING_RANK_MIN} avis. Ce seuil protège
@@ -135,14 +146,8 @@ function ReviewCard({
 }: {
   review: Awaited<ReturnType<typeof getPartnerReviews>>[number];
 }) {
-  const masque = review.hiddenAt !== null;
-
   return (
-    <article
-      className={`rounded-2xl border p-4 transition-all duration-300 ${
-        masque ? "border-slate-100 bg-slate-50/60" : "border-slate-100 hover:border-orange-200"
-      }`}
-    >
+    <article className="rounded-2xl border border-slate-100 p-4 transition-all duration-300 hover:border-orange-200">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <RatingStars rating={review.rating} size="sm" />
@@ -162,17 +167,23 @@ function ReviewCard({
         {review.orderReference ? ` · ${review.orderReference}` : ""}
       </p>
 
-      {masque ? (
-        // Le motif n'est pas affiché : il cite souvent celui qui a signalé.
-        // Hors du `grant select`, il ne sort d'ailleurs pas de la base.
-        <p className="mt-2 flex items-start gap-1.5 rounded-xl bg-slate-100 px-3 py-2 text-xs leading-relaxed text-slate-600">
-          <EyeOff className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-          Cet avis a été retiré par l&apos;équipe ÉniEvent après examen. Il ne compte plus
-          dans votre note et n&apos;est plus visible du public.
+      {/* Le partenaire lit exactement ce que lit son client : le motif est
+          public, et le lui cacher n'aurait servi à rien. */}
+      {review.bodyRedactedAt ? (
+        <p className="mt-2 flex items-start gap-1.5 rounded-xl bg-slate-100 px-3 py-2 text-sm leading-relaxed text-slate-600">
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+          <span>
+            <span className="font-semibold text-slate-900">
+              Commentaire retiré par ÉniEvent
+            </span>
+            {review.redactionReason ? ` — ${review.redactionReason}` : null}
+            <span className="mt-0.5 block text-xs text-slate-500">
+              La note du client reste comptée : nous retirons un texte illicite, pas un
+              jugement.
+            </span>
+          </span>
         </p>
-      ) : null}
-
-      {review.body ? (
+      ) : review.body ? (
         <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-600">
           {review.body}
         </p>

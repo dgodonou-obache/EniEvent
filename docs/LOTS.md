@@ -4,8 +4,9 @@ Ce qui est en ligne, ce qui reste, et dans quel ordre. **C'est le seul document 
 lire pour savoir quoi construire ensuite.** Les plans de `~/.claude/plans/`
 décrivent des lots déjà livrés et ne font plus foi.
 
-Dernière mise à jour : 10 octobre 2026, après le lot A — Confiance. 831 tests
-verts, 49 migrations, production sur https://enievent.com.
+Dernière mise à jour : 11 octobre 2026, après le lot A — Confiance et le retour
+sur sa règle de modération. 833 tests verts, 50 migrations, production sur
+https://enievent.com.
 
 > ⚠️ **Les paiements réels sont ouverts.** Tout ce qui suit s'écrit désormais
 > sur un produit qui encaisse. Voir §3.3 — le catalogue est encore fictif, et
@@ -36,6 +37,7 @@ chiffrer, encaisser et être versé ; l'administration voit passer l'argent.
 | Partenaire : équipe, invitations, pièces justificatives, statistiques, support | En ligne |
 | Avis après prestation, notes, droit de réponse | En ligne |
 | Signalements de contenu, litiges sur réservation | En ligne |
+| Avis **jamais retirés** — seul un texte illicite l'est, la note restant comptée | En ligne |
 | Client : favoris et reçus de paiement | En ligne |
 | Suppression de compte, sous conditions (client, partenaire, entreprise) | En ligne |
 | Pages légales | En ligne, **à compléter** (§3) |
@@ -172,11 +174,18 @@ dissous, et un écran annonçant « arrive au lot 2 » alors que le lot 2 est en
 production depuis des semaines dit au lecteur que le produit est à l'arrêt.
 `tests/roadmap.test.ts` interdit désormais le retour de l'ancienne numérotation.
 
-### ~~Lot A — Confiance~~ · **livré** (migrations 0047, 0048 et 0049)
+### ~~Lot A — Confiance~~ · **livré** (migrations 0047 à 0050)
 
 `/pro/avis` · `/admin/avis` · `/admin/signalements` · `/admin/litiges`
 
 Avis et notes après prestation, droit de réponse, signalements, litiges.
+
+> ⚠️ **Un avis ne se retire pas.** Décision d'exploitation du 11 octobre 2026,
+> qui renverse celle de la veille, et le motif est le bon : *retirer un mauvais
+> avis est un signe de méfiance envers la plateforme*. Un visiteur qui ne voit
+> que des éloges n'en conclut pas que les prestataires sont bons, il en conclut
+> que le reste a été effacé. Le recours d'un partenaire est sa **réponse
+> publique**, et elle seule.
 
 Ce qu'il a fallu trancher, et qui n'était pas évident :
 
@@ -204,11 +213,13 @@ Ce qu'il a fallu trancher, et qui n'était pas évident :
 - **La signature d'un avis ne vient pas de `profiles`**, qui n'est lisible que
   par son propriétaire. Elle est calculée à l'écriture et stockée (« Clara G. »),
   et un déclencheur la ramène à « Un client » dès qu'un compte est anonymisé.
-- **« Retrait immédiat sur signalement » est une arme**, bornée par trois
-  verrous : retrait réservé à une partie concernée, immunité d'un avis rétabli,
-  plafond de débit. Ce qui reste possible — faire masquer **une fois** chacun de
-  ses mauvais avis — est écrit dans `CLAUDE.md` §5 plutôt que prétendu résolu.
-  Une **annonce** signalée, elle, n'est jamais retirée automatiquement.
+- **La seule exception au « jamais retiré » porte sur le texte, pas sur la
+  note.** Un avis peut contenir une insulte nommant un salarié, un numéro de
+  téléphone — qui contournerait tout le masquage des coordonnées — ou l'adresse
+  de quelqu'un. `redact_review_body` retire ce texte-là pour un motif **publié à
+  sa place** ; l'avis reste affiché, et **sa note reste comptée**. Cette dernière
+  clause est la garantie centrale : sans elle, « contenu illicite » redeviendrait
+  le moyen de faire disparaître un 1/5.
 - **Un litige ne déplace pas d'argent.** Il existe un chemin vers le
   remboursement, `cancel_order`, qui applique le barème figé sur la commande ;
   en ouvrir un second dans un lot sur la confiance aurait été le mauvais
@@ -218,7 +229,8 @@ Ce qu'il a fallu trancher, et qui n'était pas évident :
 production. C'était la raison de le faire maintenant — la plomberie doit exister
 avant les premières vraies réservations, sinon la première vague d'avis, la plus
 difficile à obtenir, se perd. `npm run smoke:avis` joue le parcours entier contre
-le vrai Supabase et nettoie derrière lui.
+le vrai Supabase — 40 contrôles, dont trois qui vérifient que signaler **ne
+retire rien** — et nettoie derrière lui.
 
 ### Lot B — Facturation · 7 écrans
 

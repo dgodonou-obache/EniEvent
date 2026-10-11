@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, EyeOff, Flag, Loader2, ShieldAlert } from "lucide-react";
+import { Check, Flag, Loader2, ShieldAlert } from "lucide-react";
 
 import {
   dismissReport,
@@ -99,22 +99,25 @@ export function ReportCard({ report }: { report: AdminReport }) {
             )}
           </div>
 
-          {/* Dit pourquoi l'avis est retiré, ou pourquoi il ne l'est pas. Sans
-              cette phrase, l'écran paraîtrait incohérent d'une ligne à l'autre. */}
+          {/* ⚠️ **Plus rien n'est retiré automatiquement**, et l'écran doit le
+              dire : un administrateur qui se souvient de l'ancien comportement
+              chercherait l'avis masqué. Le signalement est devenu ce qu'il
+              aurait dû être — un signal, pas un bouton de suppression. */}
           <p className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-slate-600">
-            {report.reviewHiddenAt ? (
-              <>
-                <EyeOff className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
-                Retiré du public depuis le signalement : il ne compte plus dans la note du
-                prestataire tant que vous n&apos;avez pas tranché.
-              </>
+            <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
+            {report.reviewBodyRedactedAt ? (
+              <span>
+                Le <strong>commentaire</strong> de cet avis a été retiré ; sa note reste
+                comptée et l&apos;avis reste affiché, avec le motif à la place du texte.
+              </span>
             ) : (
-              <>
-                <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
-                {report.reporterIsParty
-                  ? "Toujours en ligne : cet avis a déjà été rétabli une fois, il est désormais immunisé contre les signalements."
-                  : "Toujours en ligne : le retrait automatique ne joue que pour une partie concernée, afin qu'un concurrent ne puisse pas éteindre les avis d'un rival."}
-              </>
+              <span>
+                <strong>Cet avis reste en ligne</strong>, et le restera : un avis ne se
+                retire pas. Si son <em>texte</em> est illicite — insulte nominative,
+                coordonnées, données personnelles — retirez-le depuis{" "}
+                <span className="font-semibold">Avis</span> ; la note du client continuera
+                de compter. Sinon, le recours du prestataire est sa réponse publique.
+              </span>
             )}
           </p>
         </>
@@ -152,19 +155,27 @@ export function ReportCard({ report }: { report: AdminReport }) {
             disabled={pending}
           >
             {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-            Retenir le signalement
+            Retenir — contenu problématique
           </Button>
 
-          <Button type="submit" name="sens" value="dismissed" size="sm" variant="ghost" disabled={pending}>
-            Écarter{surAvis ? " et rétablir" : ""}
+          <Button
+            type="submit"
+            name="sens"
+            value="dismissed"
+            size="sm"
+            variant="ghost"
+            disabled={pending}
+          >
+            Écarter — rien à reprocher
           </Button>
         </div>
 
         {surAvis ? (
           <p className="mt-2 text-xs leading-relaxed text-slate-500">
-            Écarter rétablit l&apos;avis <strong>définitivement</strong> : aucun nouveau
-            signalement ne pourra plus le masquer. Seule l&apos;équipe pourra encore le
-            retirer, depuis <span className="font-semibold">Avis</span>.
+            Les deux issues <strong>ne touchent pas à l&apos;avis</strong> : elles consignent
+            votre décision, et c&apos;est tout. Retirer un commentaire illicite est un geste
+            distinct, depuis <span className="font-semibold">Avis</span> — les enchaîner
+            ferait du signalement un bouton de suppression.
           </p>
         ) : null}
 

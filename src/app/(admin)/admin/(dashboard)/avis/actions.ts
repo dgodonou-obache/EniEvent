@@ -7,22 +7,28 @@ import { REASON_MIN } from "@/lib/validation/review";
 import { createClient } from "@/utils/supabase/server";
 
 /**
- * Modération des avis.
+ * Modération des avis — et elle ne porte que sur le **texte**.
  *
- * ⚠️ **Le circuit de modération des annonces ne journalise rien et ne prévient
- * personne** (`/admin/moderation`). Ce n'est pas un modèle à reprendre : un
- * avis retiré est une parole supprimée, et la trace de qui l'a retirée et
- * pourquoi est ce qui distingue une modération d'un arbitraire.
- * `hide_review` et `reinstate_review` écrivent donc dans `audit_logs`.
+ * ⚠️ **Un avis ne se retire pas, décision d'exploitation du 11 octobre 2026.**
+ * Retirer un mauvais avis est un signe de méfiance envers la plateforme : un
+ * visiteur qui ne voit que des éloges n'en conclut pas que les prestataires
+ * sont bons, il en conclut que le reste a été effacé. Le recours d'un
+ * partenaire est la **réponse publique**, et elle seule.
  *
- * **Retirer n'est pas effacer.** Un avis masqué sort des moyennes et du public,
- * mais reste lisible par son auteur et par le prestataire concerné : on ne
- * supprime pas la parole de quelqu'un sans qu'il puisse la relire.
+ * Ce qui subsiste, et à cette condition seulement : un avis peut contenir
+ * autre chose qu'un reproche — une insulte nommant un salarié, un numéro de
+ * téléphone qui contournerait tout le masquage des coordonnées, l'adresse de
+ * quelqu'un. `redact_review_body` retire ce texte-là, pour un motif **publié
+ * sous l'avis**, et :
  *
- * Le rétablissement pose `reinstated_at`, qui vaut **immunité** : un nouveau
- * signalement ne masquera plus cet avis. Sans cela, un prestataire pourrait
- * faire disparaître indéfiniment un avis sévère en le resignalant après chaque
- * examen.
+ * - **la note reste comptée**, ce qui est le point entier. Sans cela,
+ *   « contenu illicite » redeviendrait le moyen de faire disparaître un 1/5, et
+ *   on serait revenu au point de départ par la porte de service ;
+ * - **l'avis reste affiché**, avec ses étoiles et le motif à la place du texte.
+ *   La plateforme ne cache pas qu'il s'est passé quelque chose, elle dit quoi.
+ *
+ * Le geste est journalisé dans `audit_logs` — contrairement à la modération des
+ * annonces, qui ne laisse aucune trace et n'est pas un modèle à reprendre.
  */
 
 export interface ModerationState {
@@ -41,7 +47,7 @@ function rafraichir() {
   }
 }
 
-export async function hideReview(
+export async function redactReviewBody(
   _previous: ModerationState,
   formData: FormData,
 ): Promise<ModerationState> {
@@ -50,31 +56,16 @@ export async function hideReview(
   const reviewId = String(formData.get("reviewId") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
 
-  // Même minimum qu'en base. C'est ce motif qu'on relira dans six mois si
-  // l'auteur réclame, et « spam » n'expliquera rien.
+  // Ce motif est **lu par le public**, à la place du commentaire. D'où le
+  // minimum : il doit se lire comme une phrase, pas comme un code interne.
   if (reason.length < REASON_MIN) {
-    return { error: `Indiquez un motif d'au moins ${REASON_MIN} caractères.` };
+    return { error: `Indiquez un motif d'au moins ${REASON_MIN} caractères : il sera publié.` };
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("hide_review", { avis: reviewId, motif: reason });
-
-  if (error) return { error: translate(error.message) };
-
-  rafraichir();
-
-  return { message: "Avis retiré. Il ne compte plus dans la note du prestataire." };
-}
-
-export async function reinstateReview(
-  _previous: ModerationState,
-  formData: FormData,
-): Promise<ModerationState> {
-  await requireAdmin();
-
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("reinstate_review", {
-    avis: String(formData.get("reviewId") ?? ""),
+  const { error } = await supabase.rpc("redact_review_body", {
+    avis: reviewId,
+    motif: reason,
   });
 
   if (error) return { error: translate(error.message) };
@@ -83,8 +74,26 @@ export async function reinstateReview(
 
   return {
     message:
-      "Avis rétabli. Il ne pourra plus être masqué par un nouveau signalement : seule l'équipe pourra le retirer de nouveau.",
+      "Commentaire retiré. Le motif s'affiche à sa place, et la note du client continue de compter.",
   };
+}
+
+export async function restoreReviewBody(
+  _previous: ModerationState,
+  formData: FormData,
+): Promise<ModerationState> {
+  await requireAdmin();
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("restore_review_body", {
+    avis: String(formData.get("reviewId") ?? ""),
+  });
+
+  if (error) return { error: translate(error.message) };
+
+  rafraichir();
+
+  return { message: "Commentaire rétabli : le texte du client est de nouveau affiché." };
 }
 
 function translate(message: string): string {

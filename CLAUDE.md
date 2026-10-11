@@ -431,17 +431,36 @@ barrière devant quelqu'un qui n'ouvre pas de navigateur.
   le nom complet. Elle survit donc à un changement de nom — et un déclencheur sur
   `profiles.deleted_at` la ramène à « Un client » dès qu'un compte est anonymisé, sans
   quoi quelqu'un qui a demandé à être oublié continuerait de signer.
-- ⚠️ **« Retrait immédiat sur signalement » est une arme, et trois bornes l'en empêchent.**
-  C'est une décision d'exploitation justifiée — un propos diffamatoire laissé trois jours
-  sur une fiche coûte des clients qu'aucune modération tardive ne rendra. Mais pris tel
-  quel, un partenaire effacerait chacun de ses mauvais avis et un concurrent éteindrait
-  les **bons** avis d'un rival. D'où, dans la migration 0049 : le retrait n'opère que pour
-  **une partie concernée** ; un avis **rétabli est immunisé** (`reviews.reinstated_at`),
-  ce qui ferme la boucle du resignalement perpétuel ; et un **plafond de débit** borne la
-  rafale. Ce qui reste possible est dit plutôt que prétendu résolu — un partenaire peut
-  faire masquer **une fois** chacun de ses mauvais avis, le temps de l'examen, et le coût
-  retombe sur lui. Une **annonce** signalée, elle, n'est jamais retirée automatiquement :
-  cela couperait les réservations d'un partenaire sur la parole d'un inconnu.
+- ⚠️ **UN AVIS NE SE RETIRE PAS. Jamais, pour aucun motif, quelle que soit sa note.**
+  Décision d'exploitation du 11 octobre 2026, qui **renverse** celle de la veille, et le
+  motif est le bon : *retirer un mauvais avis est un signe de méfiance envers la
+  plateforme*. Un visiteur qui ne voit que des éloges n'en conclut pas que les
+  prestataires sont bons, il en conclut que le reste a été effacé — et ÉniEvent perd
+  exactement ce que les avis devaient lui apporter. **Le recours d'un partenaire est sa
+  réponse publique**, et elle seule. La migration 0050 a donc supprimé le retrait sur
+  signalement, l'immunité qui le bornait, et les fonctions `hide_review` /
+  `reinstate_review` — **supprimées, pas laissées en coquilles** : un appel oublié doit
+  échouer, pas réussir sans rien faire. Un signalement est redevenu ce qu'il aurait dû
+  être : un signal adressé à l'équipe, qui ne touche à rien. Ne pas reconstruire ce
+  mécanisme sans que l'exploitant le demande explicitement.
+- ⚠️ **La seule exception porte sur le _texte_, jamais sur la note — et c'est la ligne à
+  ne pas déplacer.** Un avis peut contenir autre chose qu'un reproche : une insulte
+  nommant un salarié, un numéro de téléphone — qui contournerait d'un coup tout le
+  masquage des coordonnées de la messagerie —, l'adresse de quelqu'un. « Un avis reste »
+  ne peut pas vouloir dire « ÉniEvent ne peut rien faire de ça ».
+  `redact_review_body(avis, motif)` retire donc ce texte-là, et :
+  **la note reste comptée** — `app.refresh_ratings` ne filtre plus rien, et c'est la
+  garantie centrale : sans elle, « contenu illicite » redeviendrait le moyen de faire
+  disparaître un 1/5, et on serait revenu au point de départ par la porte de service ;
+  **l'avis reste affiché** avec ses étoiles ; et **le motif est publié à sa place**, lu
+  par tous. C'est ce qui sépare une modération assumée d'un effacement — d'où un motif
+  écrit *pour le lecteur*, et `redacted_by` (qui a tranché) seul fermé. Le geste est
+  journalisé. Jamais pour un avis simplement sévère.
+  `tests/rls-avis.test.ts` garde la garantie en réintroduisant le filtre, et
+  `smoke:avis` vérifie contre la vraie base que signaler ne retire rien.
+- Une **annonce** signalée n'est jamais retirée automatiquement non plus : cela couperait
+  les réservations d'un partenaire sur la parole d'un inconnu. Le **plafond de débit** des
+  signalements (0049) survit, lui : il borne un volume d'envois, ce qui n'a rien à voir.
 - ⚠️ **Un litige ne déplace pas d'argent, et `resolve_dispute` n'en déplacera jamais.** Il
   existe un chemin vers le remboursement — `cancel_order` — qui applique le barème figé
   sur la commande et borne le rendu à l'encaissé (§1). En ouvrir un second serait un
@@ -653,6 +672,11 @@ qui appelle une réponse doit déclencher une notification.**
   signalement, lui, **transporte son motif** : son destinataire est l'équipe, qui a par
   ailleurs accès à la table, et le cacher obligerait à ouvrir le back-office pour savoir
   s'il faut s'y mettre tout de suite — même raisonnement que `support.new`.
+  ⚠️ **Et aucun de ces deux courriels ne promet de retrait.** `review.received` est lu par
+  un partenaire qui découvre un 1/5, donc au moment précis où il cherche comment le faire
+  enlever : il dit donc tout de suite qu'un avis ne se retire pas, et pourquoi sa réponse
+  vaut mieux pour lui. Un texte qui laisse espérer un retrait fabrique une déception et
+  une réclamation.
 - ⚠️ **`dispute.opened` a trois destinataires et trois rédactions, et jamais celui qui
   l'ouvre.** La charge utile porte `pour` (`client`, `partner` ou `equipe`) et tout le
   texte en dépend : la partie mise en cause doit pouvoir donner sa version, et apprendre

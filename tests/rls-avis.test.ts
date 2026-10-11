@@ -424,12 +424,18 @@ async function partenaireNeuf(nom: string): Promise<{ org: string; annonce: stri
 }
 
 /** Dépose un avis en tant que CLARA sur une commande fabriquée pour l'occasion. */
-async function deposer(org: string, annonce: string | null, note: number): Promise<string> {
+async function deposer(
+  org: string,
+  annonce: string | null,
+  note: number,
+  texte: string | null = null,
+): Promise<string> {
   const commande = await commandeTerminee({ client: CLARA, org, annonce });
   const { rows } = await actingAs(db, CLARA, async () =>
-    db.query("insert into reviews (order_id, rating) values ($1, $2) returning id", [
+    db.query("insert into reviews (order_id, rating, body) values ($1, $2, $3) returning id", [
       commande,
       note,
+      texte,
     ]),
   );
   return rows[0].id as string;
@@ -498,46 +504,105 @@ describe("les notes recalculées", () => {
     expect(Number(trois.rating_sort)).toBe(5);
   });
 
-  it("retire des moyennes un avis masqué, et le rend au rétablissement", async () => {
-    const { org, annonce } = await partenaireNeuf("Masque Test");
+  /**
+   * ⚠️ **La garantie centrale de la décision du 11 octobre 2026.**
+   *
+   * Retirer le commentaire d'un avis ne soulage **pas** la note. Si cette
+   * assertion tombe, « contenu illicite » redevient le moyen de faire
+   * disparaître un 1/5 et on est revenu au point de départ par la porte de
+   * service — sans qu'aucune erreur n'apparaisse nulle part, puisque le produit
+   * continuerait de fonctionner.
+   */
+  it("ne retire jamais un avis de la moyenne, même commentaire retiré", async () => {
+    const { org, annonce } = await partenaireNeuf("Moyenne Intacte");
 
     await deposer(org, annonce, 5);
     const mauvais = await deposer(org, annonce, 1);
 
-    const moyenne = async () =>
-      Number(
-        (await db.query("select rating_avg from listings where id = $1", [annonce])).rows[0]
-          .rating_avg,
-      );
+    const notes = async () =>
+      (
+        await db.query("select rating_avg, rating_count from listings where id = $1", [annonce])
+      ).rows[0];
 
-    expect(await moyenne()).toBe(3);
+    const avant = await notes();
+    expect(Number(avant.rating_avg)).toBe(3);
+    expect(avant.rating_count).toBe(2);
 
     await actingAs(db, ADMIN, async () =>
-      db.query("select hide_review($1, 'Propos injurieux envers le personnel')", [mauvais]),
+      db.query("select redact_review_body($1, 'Propos injurieux envers un salarié')", [mauvais]),
     );
-    expect(await moyenne()).toBe(5);
 
-    await actingAs(db, ADMIN, async () => db.query("select reinstate_review($1)", [mauvais]));
-    expect(await moyenne()).toBe(3);
+    const apres = await notes();
+    expect(Number(apres.rating_avg)).toBe(3);
+    expect(apres.rating_count).toBe(2);
+
+    // Et le profil du partenaire suit la même règle.
+    const { rows: p } = await db.query(
+      "select rating_avg, rating_count from partner_profiles where org_id = $1",
+      [org],
+    );
+    expect(Number(p[0].rating_avg)).toBe(3);
+    expect(p[0].rating_count).toBe(2);
   });
 
-  it("revient à « pas encore de note » quand il ne reste aucun avis", async () => {
-    // ⚠️ « Pas encore de donnée » et « zéro » ne s'écrivent pas pareil (§5 du
-    // guide). Une annonce dont le seul avis a été masqué doit afficher « — »,
-    // pas « 0 sur 5 » — et c'est `null` qui porte cette différence.
-    const { org, annonce } = await partenaireNeuf("Vide Test");
+  it("garde l'avis lisible, avec le motif à la place du texte", async () => {
+    const { org, annonce } = await partenaireNeuf("Motif Public");
+    const avis = await deposer(org, annonce, 1);
 
-    const seul = await deposer(org, annonce, 4);
     await actingAs(db, ADMIN, async () =>
-      db.query("select hide_review($1, 'Avis déposé par erreur sur la mauvaise fiche')", [seul]),
+      db.query("select redact_review_body($1, 'Numéro de téléphone publié dans le texte')", [
+        avis,
+      ]),
     );
+
+    // Lu par un **visiteur**, sans aucune session : l'avis reste public, et le
+    // motif avec lui. C'est ce qui distingue une modération assumée d'un
+    // effacement.
+    const { rows } = await actingAs(db, null, async () =>
+      db.query(
+        "select rating, body_redacted_at, redaction_reason from reviews where id = $1",
+        [avis],
+      ),
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].rating).toBe(1);
+    expect(rows[0].body_redacted_at).not.toBeNull();
+    expect(rows[0].redaction_reason).toMatch(/téléphone/);
+  });
+
+  it("rétablit le commentaire sans toucher à la note", async () => {
+    const { org, annonce } = await partenaireNeuf("Retablir Texte");
+    const avis = await deposer(org, annonce, 2);
+
+    await actingAs(db, ADMIN, async () => {
+      await db.query("select redact_review_body($1, 'Retiré par erreur de manipulation')", [avis]);
+      await db.query("select restore_review_body($1)", [avis]);
+    });
 
     const { rows } = await db.query(
-      "select rating_avg, rating_count from listings where id = $1",
-      [annonce],
+      "select body_redacted_at, redaction_reason from reviews where id = $1",
+      [avis],
     );
-    expect(rows[0].rating_avg).toBeNull();
-    expect(rows[0].rating_count).toBe(0);
+    expect(rows[0].body_redacted_at).toBeNull();
+    expect(rows[0].redaction_reason).toBeNull();
+
+    const { rows: n } = await db.query("select rating_count from listings where id = $1", [
+      annonce,
+    ]);
+    expect(n[0].rating_count).toBe(1);
+  });
+
+  it("n'offre plus aucun moyen de retirer un avis", async () => {
+    // ⚠️ `hide_review` et `reinstate_review` ont été **supprimées**, pas
+    // laissées en coquilles : un appel oublié quelque part doit échouer, pas
+    // réussir sans rien faire.
+    for (const appel of [
+      "select hide_review('11111111-1111-4111-8111-111111111111', 'un motif assez long ici')",
+      "select reinstate_review('11111111-1111-4111-8111-111111111111')",
+    ]) {
+      await expect(db.query(appel)).rejects.toThrow(/does not exist/i);
+    }
   });
 });
 
@@ -638,72 +703,75 @@ describe("droit de réponse", () => {
 });
 
 describe("lecture", () => {
-  let masque: string;
+  let modere: string;
 
   beforeAll(async () => {
     const commande = await commandeTerminee({ client: CLARA, org: orgBob, annonce: null });
     const { rows } = await actingAs(db, CLARA, async () =>
       db.query(
         `insert into reviews (order_id, rating, body)
-         values ($1, 1, 'Texte à masquer pour le test.') returning id`,
+         values ($1, 1, 'Texte dont le commentaire sera retiré.') returning id`,
         [commande],
       ),
     );
-    masque = rows[0].id as string;
+    modere = rows[0].id as string;
 
     await actingAs(db, ADMIN, async () =>
-      db.query("select hide_review($1, 'Signalement retenu : propos diffamatoires')", [masque]),
+      db.query("select redact_review_body($1, 'Propos diffamatoires nominatifs')", [modere]),
     );
   });
 
-  it("montre les avis publiés à un visiteur non connecté", async () => {
+  it("montre tous les avis à un visiteur non connecté", async () => {
+    // ⚠️ **Il n'existe plus d'avis invisible.** La politique est devenue
+    // `using (true)` : un avis dont le commentaire a été retiré se lit comme
+    // les autres, étoiles comprises.
     const { rows } = await actingAs(db, null, async () =>
-      db.query("select id from reviews where hidden_at is null"),
+      db.query("select id from reviews"),
     );
 
     expect(rows.length).toBeGreaterThan(0);
   });
 
-  it("cache un avis masqué au public", async () => {
+  it("montre l'avis modéré au public, motif compris", async () => {
     const { rows } = await actingAs(db, null, async () =>
-      db.query("select id from reviews where id = $1", [masque]),
+      db.query(
+        "select rating, body_redacted_at, redaction_reason from reviews where id = $1",
+        [modere],
+      ),
     );
 
-    expect(rows).toHaveLength(0);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].rating).toBe(1);
+    expect(rows[0].redaction_reason).toMatch(/diffamatoires/);
   });
 
-  it("le laisse lisible par son auteur et par le prestataire concerné", async () => {
-    // On ne supprime pas la parole de quelqu'un sans qu'il puisse la relire —
-    // et le prestataire a besoin de savoir ce qui a été dit de lui.
-    for (const qui of [CLARA, BOB]) {
-      const { rows } = await actingAs(db, qui, async () =>
-        db.query("select id from reviews where id = $1", [masque]),
-      );
-      expect(rows).toHaveLength(1);
-    }
-  });
-
-  it("garde le motif de modération hors de toute lecture directe", async () => {
+  it("garde le nom du modérateur hors de toute lecture directe", async () => {
     // ⚠️ Contrôle **par le nom de la colonne**, pas par `select *` : une
     // colonne retirée du grant ne sort plus d'une étoile, et un contrôle écrit
     // ainsi passerait au vert pour la mauvaise raison.
+    //
+    // Le **motif** est public depuis la migration 0050 — c'est lui qui rend la
+    // modération assumée. C'est `redacted_by`, qui a tranché, qui reste fermé.
     for (const qui of [CLARA, BOB, ADMIN]) {
       await actingAs(db, qui, async () => {
         await expect(
-          db.query("select hidden_reason from reviews where id = $1", [masque]),
+          db.query("select redacted_by from reviews where id = $1", [modere]),
         ).rejects.toThrow(/permission denied/i);
       });
     }
   });
 
-  it("le rend à l'administration par admin_reviews()", async () => {
-    // Un administrateur est lui aussi `authenticated` : seule une fonction
-    // `security definer` sait l'en distinguer.
+  it("rend le texte d'origine à l'administration par admin_reviews()", async () => {
+    // Le texte retiré reste lisible par l'équipe : c'est lui qu'on relira si
+    // l'auteur réclame.
     const { rows } = await actingAs(db, ADMIN, async () =>
-      db.query("select hidden_reason from admin_reviews('masques') where id = $1", [masque]),
+      db.query("select body, redaction_reason from admin_reviews('moderes') where id = $1", [
+        modere,
+      ]),
     );
 
-    expect(rows[0].hidden_reason).toMatch(/diffamatoires/);
+    expect(rows[0].body).toMatch(/commentaire sera retiré/);
+    expect(rows[0].redaction_reason).toMatch(/diffamatoires/);
   });
 
   it("ne rend rien par admin_reviews() à qui n'est pas administrateur", async () => {
@@ -714,11 +782,13 @@ describe("lecture", () => {
     expect(rows).toHaveLength(0);
   });
 
-  it("refuse à quiconque de masquer un avis sans être administrateur", async () => {
+  it("refuse à quiconque de retirer un commentaire sans être administrateur", async () => {
     for (const qui of [CLARA, ALICE, BOB]) {
       await actingAs(db, qui, async () => {
         await expect(
-          db.query("select hide_review($1, 'Cet avis ne me convient pas du tout')", [masque]),
+          db.query("select redact_review_body($1, 'Cet avis ne me convient pas du tout')", [
+            modere,
+          ]),
         ).rejects.toThrow(/équipe ÉniEvent/i);
       });
     }
@@ -851,46 +921,50 @@ async function partenaireAvecPatron(
 /**
  * Signalements.
  *
- * ⚠️ **Le retrait immédiat sur signalement est une arme**, et ces contrôles
- * gardent les trois bornes qui l'empêchent d'en être une. Si l'une tombe, un
- * partenaire efface ses mauvais avis ou un concurrent éteint les bons avis d'un
- * rival — et dans les deux cas, rien n'échoue : la plateforme continue de
- * fonctionner en mentant.
+ * ⚠️ **La décision du 11 octobre 2026 a retourné ce bloc entier.** Un
+ * signalement ne retire plus rien : il est redevenu ce qu'il aurait dû être, un
+ * signal adressé à l'équipe. Retirer un mauvais avis est un signe de méfiance
+ * envers la plateforme — une vitrine qui n'affiche que des éloges ne rassure
+ * personne.
+ *
+ * Ce que ces contrôles gardent est donc l'**inverse** de ce qu'ils gardaient :
+ * que signaler **ne fasse rien disparaître**, quel que soit le signaleur, et
+ * que la note du prestataire ne bouge pas d'un dixième.
  */
 describe("signalement d'un avis", () => {
-  it("retire l'avis sur-le-champ quand le prestataire concerné le signale", async () => {
-    // La raison d'être du dispositif : un propos diffamatoire laissé trois
-    // jours sur une fiche coûte des clients qu'aucune modération tardive ne
-    // rendra.
-    const { org, annonce, patron } = await partenaireAvecPatron("Retrait Immediat");
-    const avis = await deposer(org, annonce, 1);
+  it("ne retire rien, même signalé par le prestataire concerné", async () => {
+    // ⚠️ **Le contrôle qui porte toute la décision.** C'était le comportement
+    // voulu la veille, et c'est devenu le défaut à interdire : si cette
+    // assertion tombe, un partenaire efface ses mauvais avis et la plateforme
+    // perd exactement ce que les avis devaient lui apporter.
+    const { org, annonce, patron } = await partenaireAvecPatron("Rien Retire");
+    const avis = await deposer(org, annonce, 1, "Prestation très en dessous de ce qui était promis.");
 
-    const ref = await actingAs(db, patron, async () =>
-      db.query("select open_report('review', $1, 'Propos diffamatoires sur notre personnel') as ref", [
+    const { rows: ref } = await actingAs(db, patron, async () =>
+      db.query("select open_report('review', $1, 'Nous contestons formellement cet avis') as ref", [
         avis,
       ]),
     );
 
-    expect(ref.rows[0].ref).toMatch(/^SIG-/);
+    expect(ref[0].ref).toMatch(/^SIG-/);
 
-    const { rows } = await db.query("select hidden_at, hidden_reason from reviews where id = $1", [
-      avis,
-    ]);
-    expect(rows[0].hidden_at).not.toBeNull();
-    expect(rows[0].hidden_reason).toMatch(/examen en cours/);
+    const { rows } = await db.query(
+      "select body, body_redacted_at from reviews where id = $1",
+      [avis],
+    );
+    expect(rows[0].body_redacted_at).toBeNull();
+    expect(rows[0].body).not.toBeNull();
 
-    // Et il sort de la note aussitôt, par le même déclencheur de recalcul.
+    // Et la note n'a pas bougé d'un dixième.
     const { rows: note } = await db.query(
       "select rating_avg, rating_count from listings where id = $1",
       [annonce],
     );
-    expect(note[0].rating_count).toBe(0);
+    expect(Number(note[0].rating_avg)).toBe(1);
+    expect(note[0].rating_count).toBe(1);
   });
 
-  it("ne retire rien quand un tiers signale", async () => {
-    // ⚠️ **La borne qui protège un partenaire de son concurrent.** Sans elle,
-    // il suffirait de signaler les **bons** avis d'un rival pour le faire
-    // reculer au classement.
+  it("ne retire rien non plus quand un tiers signale", async () => {
     const { org, annonce } = await partenaireAvecPatron("Tiers Signale");
     const avis = await deposer(org, annonce, 5);
 
@@ -900,12 +974,29 @@ describe("signalement d'un avis", () => {
       ]),
     );
 
-    const { rows } = await db.query("select hidden_at from reviews where id = $1", [avis]);
-    expect(rows[0].hidden_at).toBeNull();
+    const { rows } = await db.query("select body_redacted_at from reviews where id = $1", [avis]);
+    expect(rows[0].body_redacted_at).toBeNull();
 
-    // Le signalement existe bien : il est examiné, il ne masque simplement rien.
     const { rows: s } = await db.query("select status from reports where review_id = $1", [avis]);
     expect(s[0].status).toBe("open");
+  });
+
+  it("l'avis reste public pendant tout l'examen", async () => {
+    // Le défaut d'hier : l'avis disparaissait le temps du traitement, et la
+    // note de son prestataire était fausse pendant ce temps-là.
+    const { org, annonce, patron } = await partenaireAvecPatron("Public Pendant");
+    const avis = await deposer(org, annonce, 2, "Texte qui reste lisible pendant tout l examen.");
+
+    await actingAs(db, patron, async () =>
+      db.query("select open_report('review', $1, 'Signalement pendant lequel on vérifie')", [avis]),
+    );
+
+    const { rows } = await actingAs(db, null, async () =>
+      db.query("select id, body from reviews where id = $1", [avis]),
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].body).toMatch(/pendant tout l examen/);
   });
 
   it("refuse de signaler deux fois le même contenu", async () => {
@@ -945,77 +1036,37 @@ describe("signalement d'un avis", () => {
     });
   });
 
-  it("immunise un avis rétabli contre tout nouveau signalement", async () => {
-    // ⚠️ **La borne qui ferme la boucle.** Sans elle, il suffisait de
-    // resignaler après chaque examen pour masquer un avis à perpétuité.
-    const { org, annonce, patron } = await partenaireAvecPatron("Immunite");
-    const avis = await deposer(org, annonce, 1);
-
-    const { rows: premier } = await actingAs(db, patron, async () =>
-      db.query("select open_report('review', $1, 'Premier signalement de cet avis') as ref", [avis]),
-    );
-    expect(premier[0].ref).toMatch(/^SIG-/);
-
-    const { rows: s } = await db.query("select id from reports where review_id = $1", [avis]);
-    await actingAs(db, ADMIN, async () =>
-      db.query("select resolve_report($1, 'dismissed', 'Avis sévère mais légitime, rien à retirer')", [
-        s[0].id,
-      ]),
-    );
-
-    const { rows: apres } = await db.query(
-      "select hidden_at, reinstated_at from reviews where id = $1",
-      [avis],
-    );
-    expect(apres[0].hidden_at).toBeNull();
-    expect(apres[0].reinstated_at).not.toBeNull();
-
-    // Second signalement, par quelqu'un d'autre de la même structure : il est
-    // enregistré, mais ne masque plus rien.
-    const users = await db.query(
-      `insert into auth.users (id, email, raw_user_meta_data)
-       values (gen_random_uuid(), 'second@immunite.bj', '{"account_type":"partenaire"}') returning id`,
-    );
-    const collegue = users.rows[0].id as string;
-    await db.query(
-      "insert into organization_members (org_id, org_type, user_id, role) values ($1, 'partner', $2, 'manager')",
-      [org, collegue],
-    );
-
-    await actingAs(db, collegue, async () =>
-      db.query("select open_report('review', $1, 'Nous le signalons de nouveau quand même')", [
-        avis,
-      ]),
-    );
-
-    const { rows: toujours } = await db.query("select hidden_at from reviews where id = $1", [avis]);
-    expect(toujours[0].hidden_at).toBeNull();
-  });
-
-  it("garde l'avis masqué quand le signalement est retenu", async () => {
-    const { org, annonce, patron } = await partenaireAvecPatron("Retenu");
-    const avis = await deposer(org, annonce, 1);
+  it("trancher un signalement ne touche pas à l'avis", async () => {
+    // ⚠️ Les deux issues consignent une décision, et c'est tout. Retirer un
+    // commentaire illicite est un **second geste**, explicite : les enchaîner
+    // ferait du signalement un bouton de suppression.
+    const { org, annonce, patron } = await partenaireAvecPatron("Trancher Neutre");
+    const avis = await deposer(org, annonce, 1, "Texte que trancher le signalement ne doit pas effacer.");
 
     await actingAs(db, patron, async () =>
-      db.query("select open_report('review', $1, 'Insultes nominatives envers notre chef')", [avis]),
+      db.query("select open_report('review', $1, 'Un motif suffisamment long ici')", [avis]),
     );
-
     const { rows: s } = await db.query("select id from reports where review_id = $1", [avis]);
+
     await actingAs(db, ADMIN, async () =>
-      db.query("select resolve_report($1, 'upheld', 'Insultes confirmées, retrait définitif')", [
+      db.query("select resolve_report($1, 'upheld', 'Signalement fondé, contenu problématique')", [
         s[0].id,
       ]),
     );
 
-    // Le motif est réécrit avec la décision : sans cela, la trace resterait
-    // « examen en cours » pour toujours.
-    const { rows } = await actingAs(db, ADMIN, async () =>
-      db.query("select hidden_at, hidden_reason from admin_reviews('masques') where id = $1", [
-        avis,
-      ]),
+    // « Retenu » **ne retire rien** : c'est la différence avec la veille.
+    const { rows } = await db.query(
+      "select body, body_redacted_at from reviews where id = $1",
+      [avis],
     );
-    expect(rows[0].hidden_at).not.toBeNull();
-    expect(rows[0].hidden_reason).toMatch(/Insultes confirmées/);
+    expect(rows[0].body_redacted_at).toBeNull();
+    expect(rows[0].body).not.toBeNull();
+
+    const { rows: r } = await db.query("select status, resolution from reports where id = $1", [
+      s[0].id,
+    ]);
+    expect(r[0].status).toBe("upheld");
+    expect(r[0].resolution).toMatch(/fondé/);
   });
 
   it("refuse de trancher deux fois le même signalement", async () => {
@@ -1058,6 +1109,26 @@ describe("signalement d'un avis", () => {
         ).rejects.toThrow(/équipe ÉniEvent/i);
       });
     }
+  });
+
+  it("laisse le prestataire répondre à un avis dont le texte a été retiré", async () => {
+    // Le cas où il en a le plus besoin : son client a été modéré, et il veut
+    // dire publiquement ce qui s'est passé. La migration 0048 le refusait.
+    const { org, annonce, patron } = await partenaireAvecPatron("Repondre Modere");
+    const avis = await deposer(org, annonce, 1);
+
+    await actingAs(db, ADMIN, async () =>
+      db.query("select redact_review_body($1, 'Insultes nominatives envers un salarié')", [avis]),
+    );
+
+    await actingAs(db, patron, async () =>
+      db.query("select reply_to_review($1, 'Nous regrettons cet échange et voici notre version.')", [
+        avis,
+      ]),
+    );
+
+    const { rows } = await db.query("select reply from reviews where id = $1", [avis]);
+    expect(rows[0].reply).toMatch(/notre version/);
   });
 
   it("cache un signalement à tout le monde sauf son auteur et l'équipe", async () => {
@@ -1109,10 +1180,13 @@ describe("signalement d'un avis", () => {
 
   it("plafonne les signalements sans gêner un usage normal", async () => {
     // ⚠️ Les **deux** bords : un plafond trop serré est une panne, pas une
-    // protection (leçon de la migration 0045).
+    // protection (leçon de la migration 0045). Ce plafond est le seul des trois
+    // bornes de la 0049 qui survive — il borne un volume d'envois, ce qui n'a
+    // rien à voir avec le retrait.
     const users = await db.query(
       `insert into auth.users (id, email, raw_user_meta_data)
-       values (gen_random_uuid(), 'rafale@exemple.bj', '{"account_type":"particulier"}') returning id`,
+       values (gen_random_uuid(), 'rafale@exemple.bj', '{"account_type":"particulier"}')
+       returning id`,
     );
     const rafale = users.rows[0].id as string;
 

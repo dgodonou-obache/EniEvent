@@ -1,4 +1,4 @@
-import { MessageSquareQuote, Star } from "lucide-react";
+import { MessageSquareQuote, ShieldAlert, Star } from "lucide-react";
 
 import type { ReviewView } from "@/lib/reviews";
 import { RATING_RANK_MIN } from "@/lib/validation/review";
@@ -50,7 +50,7 @@ export function ReviewList({
           <p className="mt-3 text-sm font-bold text-slate-900">Pas encore d&apos;avis</p>
           <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
             Seul un client qui a réservé ici et réglé sa prestation peut en écrire un.
-            C&apos;est pour cela qu&apos;il n&apos;y en a aucun de complaisance.
+            Et aucun n&apos;est retirable : ni les bons, ni les mauvais.
           </p>
         </div>
       </section>
@@ -95,7 +95,25 @@ export function ReviewList({
               </time>
             </div>
 
-            {avis.body ? (
+            {/* ⚠️ **Un avis n'est jamais retiré, seul son texte peut l'être** —
+                et quand il l'est, le motif prend sa place **en clair**. C'est
+                tout l'écart entre une modération assumée et un effacement : le
+                lecteur voit qu'il s'est passé quelque chose, et quoi. La note,
+                elle, est toujours là, au-dessus, et compte dans la moyenne. */}
+            {avis.bodyRedactedAt ? (
+              <p className="mt-2 flex items-start gap-1.5 rounded-xl bg-slate-100 px-3 py-2 text-sm leading-relaxed text-slate-600">
+                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                <span>
+                  <span className="font-semibold text-slate-900">
+                    Commentaire retiré par ÉniEvent
+                  </span>
+                  {avis.redactionReason ? ` — ${avis.redactionReason}` : null}
+                  <span className="mt-0.5 block text-xs text-slate-500">
+                    La note du client reste comptée.
+                  </span>
+                </span>
+              </p>
+            ) : avis.body ? (
               <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-600">
                 {avis.body}
               </p>

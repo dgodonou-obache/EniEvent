@@ -26,10 +26,22 @@ export interface ReviewView {
   createdAt: string;
   reply: string | null;
   repliedAt: string | null;
+  /**
+   * Date de retrait du **commentaire** par l'équipe, et son motif.
+   *
+   * ⚠️ Un avis n'est jamais retiré (migration 0050) : sa note compte toujours,
+   * et il reste affiché. Seul son texte peut l'être, pour contenu illicite, et
+   * le motif prend sa place **en clair** — c'est ce qui distingue une
+   * modération assumée d'un effacement.
+   */
+  bodyRedactedAt: string | null;
+  redactionReason: string | null;
 }
 
-/** Les colonnes lisibles. `hidden_reason` et `hidden_by` n'en font pas partie. */
-const COLUMNS = "id, rating, body, author_label, reply, replied_at, created_at";
+/** Les colonnes lisibles. `redacted_by` n'en fait pas partie : le motif est
+ *  public, le modérateur non. */
+const COLUMNS =
+  "id, rating, body, author_label, reply, replied_at, created_at, body_redacted_at, redaction_reason";
 
 interface Row {
   id: string;
@@ -39,6 +51,8 @@ interface Row {
   reply: string | null;
   replied_at: string | null;
   created_at: string;
+  body_redacted_at: string | null;
+  redaction_reason: string | null;
 }
 
 function toView(row: Row): ReviewView {
@@ -50,14 +64,18 @@ function toView(row: Row): ReviewView {
     createdAt: row.created_at,
     reply: row.reply,
     repliedAt: row.replied_at,
+    bodyRedactedAt: row.body_redacted_at,
+    redactionReason: row.redaction_reason,
   };
 }
 
 /**
- * Avis publiés d'une annonce, les plus récents d'abord.
+ * Avis d'une annonce, les plus récents d'abord.
  *
- * `hidden_at is null` est explicite alors que la RLS le ferait : l'intention
- * reste lisible, et l'index partiel `reviews_listing_idx` est utilisé.
+ * ⚠️ **Aucun filtre, et c'est le cœur de la décision du 11 octobre 2026** : il
+ * n'existe plus d'avis invisible. Un avis dont le commentaire a été retiré
+ * figure ici comme les autres, avec ses étoiles et le motif à la place du
+ * texte — un avis qui disparaît se lit comme un avis étouffé.
  */
 export async function getListingReviews(listingId: string, limit = 20): Promise<ReviewView[]> {
   const supabase = await createClient();
@@ -66,7 +84,6 @@ export async function getListingReviews(listingId: string, limit = 20): Promise<
     .from("reviews")
     .select(COLUMNS)
     .eq("listing_id", listingId)
-    .is("hidden_at", null)
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -74,7 +91,6 @@ export async function getListingReviews(listingId: string, limit = 20): Promise<
 }
 
 export interface PartnerReview extends ReviewView {
-  hiddenAt: string | null;
   listingId: string | null;
   listingTitle: string | null;
   orderReference: string;
@@ -92,12 +108,11 @@ export async function getPartnerReviews(orgId: string): Promise<PartnerReview[]>
 
   const { data } = await supabase
     .from("reviews")
-    .select(`${COLUMNS}, hidden_at, listing_id, listings(title), orders(reference)`)
+    .select(`${COLUMNS}, listing_id, listings(title), orders(reference)`)
     .eq("org_id", orgId)
     .order("created_at", { ascending: false });
 
   type Jointe = Row & {
-    hidden_at: string | null;
     listing_id: string | null;
     listings: { title: string } | null;
     orders: { reference: string } | null;
@@ -105,7 +120,6 @@ export async function getPartnerReviews(orgId: string): Promise<PartnerReview[]>
 
   return ((data ?? []) as unknown as Jointe[]).map((row) => ({
     ...toView(row),
-    hiddenAt: row.hidden_at,
     listingId: row.listing_id,
     listingTitle: row.listings?.title ?? null,
     orderReference: row.orders?.reference ?? "",
@@ -129,8 +143,6 @@ export async function getMyReviewsByOrder(orderIds: string[]): Promise<Map<strin
 }
 
 export interface AdminReview extends ReviewView {
-  hiddenAt: string | null;
-  hiddenReason: string | null;
   orgId: string;
   orgName: string;
   listingId: string | null;
@@ -141,13 +153,13 @@ export interface AdminReview extends ReviewView {
 /**
  * Tous les avis, pour `/admin/avis`.
  *
- * Par fonction `SECURITY DEFINER` et non par requête directe : `hidden_reason`
- * est hors du `grant select`, et un administrateur est lui aussi
- * `authenticated` — un droit de colonne ne sait pas l'en distinguer. Même
- * moule qu'`admin_users()` (0040) et `admin_companies()` (0036).
+ * Par fonction `SECURITY DEFINER` et non par requête directe : l'écran a
+ * besoin du nom du partenaire, du titre de l'annonce et de la référence de la
+ * commande, qui vivent dans des tables fermées à `authenticated` — et un
+ * administrateur en est un. Même moule qu'`admin_users()` (0040).
  */
 export async function getAdminReviews(
-  etat: "tous" | "visibles" | "masques" = "tous",
+  etat: "tous" | "intacts" | "moderes" = "tous",
 ): Promise<AdminReview[]> {
   const supabase = await createClient();
 
@@ -163,8 +175,8 @@ export async function getAdminReviews(
     createdAt: row.created_at,
     reply: row.reply,
     repliedAt: row.replied_at,
-    hiddenAt: row.hidden_at,
-    hiddenReason: row.hidden_reason,
+    bodyRedactedAt: row.body_redacted_at,
+    redactionReason: row.redaction_reason,
     orgId: row.org_id,
     orgName: row.org_name,
     listingId: row.listing_id,
@@ -189,7 +201,7 @@ export interface AdminReport {
   reviewRating: number | null;
   reviewBody: string | null;
   reviewAuthor: string | null;
-  reviewHiddenAt: string | null;
+  reviewBodyRedactedAt: string | null;
   listingId: string | null;
   listingTitle: string | null;
   orgName: string | null;
@@ -226,7 +238,7 @@ export async function getAdminReports(
     reviewRating: row.review_rating,
     reviewBody: row.review_body,
     reviewAuthor: row.review_author,
-    reviewHiddenAt: row.review_hidden_at,
+    reviewBodyRedactedAt: row.review_body_redacted_at,
     listingId: row.listing_id,
     listingTitle: row.listing_title,
     orgName: row.org_name,

@@ -1,25 +1,27 @@
-import { Star } from "lucide-react";
+import { ShieldAlert, Star } from "lucide-react";
 
 import { ReviewModerationCard } from "@/components/dashboard/ReviewModerationCard";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getAdminReviews } from "@/lib/reviews";
 
 /**
- * Modération des avis.
+ * Les avis, et le peu qu'on peut en faire.
  *
- * **Les avis sont publiés immédiatement** — décision d'exploitation : une file
- * d'attente avant publication ferait d'ÉniEvent l'éditeur de chaque avis, et
- * un avis qui met trois jours à paraître n'est plus lu par personne. Le retrait
- * vient donc **après**, sur signalement ou par examen de cette page.
+ * ⚠️ **Il n'y a pas de file de modération, parce qu'un avis ne se modère pas.**
+ * Décision d'exploitation du 11 octobre 2026 : les avis sont publiés
+ * immédiatement et **ne sont jamais retirés** — retirer un mauvais avis est un
+ * signe de méfiance envers la plateforme, et une vitrine qui n'affiche que des
+ * éloges ne rassure personne. Le recours d'un partenaire est la réponse
+ * publique, depuis `/pro/avis`.
  *
- * Ce qui est montré d'abord : les avis **retirés**. C'est le seul groupe qui
- * demande une décision — un avis masqué par un signalement attend qu'on
- * tranche, et pendant ce temps il manque à la note du prestataire. Les avis
- * visibles sont une archive qu'on ne parcourt que sur réclamation.
+ * Cet écran sert donc à **lire**, et à un seul geste : retirer le *texte* d'un
+ * avis au contenu illicite — insulte nominative, coordonnées, données
+ * personnelles — la note restant comptée et l'avis affiché.
  *
- * ⚠️ Lecture par `admin_reviews()` et non par requête directe : `hidden_reason`
- * est hors du `grant select`, et un administrateur est lui aussi
- * `authenticated` — un droit de colonne ne sait pas l'en distinguer.
+ * Ce qui est montré d'abord : les avis sévères **publiés**. Non pour les
+ * retirer — la plupart sont mérités, et les retirer tromperait les clients
+ * suivants — mais pour savoir ce qui se dit, et voir si le partenaire a
+ * répondu. Un avis sévère sans réponse est le vrai signal.
  */
 
 export const metadata = { title: "Avis" };
@@ -27,9 +29,9 @@ export const metadata = { title: "Avis" };
 export default async function AdminReviewsPage() {
   const avis = await getAdminReviews("tous");
 
-  const retires = avis.filter((a) => a.hiddenAt !== null);
-  const visibles = avis.filter((a) => a.hiddenAt === null);
-  const severes = visibles.filter((a) => a.rating <= 2);
+  const moderes = avis.filter((a) => a.bodyRedactedAt !== null);
+  const severes = avis.filter((a) => a.rating <= 2);
+  const severesSansReponse = severes.filter((a) => a.reply === null);
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -37,7 +39,18 @@ export default async function AdminReviewsPage() {
       <p className="mt-1 text-sm text-slate-500">
         {avis.length === 0
           ? "Aucun avis déposé pour l'instant."
-          : `${avis.length} avis · ${retires.length} retiré${retires.length > 1 ? "s" : ""} · ${severes.length} à deux étoiles ou moins`}
+          : `${avis.length} avis · ${severes.length} à deux étoiles ou moins · ${moderes.length} commentaire${moderes.length > 1 ? "s" : ""} retiré${moderes.length > 1 ? "s" : ""}`}
+      </p>
+
+      <p className="mt-4 flex items-start gap-2 rounded-2xl border border-slate-100 bg-slate-50/60 px-4 py-3 text-sm leading-relaxed text-slate-700">
+        <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+        <span>
+          <strong>Aucun avis ne se retire</strong>, quelle que soit sa note et quel que soit
+          le signalement. Le seul geste possible est de retirer un <em>texte</em> illicite —
+          la note reste comptée, l&apos;avis reste affiché, et le motif s&apos;affiche à la
+          place du commentaire. Pour tout le reste, le recours du partenaire est sa réponse
+          publique.
+        </span>
       </p>
 
       {avis.length === 0 ? (
@@ -50,16 +63,19 @@ export default async function AdminReviewsPage() {
         </div>
       ) : (
         <div className="mt-6 space-y-8">
-          {retires.length > 0 ? (
+          {severesSansReponse.length > 0 ? (
             <section>
-              <h2 className="mb-1 text-lg font-bold text-slate-900">Retirés</h2>
+              <h2 className="mb-1 text-lg font-bold text-slate-900">
+                Sévères, et sans réponse
+              </h2>
               <p className="mb-3 text-sm text-slate-500">
-                Ces avis ne comptent plus dans la note de leur prestataire. Un avis masqué
-                par un signalement attend votre décision : rétabli, il ne pourra plus être
-                masqué par un nouveau signalement.
+                Deux étoiles ou moins, et le prestataire n&apos;a pas encore répondu. C&apos;est
+                le seul vrai signal de cet écran : un avis sévère est souvent mérité, mais un
+                silence prolongé en dessous se lit comme un aveu. Une relance au partenaire
+                vaut mieux qu&apos;une intervention.
               </p>
               <ul className="space-y-4">
-                {retires.map((a) => (
+                {severesSansReponse.map((a) => (
                   <li key={a.id}>
                     <ReviewModerationCard review={a} />
                   </li>
@@ -68,18 +84,18 @@ export default async function AdminReviewsPage() {
             </section>
           ) : null}
 
-          {severes.length > 0 ? (
+          {moderes.length > 0 ? (
             <section>
               <h2 className="mb-1 text-lg font-bold text-slate-900">
-                Sévères, et publiés
+                Commentaires retirés
               </h2>
               <p className="mb-3 text-sm text-slate-500">
-                Deux étoiles ou moins. Un avis sévère n&apos;est pas un avis abusif — la
-                plupart sont mérités, et les retirer tromperait les clients suivants. Ils
-                sont groupés ici pour être lus, pas pour être retirés.
+                Le texte d&apos;origine reste lisible ici, barré : c&apos;est lui qu&apos;on
+                relira si l&apos;auteur réclame. Leurs notes comptent toujours dans la
+                moyenne de leur prestataire.
               </p>
               <ul className="space-y-4">
-                {severes.map((a) => (
+                {moderes.map((a) => (
                   <li key={a.id}>
                     <ReviewModerationCard review={a} />
                   </li>
@@ -89,9 +105,9 @@ export default async function AdminReviewsPage() {
           ) : null}
 
           <section>
-            <h2 className="mb-3 text-lg font-bold text-slate-900">Tous les avis publiés</h2>
+            <h2 className="mb-3 text-lg font-bold text-slate-900">Tous les avis</h2>
             <ul className="space-y-4">
-              {visibles.map((a) => (
+              {avis.map((a) => (
                 <li key={a.id}>
                   <ReviewModerationCard review={a} />
                 </li>

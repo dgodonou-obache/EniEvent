@@ -400,9 +400,15 @@ export function renderEmail(
           ["Commentaire", payload.hasBody === true ? "Oui, à lire en ligne" : "Aucun"],
         ],
         cta: { label: "Lire et répondre", href: `${base}/pro/avis` },
+        // ⚠️ **Ne promet aucun retrait.** C'est le courriel qu'un partenaire
+        // lit en découvrant un 1/5, donc le moment précis où il cherche
+        // comment le faire enlever : autant qu'il apprenne tout de suite que
+        // la réponse est le recours, et pourquoi c'est mieux pour lui.
         outro:
-          "Vous ne pouvez répondre qu'une fois : prenez le temps de lire avant " +
-          "d'écrire. Un avis vous paraît abusif ? Signalez-le depuis la même page.",
+          "Un avis ne se retire pas, même sévère — une vitrine qui n'affiche que " +
+          "des éloges ne rassure personne, et vos clients le savent. Votre réponse, " +
+          "elle, se lit par tous les suivants. Vous ne pouvez l'écrire qu'une fois : " +
+          "prenez le temps de lire avant d'écrire.",
       });
     }
 
@@ -433,20 +439,21 @@ export function renderEmail(
         preheader: "Un contenu vient d'être signalé.",
         heading: `Un signalement sur ${genre}`,
         intro:
-          payload.genre === "listing"
-            ? "Une annonce vient d'être signalée. Rien n'a été retiré automatiquement : " +
-              "une annonce validée reste en ligne jusqu'à votre décision."
-            : "Un avis vient d'être signalé. S'il l'a été par le prestataire concerné, " +
-              "il est déjà retiré du public en attendant votre examen — et il manque " +
-              "donc à sa note pendant ce temps.",
+          "Rien n'a été retiré : un signalement alerte, il ne supprime pas. " +
+          (payload.genre === "listing"
+            ? "L'annonce reste en ligne jusqu'à votre décision — la retirer sur la " +
+              "parole d'un inconnu couperait les réservations d'un partenaire."
+            : "L'avis reste affiché et sa note compte toujours. Si son texte est " +
+              "illicite — insulte nominative, coordonnées, données personnelles — " +
+              "vous pouvez le retirer depuis l'écran Avis ; la note, elle, restera."),
         details: [
           ["Référence", text(payload.reference)],
           ["Motif invoqué", text(payload.reason)],
         ],
         cta: { label: "Examiner le signalement", href: `${base}/admin/signalements` },
         outro:
-          "Un avis écarté devient définitivement intouchable par un nouveau signalement : " +
-          "tranchez-le une fois, proprement.",
+          "Un partenaire qui conteste un avis a d'abord son droit de réponse : c'est " +
+          "souvent la bonne réponse à lui faire.",
       });
     }
 
