@@ -216,6 +216,57 @@ for (const parcours of PARCOURS) {
   console.log("");
 }
 
+// ---------------------------------------------------------------------------
+// La marque, déclarée et servie
+//
+// ⚠️ **Un favicon cassé répond 200.** Next lit `favicon.ico` pour écrire ses
+// balises `<link rel="icon">` ; avec des PNG indexés en palette au lieu de RGBA,
+// son décodeur refuse — « The PNG is not in RGBA format! » — et **aucune balise
+// n'est émise**, pendant que le fichier continue d'être servi normalement. Un
+// contrôle qui s'arrête au code de retour conclut que tout va bien.
+//
+// Et les chemins de `public/` comptent autant : iOS et les moissonneurs
+// d'icônes qui alimentent les suggestions de recherche **ne lisent pas le
+// HTML**, ils tapent ces adresses à la racine. Les deux rendaient un 404 en
+// HTML jusqu'au 15 octobre 2026, d'où un iPhone qui affichait une autre marque
+// dans ses suggestions que sur le site ouvert.
+// ---------------------------------------------------------------------------
+console.log("La marque");
+
+const accueil = await fetch(BASE).then((r) => r.text());
+
+for (const [quoi, motif] of [
+  ["balise icon", /<link rel="icon"[^>]*favicon\.ico/],
+  ["balise icon 512", /<link rel="icon"[^>]*icon\.png/],
+  ["balise apple-touch-icon", /<link rel="apple-touch-icon"/],
+  ["balise manifest", /<link rel="manifest"/],
+]) {
+  const ok = motif.test(accueil);
+  if (!ok) echecs += 1;
+  console.log(`  ${ok ? "✓" : "✗"} ${quoi.padEnd(34)} ${ok ? "déclarée" : "ABSENTE du HTML"}`);
+}
+
+for (const chemin of [
+  "/favicon.ico",
+  "/icon.png",
+  "/apple-icon.png",
+  "/apple-touch-icon.png",
+  "/apple-touch-icon-precomposed.png",
+  "/icon-192.png",
+  "/manifest.webmanifest",
+]) {
+  const r = await fetch(`${BASE}${chemin}`);
+  const type = r.headers.get("content-type") ?? "";
+  // Un 404 de Next rend du HTML : exiger le type évite de compter une page
+  // d'erreur pour une icône.
+  const ok = r.status === 200 && /image|manifest/.test(type);
+
+  if (!ok) echecs += 1;
+  console.log(`  ${ok ? "✓" : "✗"} ${chemin.padEnd(34)} ${r.status} ${type.split(";")[0]}`);
+}
+
+console.log("");
+
 if (echecs > 0) {
   console.error(`${echecs} écran(s) en échec.`);
   process.exit(1);

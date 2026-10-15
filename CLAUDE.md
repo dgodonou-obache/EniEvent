@@ -590,6 +590,25 @@ barrière devant quelqu'un qui n'ouvre pas de navigateur.
   le signale. Passer une clé (`space="partner"`) et résoudre côté client.
   Corollaire : **rendre réellement une page authentifiée** avant de la déclarer
   livrée ; un test contre la base ne prouve pas que l'écran s'affiche.
+- ⚠️ **Les icônes se régénèrent d'une commande, et un favicon cassé répond 200.**
+  `npm run icones` dérive les six fichiers de `public/images/marque-enievent.png` ;
+  rien ne les relie entre eux, et en remplacer un à la main donne un onglet et un écran
+  d'accueil qui ne portent pas la même marque, sans qu'aucune erreur n'apparaisse. Deux
+  pièges mesurés le 15 octobre 2026, tous deux invisibles au code de retour :
+  **les PNG empilés dans un `.ico` doivent être en RGBA** — en palette, le décodeur de
+  Next refuse (« The PNG is not in RGBA format! ») et **aucune balise `<link rel="icon">`
+  n'est émise** pendant que le fichier continue d'être servi ;
+  et **iOS ne lit pas le HTML** — lui et les moissonneurs qui alimentent les suggestions
+  de recherche tapent `/apple-touch-icon.png` et `/apple-touch-icon-precomposed.png` à la
+  racine, qui rendaient un 404 en HTML. D'où un iPhone affichant une marque dans ses
+  suggestions et une autre sur le site ouvert. La fin de `smoke:ecrans` garde les quatre
+  balises **et** les sept adresses, en exigeant le type de contenu : un 404 de Next rend
+  du HTML, et le seul code de retour ne prouverait rien.
+- ⚠️ **Pas de `display: "standalone"` dans le manifeste.** Il ferait s'ouvrir le site sans
+  barre d'adresse depuis l'écran d'accueil. Sur une plateforme où l'on règle des sommes
+  réelles par Mobile Money, l'adresse visible est un repère de confiance — c'est elle qui
+  permet de vérifier qu'on est bien sur `enievent.com` avant de payer. « Ça fait plus
+  application » n'est pas une raison suffisante pour la retirer.
 - ⚠️ **Les en-têtes de sécurité vivent dans `next.config.ts`**, qui était vide jusqu'à
   l'audit du 8 octobre 2026 : la production ne servait que le HSTS de Vercel. `/admin`
   valide des annonces et déclenche des remboursements — rien n'empêchait de l'encadrer

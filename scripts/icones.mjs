@@ -169,15 +169,40 @@ console.log(`Dessin   ${cadre.largeur}×${cadre.hauteur} à (${cadre.x0}, ${cadr
 console.log(`Découpe  ${decoupe.width}×${decoupe.height} à (${decoupe.left}, ${decoupe.top})`);
 console.log("");
 
+/**
+ * Les fichiers à écrire.
+ *
+ * ⚠️ **Les quatre derniers vivent dans `public/`, et ce n'est pas un doublon.**
+ * Next déclare bien `<link rel="apple-touch-icon" href="/apple-icon.png">`,
+ * mais iOS et la plupart des moissonneurs d'icônes — ceux qui alimentent les
+ * suggestions de recherche — **ne lisent pas le HTML** : ils tapent directement
+ * les chemins conventionnels à la racine. Mesuré sur la production le
+ * 15 octobre 2026, ces quatre adresses rendaient un 404 en HTML :
+ *
+ *     /apple-touch-icon.png               404
+ *     /apple-touch-icon-precomposed.png   404
+ *
+ * D'où un iPhone qui affichait la bonne marque une fois le site ouvert — le
+ * HTML, lui, est correct — et une autre dans la liste des suggestions.
+ *
+ * `precomposed` vise les iOS anciens, qui le demandent **en premier** ; il est
+ * conservé pour cette raison, pas par nostalgie.
+ */
 const sorties = [
   ["src/app/icon.png", 512],
   ["src/app/apple-icon.png", 180],
+  ["public/apple-touch-icon.png", 180],
+  ["public/apple-touch-icon-precomposed.png", 180],
+  // Pour le manifeste. Le 512 n'est pas repris ici : Next sert déjà
+  // `src/app/icon.png` à l'adresse `/icon.png`, et le dupliquer coûterait
+  // 150 Ko pour rien.
+  ["public/icon-192.png", 192],
 ];
 
 for (const [chemin, taille] of sorties) {
   const png = await rendre(SOURCE, decoupe, taille);
   await writeFile(chemin, png);
-  console.log(`  ${chemin.padEnd(26)} ${taille}×${taille}  ${png.length} octets`);
+  console.log(`  ${chemin.padEnd(40)} ${taille}×${taille}  ${png.length} octets`);
 }
 
 const empilees = [];
@@ -188,7 +213,7 @@ for (const taille of TAILLES_ICO) {
 const ico = assemblerIco(empilees);
 await writeFile("src/app/favicon.ico", ico);
 console.log(
-  `  ${"src/app/favicon.ico".padEnd(26)} ${TAILLES_ICO.join(", ")}  ${ico.length} octets`,
+  `  ${"src/app/favicon.ico".padEnd(40)} ${TAILLES_ICO.join(", ")}  ${ico.length} octets`,
 );
 
 // Relecture : un conteneur ICO mal assemblé ne lève aucune erreur à l'écriture,
@@ -197,4 +222,4 @@ const relu = await readFile("src/app/favicon.ico");
 const nombre = relu.readUInt16LE(4);
 if (nombre !== TAILLES_ICO.length) throw new Error(`ICO illisible : ${nombre} image(s)`);
 
-console.log("\nLes trois icônes sont à jour.");
+console.log(`\nLes ${sorties.length + 1} icônes sont à jour.`);
