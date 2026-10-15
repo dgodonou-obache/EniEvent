@@ -267,6 +267,65 @@ for (const chemin of [
 
 console.log("");
 
+// ---------------------------------------------------------------------------
+// Ce que lisent les robots
+//
+// L'icône affichée par un moteur dans ses suggestions vient de **son** index,
+// qui ne bouge qu'à la ré-exploration : guider les robots est le seul levier
+// que nous ayons dessus. Les deux fichiers rendaient un 404 jusqu'au
+// 15 octobre 2026, alors que le proxy les excluait déjà nommément.
+//
+// ⚠️ **Une adresse du plan de site qui redirige est comptée comme un défaut
+// par les moteurs.** Les fiches se rendent par le même composant mais ont
+// chacune une seule URL canonique — `/lieux/…` pour un lieu, `/prestataires/…`
+// pour un service — et l'autre renvoie un 307. On échantillonne donc le plan
+// plutôt que de faire confiance au calcul.
+// ---------------------------------------------------------------------------
+console.log("Les robots");
+
+const robots = await fetch(`${BASE}/robots.txt`);
+const robotsTexte = await robots.text();
+const robotsOk =
+  robots.status === 200 &&
+  /Sitemap:/i.test(robotsTexte) &&
+  ["/admin", "/pro", "/compte", "/entreprise", "/projets"].every((e) =>
+    robotsTexte.includes(`Disallow: ${e}`),
+  );
+
+if (!robotsOk) echecs += 1;
+console.log(
+  `  ${robotsOk ? "✓" : "✗"} ${"/robots.txt".padEnd(34)} ${robots.status} ${
+    robotsOk ? "espaces privés écartés, plan annoncé" : "INCOMPLET"
+  }`,
+);
+
+const plan = await fetch(`${BASE}/sitemap.xml`);
+const planTexte = await plan.text();
+const adresses = [...planTexte.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+const planOk = plan.status === 200 && adresses.length > 0;
+
+if (!planOk) echecs += 1;
+console.log(
+  `  ${planOk ? "✓" : "✗"} ${"/sitemap.xml".padEnd(34)} ${plan.status} ${adresses.length} adresse(s)`,
+);
+
+// Un échantillon de fiches : c'est là que le préfixe peut être faux.
+const fiches = adresses.filter((u) => /\/(lieux|prestataires)\//.test(u)).slice(0, 8);
+let devient = 0;
+
+for (const adresse of fiches) {
+  const r = await fetch(adresse, { redirect: "manual" });
+  if (r.status !== 200) {
+    devient += 1;
+    console.log(`  ✗ ${adresse.slice(BASE.length).padEnd(34)} ${r.status} au lieu de 200`);
+  }
+}
+
+if (devient > 0) echecs += devient;
+else console.log(`  ✓ ${`${fiches.length} fiches échantillonnées`.padEnd(34)} toutes en 200`);
+
+console.log("");
+
 if (echecs > 0) {
   console.error(`${echecs} écran(s) en échec.`);
   process.exit(1);

@@ -604,6 +604,19 @@ barrière devant quelqu'un qui n'ouvre pas de navigateur.
   suggestions et une autre sur le site ouvert. La fin de `smoke:ecrans` garde les quatre
   balises **et** les sept adresses, en exigeant le type de contenu : un 404 de Next rend
   du HTML, et le seul code de retour ne prouverait rien.
+- ⚠️ **L'icône qu'un moteur affiche vient de son index, pas de notre serveur.** Mesuré
+  le 15 octobre 2026 : le service d'icônes de Google rendait encore un **ancien logo**
+  pour `enievent.com` — ni le nôtre, ni celui de Vercel —, et Chrome sur Android montrait
+  un globe, son marque-place quand il n'a rien en cache. Aucune purge n'est possible de
+  notre côté : le seul levier est la ré-exploration. `src/app/robots.ts` et
+  `src/app/sitemap.ts` existent pour cela — et n'existaient pas, alors que le proxy les
+  excluait déjà nommément de son filtre, signe qu'on les croyait présents. Le plan se
+  construit **depuis la base**, par le client public : la RLS n'expose que les annonces
+  validées et non suspendues, c'est-à-dire exactement ce qui doit y figurer, et s'en
+  remettre à elle évite de recopier la condition. ⚠️ Une adresse du plan qui **redirige**
+  est comptée comme un défaut : une fiche a une seule URL canonique — `/lieux/…` pour un
+  lieu, `/prestataires/…` pour un service — et l'autre renvoie un 307. La fin de
+  `smoke:ecrans` en échantillonne huit.
 - ⚠️ **Pas de `display: "standalone"` dans le manifeste.** Il ferait s'ouvrir le site sans
   barre d'adresse depuis l'écran d'accueil. Sur une plateforme où l'on règle des sommes
   réelles par Mobile Money, l'adresse visible est un repère de confiance — c'est elle qui

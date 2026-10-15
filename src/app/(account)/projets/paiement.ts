@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth/session";
 import { money, type CurrencyCode } from "@/lib/money";
 import { paymentProvider } from "@/lib/payments/fedapay";
+import { siteUrl } from "@/lib/site-url";
 import { createClient } from "@/utils/supabase/server";
 
 
@@ -132,10 +133,6 @@ export async function payOrder(
   if (requestId) revalidatePath(`/projets/${requestId}`);
 
   return { ok: true, url: ouverture.url };
-}
-
-function siteUrl(): string {
-  return (process.env.NEXT_PUBLIC_SITE_URL ?? "https://enievent.com").replace(/\/+$/, "");
 }
 
 /**

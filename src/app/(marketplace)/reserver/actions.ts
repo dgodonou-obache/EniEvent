@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { requireUser } from "@/lib/auth/session";
 import { money, type CurrencyCode } from "@/lib/money";
 import { paymentProvider } from "@/lib/payments/fedapay";
+import { siteUrl } from "@/lib/site-url";
 import { createClient } from "@/utils/supabase/server";
 
 /**
@@ -130,10 +131,6 @@ export async function bookAndPay(
   if (rattachement) console.error("Rattachement impossible :", rattachement.message);
 
   return { ok: true, url: resultat.url };
-}
-
-function siteUrl(): string {
-  return (process.env.NEXT_PUBLIC_SITE_URL ?? "https://enievent.com").replace(/\/+$/, "");
 }
 
 function messagePasserelle(reason: string, detail: string): string {
