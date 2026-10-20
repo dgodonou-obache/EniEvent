@@ -392,5 +392,12 @@ de document. Trois règles :
   l'ancienne numérotation ne réapparaît.
 - **Le décompte du §2 se mesure, il ne s'estime pas** : il compte les `href` de
   `nav-config.ts` ayant une `page.tsx` correspondante dans `src/app`.
+  ⚠️ **Mais un fichier n'est pas un écran.** `/compte` a été compté pour livré
+  pendant des semaines alors que sa page était un écran d'attente annonçant un
+  lot déjà en production — le fichier existait, le décompte était donc
+  satisfait. Aucun des trois contrôles ne regardait ce que la page **dit** :
+  `smoke:ecrans` la voyait rendre un `<h1>`, et `tests/roadmap.test.ts` gardait
+  `lotFor()`, qu'elle n'appelait pas. Depuis, ce test refuse qu'un lot soit
+  nommé ailleurs que dans `roadmap.ts`.
 - **Le §3 se relit à chaque mise en ligne.** C'est la seule partie dont le
   contenu change sans qu'aucun commit ne le signale.

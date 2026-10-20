@@ -49,9 +49,12 @@ const LOT_BY_PREFIX: { prefix: string; lot: string }[] = [
   { prefix: "/admin", lot: "Lot D — Confort" },
 
   // — Espace particulier —
-  // ✅ Complet depuis le lot D : ses huit entrées de menu ont toutes leur
-  // écran. Les replis ci-dessous ne couvrent plus que d'éventuelles
-  // sous-routes à venir.
+  // ✅ Complet : ses huit entrées de menu ont toutes leur écran, et depuis le
+  // 20 octobre 2026 un écran qui montre quelque chose. L'aperçu `/compte` est
+  // resté un écran d'attente des semaines après que son contenu soit
+  // disponible, parce qu'il annonçait son lot **en dur** au lieu de le demander
+  // ici — le garde-fou de `tests/roadmap.test.ts` ne voyait donc rien.
+  // Les replis ci-dessous ne couvrent plus que d'éventuelles sous-routes.
   { prefix: "/compte", lot: "Lot D — Confort" },
   { prefix: "/projets", lot: "Lot D — Confort" },
 ];

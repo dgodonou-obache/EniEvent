@@ -1,3 +1,5 @@
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { accountNav, adminNav, companyNav, partnerNav } from "@/components/dashboard/nav-config";
@@ -126,5 +128,49 @@ describe("titres des entrées", () => {
     expect(navItemFor("partner", "/pro/avis")?.href).toBe("/pro/avis");
     expect(navItemFor("admin", "/admin/avis")?.href).toBe("/admin/avis");
     expect(navItemFor("company", "/pro/avis")).toBeUndefined();
+  });
+});
+
+/**
+ * ⚠️ **Le défaut que les trois autres contrôles ont laissé passer.**
+ *
+ * `/compte` — l'accueil de l'espace client, premier écran d'un client connecté
+ * — a affiché « Lot 2 — Réservation & paiement » des semaines après que
+ * réservations, échéances et devis soient en production. Elle **codait son lot
+ * en dur** au lieu de le demander à `lotFor`, et échappait donc au garde-fou
+ * ci-dessus. `smoke:ecrans` la voyait rendre un `<h1>` et la comptait pour un
+ * succès ; le décompte de `docs/LOTS.md`, qui cherche un `page.tsx` par entrée
+ * de menu, la comptait pour livrée.
+ *
+ * Trois contrôles, trois angles morts, parce qu'aucun ne regarde ce qu'une page
+ * **dit**. Celui-ci le fait, sur le texte des sources — grossier, mais c'est le
+ * seul qui morde.
+ */
+describe("aucun lot annoncé en dur", () => {
+  const racine = join(import.meta.dirname, "..", "src");
+
+  function fichiers(dir: string): string[] {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((entree) => {
+      const chemin = join(dir, entree.name);
+      if (entree.isDirectory()) return fichiers(chemin);
+      return /\.tsx?$/.test(entree.name) ? [chemin] : [];
+    });
+  }
+
+  it("ne nomme un lot que depuis roadmap.ts", () => {
+    // `roadmap.ts` est la table elle-même ; `UpcomingPage` l'interroge.
+    const exemptes = ["roadmap.ts"];
+
+    const coupables = fichiers(racine)
+      .filter((f) => !exemptes.some((e) => f.endsWith(e)))
+      .filter((f) => {
+        const source = readFileSync(f, "utf8");
+        // Les commentaires expliquent le défaut : on ne regarde que le code.
+        const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+        return /\bLot\s+[A-E\d]\s*—/.test(code);
+      })
+      .map((f) => f.slice(racine.length + 1));
+
+    expect(coupables).toEqual([]);
   });
 });

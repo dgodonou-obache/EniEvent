@@ -310,14 +310,25 @@ console.log(
 );
 
 // Un échantillon de fiches : c'est là que le préfixe peut être faux.
-const fiches = adresses.filter((u) => /\/(lieux|prestataires)\//.test(u)).slice(0, 8);
+//
+// ⚠️ **On ne refetche pas l'adresse telle qu'elle figure dans le plan.** Elle
+// est absolue et bâtie sur `NEXT_PUBLIC_SITE_URL`, qui vaut `localhost:3000`
+// en développement : contre un serveur lancé sur un autre port, ou contre
+// l'alias Vercel, le contrôle partait sur le mauvais hôte et échouait en
+// « connexion refusée ». On ne garde donc que le chemin, qui est ce qu'on
+// vérifie réellement.
+const fiches = adresses
+  .filter((u) => /\/(lieux|prestataires)\//.test(u))
+  .map((u) => new URL(u).pathname)
+  .slice(0, 8);
+
 let devient = 0;
 
-for (const adresse of fiches) {
-  const r = await fetch(adresse, { redirect: "manual" });
+for (const chemin of fiches) {
+  const r = await fetch(`${BASE}${chemin}`, { redirect: "manual" });
   if (r.status !== 200) {
     devient += 1;
-    console.log(`  ✗ ${adresse.slice(BASE.length).padEnd(34)} ${r.status} au lieu de 200`);
+    console.log(`  ✗ ${chemin.padEnd(34)} ${r.status} au lieu de 200`);
   }
 }
 
