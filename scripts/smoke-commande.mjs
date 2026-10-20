@@ -109,9 +109,14 @@ try {
     .eq("order_id", commande.id)
     .order("position");
 
+  // ⚠️ **Pas une égalité.** Depuis la migration 0052, les échéances déjà
+  // exigibles le jour de la réservation sont fondues en un seul règlement :
+  // l'échéancier recopié est donc **au plus** aussi long que les conditions du
+  // partenaire, et plus court dès que l'événement est proche. Exiger l'égalité
+  // ferait échouer ce contrôle sur un devis parfaitement sain.
   check(
-    "l'échéancier du partenaire est recopié sur la commande",
-    (echeances ?? []).length === (conditions ?? []).length,
+    "l'échéancier recopié ne dépasse pas les conditions du partenaire",
+    (echeances ?? []).length > 0 && (echeances ?? []).length <= (conditions ?? []).length,
     `${(echeances ?? []).length} échéance(s) pour ${(conditions ?? []).length} ligne(s)`,
   );
 
@@ -122,6 +127,17 @@ try {
     "les échéances retombent exactement sur le total",
     sommeEcheances === commande.total,
     `${sommeEcheances} vs ${commande.total}`,
+  );
+
+  // Une date de règlement déjà passée le jour de la réservation se lit comme
+  // une panne, et l'ordre imposé par `start_payment` rendrait le retard
+  // inévitable. C'est le défaut corrigé par la migration 0052.
+  const aujourdhui = new Date().toISOString().slice(0, 10);
+  const passees = (echeances ?? []).filter((e) => e.due_date && e.due_date < aujourdhui);
+  check(
+    "aucune échéance ne naît déjà échue",
+    passees.length === 0,
+    passees.map((e) => `${e.label} le ${e.due_date}`).join(", "),
   );
 
   const premiere = (echeances ?? [])[0];

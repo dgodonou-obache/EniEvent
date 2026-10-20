@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "PowerShell(\"node: $\\(node -v\\)\"; \"npm: $\\(npm -v\\)\"; \"cwd: $\\(Get-Location\\)\"; \"empty: $\\(\\(Get-ChildItem -Force | Measure-Object\\).Count -eq 0\\)\")"
+      "PowerShell(\"node: $\\(node -v\\)\"; \"npm: $\\(npm -v\\)\"; \"cwd: $\\(Get-Location\\)\"; \"empty: $\\(\\(Get-ChildItem -Force | Measure-Object\\).Count -eq 0\\)\")",
+      "Bash(npm run *)"
     ]
   }
 }

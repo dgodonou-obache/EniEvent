@@ -101,22 +101,37 @@ function shiftDays(iso: string, days: number): string | null {
  * ne s'engage, et au partenaire pendant qu'il le compose. Toute divergence est
  * un bug, et `tests/fees.test.ts` compare les deux.
  *
- * Trois règles portent tout le reste :
+ * Quatre règles portent tout le reste :
  *
  * - un **pourcentage porte sur le total**, jamais sur le reste : c'est la
  *   lecture intuitive, et la seule qu'un partenaire vérifie de tête ;
  * - un **montant fixe est plafonné** au reste, pour qu'un échéancier ne
  *   réclame jamais plus que la commande ;
  * - le **solde vaut ce qui reste**, et n'est donc jamais calculé — c'est ce qui
- *   rend la somme exacte quels que soient les arrondis.
+ *   rend la somme exacte quels que soient les arrondis ;
+ * - ⚠️ **une échéance ne naît jamais déjà échue** (migration 0052). Tout ce dont
+ *   le jour est atteint à la réservation est fondu en un seul règlement, dû
+ *   immédiatement ; quand il ne reste rien derrière — événement imminent —, cela
+ *   donne un paiement intégral. Sans cette règle, un devis accepté la veille
+ *   d'un mariage affichait « solde à régler le 16 octobre » un 21 octobre.
+ *
+ * ⚠️ La fusion demande de savoir **quel jour on réserve**. Sans `bookingDate`,
+ * ce module n'a aucun présent à opposer aux dates — il n'en invente pas, et
+ * aucune fusion n'a lieu. C'est le cas de l'aperçu de `ScheduleEditor`, qui
+ * déroule des conditions sur un montant d'exemple, hors de toute commande.
  */
 export function resolveSchedule(
   total: Money,
   rows: readonly ScheduleRow[],
   dates: Dates = {},
 ): Instalment[] {
-  const instalments: Instalment[] = [];
+  const aVenir: Omit<Instalment, "position">[] = [];
   let reste = total.amount;
+
+  // Ce qui est exigible dès la réservation, fondu en un seul règlement.
+  let duMaintenant = 0;
+  let libelleMaintenant: string | null = null;
+  let fusionnees = 0;
 
   for (const row of rows) {
     let montant: number;
@@ -142,40 +157,67 @@ export function resolveSchedule(
           ? shiftDays(dates.eventDate, row.daysBefore ?? 0)
           : null;
 
-    instalments.push({
-      position: instalments.length,
+    reste -= montant;
+
+    // Une date inconnue n'est pas une date passée : l'échéance existe, son jour
+    // reste à venir.
+    if (dates.bookingDate && dueDate !== null && dueDate <= dates.bookingDate) {
+      duMaintenant += montant;
+      libelleMaintenant ??= row.label;
+      fusionnees += 1;
+      continue;
+    }
+
+    aVenir.push({
       label: row.label,
       amount: money(montant, total.currency),
       trigger: row.trigger,
       daysBefore: row.daysBefore,
       dueDate,
     });
-
-    reste -= montant;
-  }
-
-  // Échéancier vide ou entièrement à zéro : une commande doit rester réglable.
-  if (instalments.length === 0 && total.amount > 0) {
-    return [
-      {
-        position: 0,
-        label: "Paiement intégral",
-        amount: total,
-        trigger: "booking",
-        daysBefore: null,
-        dueDate: dates.bookingDate ?? null,
-      },
-    ];
   }
 
   // Filet : un échéancier sans solde peut ne pas tout distribuer. Le reliquat
-  // rejoint la dernière échéance plutôt que de disparaître.
-  if (reste > 0 && instalments.length > 0) {
-    const dernier = instalments[instalments.length - 1];
-    instalments[instalments.length - 1] = {
-      ...dernier,
-      amount: add(dernier.amount, money(reste, total.currency)),
-    };
+  // rejoint la dernière échéance plutôt que de disparaître — et s'il n'y en a
+  // aucune, ce qui est dû maintenant. C'est aussi ce qui couvre l'échéancier
+  // vide : une commande doit rester réglable.
+  if (reste > 0) {
+    const dernier = aVenir[aVenir.length - 1];
+
+    if (dernier) {
+      aVenir[aVenir.length - 1] = {
+        ...dernier,
+        amount: add(dernier.amount, money(reste, total.currency)),
+      };
+    } else {
+      duMaintenant += reste;
+    }
+
+    reste = 0;
+  }
+
+  const instalments: Instalment[] = [];
+
+  if (duMaintenant > 0) {
+    instalments.push({
+      position: 0,
+      // Plusieurs échéances fondues qui couvrent tout, ou aucun libellé de
+      // partenaire à reprendre : le client règle la totalité et l'écran le dit.
+      // Une seule ligne garde le libellé choisi par le partenaire — ce n'est
+      // pas à ce calcul de renommer ses conditions.
+      label:
+        libelleMaintenant === null || (fusionnees > 1 && duMaintenant === total.amount)
+          ? "Paiement intégral"
+          : libelleMaintenant,
+      amount: money(duMaintenant, total.currency),
+      trigger: "booking",
+      daysBefore: null,
+      dueDate: dates.bookingDate ?? null,
+    });
+  }
+
+  for (const echeance of aVenir) {
+    instalments.push({ ...echeance, position: instalments.length });
   }
 
   return instalments;

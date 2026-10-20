@@ -153,6 +153,22 @@ supabase/migrations/    schéma, une migration par domaine
 - `src/lib/cancellation.ts` double `app.refund_percent` pour que l'écran annonce la somme
   **avant** confirmation ; `tests/rls-remboursements.test.ts` compare les deux barèmes
   jour par jour sur leurs bornes. Une divergence, c'est un litige.
+- ⚠️ **Une échéance ne naît jamais déjà échue** (migration 0052). `event_date -
+  days_before` n'était confronté à rien : un devis accepté le 20 octobre pour un
+  événement du 22, chez un partenaire qui demande le solde « 7 jours avant », posait un
+  « Solde — à régler le 16 octobre » le jour même de la réservation (CMD-202610-000141).
+  Le client lit une date passée comme une panne, et il a raison ; pire, `start_payment`
+  impose l'ordre des échéances, donc il aurait réglé l'acompte pour se retrouver aussitôt
+  « en retard » sur le reste, **sans aucun chemin pour ne pas l'être**. La règle :
+  **ce qui est déjà exigible le jour de la réservation est fondu en un seul règlement, dû
+  immédiatement** — et quand il ne reste rien derrière, cela donne un paiement intégral,
+  qui est aussi la seule façon honnête de tenir une prestation imminente. La fusion
+  **additionne** des montants déjà arrêtés : la somme reste le total par construction, et
+  le solde continue de n'être jamais calculé. Ne pas confondre avec un **retard survenu
+  après** la réservation, qui est un vrai retard de paiement et que l'écran affiche déjà
+  comme tel : le défaut était à la naissance. `src/lib/fees.ts` porte la même règle —
+  sans `bookingDate` il n'a aucun présent à opposer aux dates et ne fusionne rien, ce qui
+  est le cas de l'aperçu de `ScheduleEditor`.
 - ⚠️ **FedaPay refuse `/payouts` (403) et `/refunds` (401)** sur ce compte, avec la clé
   même qui obtient 200 sur `/transactions` : virements et remboursements demandent un
   compte marchand validé. Les deux sont donc des **registres** — `mark_payout_sent` et

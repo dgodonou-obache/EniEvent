@@ -197,6 +197,90 @@ describe("échéancier du partenaire", () => {
   });
 });
 
+/**
+ * ⚠️ **Une échéance ne naît jamais déjà échue.**
+ *
+ * Constaté en production le 21 octobre 2026 : un devis accepté la veille d'un
+ * événement du 22, chez un partenaire qui demande le solde 7 jours avant. Le
+ * client lisait « Solde — à régler le 16 octobre », une date passée, le jour
+ * même de sa réservation. Et `start_payment` impose l'ordre des échéances : il
+ * aurait réglé l'acompte pour se retrouver aussitôt « en retard » sur le reste.
+ *
+ * Ces cas doublent ceux de `tests/rls-echeanciers.test.ts`, qui éprouve la même
+ * règle dans `app.build_instalments`. Les deux doivent dire la même chose.
+ */
+describe("une échéance ne naît jamais déjà échue", () => {
+  it("réclame la totalité quand l'événement est trop proche", () => {
+    // Réservation le 21, événement le 22 : le solde « 7 jours avant » tombait
+    // le 15. Il n'y a plus qu'un seul moment pour payer, c'est maintenant.
+    const e = resolveSchedule(XOF(500), [pct("Réservation", 30), solde(7)], {
+      eventDate: "2026-10-22",
+      bookingDate: "2026-10-21",
+    });
+
+    expect(e).toHaveLength(1);
+    expect(e[0].amount.amount).toBe(500);
+    expect(e[0].dueDate).toBe("2026-10-21");
+    expect(e[0].label).toBe("Paiement intégral");
+  });
+
+  it("ne fond que ce qui est échu, et laisse le reste à sa date", () => {
+    // L'événement est dans 30 jours : le deuxième versement « 90 jours avant »
+    // est déjà derrière nous, le solde « 7 jours avant » non.
+    const e = resolveSchedule(
+      XOF(1_000_000),
+      [pct("Acompte", 30), pct("Deuxième versement", 40, 90), solde(7)],
+      { eventDate: "2026-11-20", bookingDate: "2026-10-21" },
+    );
+
+    expect(e).toHaveLength(2);
+    expect(e[0].amount.amount).toBe(700_000);
+    expect(e[0].dueDate).toBe("2026-10-21");
+    expect(e[1].amount.amount).toBe(300_000);
+    expect(e[1].dueDate).toBe("2026-11-13");
+  });
+
+  it("garde le libellé du partenaire quand rien n'a été fondu", () => {
+    // Une seule échéance exigible, c'est l'acompte habituel : le renommer
+    // reviendrait à réécrire les conditions du partenaire sans qu'il l'ait
+    // demandé.
+    const e = resolveSchedule(XOF(1_000_000), [pct("Acompte à la réservation", 30), solde(7)], {
+      eventDate: "2026-12-24",
+      bookingDate: "2026-10-21",
+    });
+
+    expect(e[0].label).toBe("Acompte à la réservation");
+  });
+
+  it("ne confond pas une date inconnue avec une date passée", () => {
+    // Une date souple est fréquente sur un mariage. Le solde attend que la
+    // date se fixe ; le réclamer tout de suite serait un faux.
+    const e = resolveSchedule(XOF(1_000_000), [pct("Acompte", 30), solde(7)], {
+      bookingDate: "2026-10-21",
+    });
+
+    expect(e).toHaveLength(2);
+    expect(e[1].dueDate).toBeNull();
+  });
+
+  it("n'émet jamais une échéance antérieure au jour de la réservation", () => {
+    // Le contrôle qui compte, sur tout ce qui tombe mal : aucune date passée,
+    // et la somme reste exactement le total.
+    const rows = [pct("Acompte", 25), pct("Deuxième", 25, 60), pct("Troisième", 25, 30), solde(7)];
+
+    for (const jours of [0, 1, 3, 8, 31, 61, 120]) {
+      const event = new Date(Date.UTC(2026, 9, 21 + jours)).toISOString().slice(0, 10);
+      const e = resolveSchedule(XOF(1_234_567), rows, { eventDate: event, bookingDate: "2026-10-21" });
+
+      expect(scheduleTotal(e, "XOF").amount, `événement dans ${jours} jours`).toBe(1_234_567);
+
+      for (const echeance of e) {
+        expect(echeance.dueDate! >= "2026-10-21", `${echeance.label} dans ${jours} jours`).toBe(true);
+      }
+    }
+  });
+});
+
 describe("accord avec le calcul de la base", () => {
   it("reproduit exactement la formule de start_payment", () => {
     // La migration 0026 calcule `round(montant * taux / 100)` et déduit le
