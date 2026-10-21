@@ -11,11 +11,17 @@ import { PAYMENT_STATUS_LABELS, type MoneyLine } from "@/lib/orders";
  *
  * `showSplit` n'est montré qu'à qui la ventilation concerne : un client n'a pas
  * à savoir ce que la plateforme retient.
+ *
+ * ⚠️ `showReason` suit la même règle, pour deux raisons distinctes : le motif
+ * d'un échec est un **code d'opérateur**, donc du jargon qu'un client ne doit
+ * pas lire (`CLAUDE.md` §5), et les déboires bancaires d'un client ne regardent
+ * pas son prestataire. Il n'est donc rendu que depuis `/admin/paiements`.
  */
 
 interface Props {
   lines: readonly MoneyLine[];
   showSplit?: boolean;
+  showReason?: boolean;
 }
 
 const QUAND = new Intl.DateTimeFormat("fr-FR", {
@@ -32,7 +38,7 @@ const TONS: Record<MoneyLine["status"], string> = {
   refunded: "bg-slate-100 text-slate-600",
 };
 
-export function PaymentTable({ lines, showSplit = false }: Props) {
+export function PaymentTable({ lines, showSplit = false, showReason = false }: Props) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white">
       <table className="w-full min-w-[640px] text-sm">
@@ -84,6 +90,11 @@ export function PaymentTable({ lines, showSplit = false }: Props) {
                   >
                     {PAYMENT_STATUS_LABELS[l.status]}
                   </span>
+                  {showReason && l.lastError && l.status !== "paid" ? (
+                    <span className="mt-1 block max-w-[16rem] text-xs leading-snug text-slate-400">
+                      {l.lastError}
+                    </span>
+                  ) : null}
                 </Td>
               </tr>
             );

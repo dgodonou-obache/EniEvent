@@ -78,7 +78,9 @@ export default async function AdminPaymentsPage() {
             />
           </div>
 
-          <PaymentTable lines={lines} showSplit />
+          {/* Seul écran à montrer le motif d'un échec : c'est un code
+              d'opérateur, à citer au support du prestataire. */}
+          <PaymentTable lines={lines} showSplit showReason />
         </>
       )}
     </div>

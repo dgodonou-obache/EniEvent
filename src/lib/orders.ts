@@ -247,6 +247,15 @@ export interface MoneyLine {
   paidAt: string | null;
   orderReference: string | null;
   instalmentLabel: string | null;
+  /**
+   * Motif de l'échec, tel que la relecture l'a constaté.
+   *
+   * ⚠️ **Ne s'affiche qu'à l'administration** (`PaymentTable showReason`). Un
+   * client n'a que faire d'un code d'opérateur — `CLAUDE.md` §5 interdit le
+   * jargon —, et un partenaire n'a pas à lire les déboires bancaires de son
+   * client. C'est en revanche exactement ce qu'on cite au support de FedaPay.
+   */
+  lastError: string | null;
 }
 
 type PaymentJoined = PaymentRow & {
@@ -267,6 +276,7 @@ function toMoneyLine(p: PaymentJoined): MoneyLine {
     paidAt: p.paid_at,
     orderReference: p.orders?.reference ?? null,
     instalmentLabel: p.order_instalments?.label ?? null,
+    lastError: p.last_error,
   };
 }
 

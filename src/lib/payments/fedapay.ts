@@ -132,6 +132,61 @@ export function fedapayPhone(phone: string | null): { number: string; country: s
   return { number: canonical.slice(4), country: "bj" };
 }
 
+/** Un code d'opérateur : lettres capitales, chiffres, tirets et points. */
+const FORME_DUN_CODE = /^[A-Z0-9][A-Z0-9_.-]{0,63}$/i;
+
+/**
+ * Le motif de l'opérateur, et lui seul.
+ *
+ * ⚠️ **On ne recopie jamais le texte brut du prestataire.** Mesuré le
+ * 21 octobre 2026 sur une transaction refusée : `last_error_message` contenait
+ * la charge utile complète de MTN, **numéro du payeur compris**
+ * (`"partyId":"2290197873940"`). Or `payments.last_error` est lisible par le
+ * partenaire autant que par le client (`payments_select`, migration 0026) :
+ * l'y recopier publierait le numéro d'un client à son prestataire, en
+ * contournant tout le masquage des coordonnées de la messagerie — durablement,
+ * et sans que rien ne le signale.
+ *
+ * D'où un **filtre positif**, comme pour les droits de colonne : ne sort d'ici
+ * que ce qui a la forme d'un code. Un message libre est écarté en entier, même
+ * s'il contient l'explication qu'on aimerait lire. Ce qui passe est
+ * `COULD_NOT_PERFORM_TRANSACTION`, `NOT_ENOUGH_FUNDS`, `API_ERROR` — c'est
+ * exactement ce qu'on cite au support du prestataire.
+ *
+ * Deux sources, dans cet ordre : le `reason` que l'opérateur enfouit dans le
+ * corps JSON du message (le plus précis), puis `last_error_code` (plus
+ * générique). Exporté pour être éprouvé sans réseau.
+ */
+export function fedapayErrorCode(tx: Record<string, unknown>): string | null {
+  const brut = tx.last_error_message;
+
+  if (typeof brut === "string" && brut.length > 0) {
+    try {
+      const corps = JSON.parse(brut) as Record<string, unknown>;
+      const motif = corps.reason;
+      if (typeof motif === "string" && FORME_DUN_CODE.test(motif)) return motif;
+    } catch {
+      // Un message qui n'est pas du JSON est du texte libre : il ne sort pas.
+    }
+  }
+
+  const code = tx.last_error_code;
+  return typeof code === "string" && FORME_DUN_CODE.test(code) ? code : null;
+}
+
+/**
+ * Ce qu'on inscrit dans `payments.last_error` quand un règlement n'aboutit pas.
+ *
+ * ⚠️ **Sans le motif de l'opérateur, un échec ne dit rien.** Trois règlements
+ * refusés le 20 octobre 2026 portaient « État canceled » — exact, et inutile :
+ * la vraie cause (`COULD_NOT_PERFORM_TRANSACTION`, refus de MTN) n'existait que
+ * dans le tableau de bord de FedaPay. On relit la transaction, donc on avait la
+ * réponse sous les yeux, et on la jetait.
+ */
+export function motifLisible(rawStatus: string, errorCode: string | null): string {
+  return errorCode ? `État ${rawStatus} — ${errorCode}` : `État ${rawStatus}`;
+}
+
 interface Options {
   config?: FedaPayConfig | null;
   /** Injectable pour les tests : aucun appel réseau en suite de tests. */
@@ -307,6 +362,7 @@ function createProvider(options: Options = {}): PaymentProvider {
             amount: typeof tx.amount === "number" ? tx.amount : Number(tx.amount ?? 0),
             currency: "XOF",
             metadata: (tx.custom_metadata as Record<string, unknown>) ?? {},
+            errorCode: fedapayErrorCode(tx),
           },
         };
       } catch (error) {

@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { after } from "next/server";
 
-import { paymentProvider } from "@/lib/payments/fedapay";
+import { motifLisible, paymentProvider } from "@/lib/payments/fedapay";
 import { createServiceRoleClient } from "@/utils/supabase/server";
 
 /**
@@ -160,7 +160,7 @@ async function verifierEtDenouer(providerRef: string): Promise<void> {
     // Comparé en base à ce qui avait été ouvert : un écart fait échouer le
     // paiement plutôt que de valider une somme inattendue.
     montant_constate: tx.amount,
-    detail: tx.state === "paid" ? undefined : `État ${tx.rawStatus}`,
+    detail: tx.state === "paid" ? undefined : motifLisible(tx.rawStatus, tx.errorCode),
   });
 
   if (error) console.error("Dénouement impossible :", error.message);

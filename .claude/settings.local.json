@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "PowerShell(\"node: $\\(node -v\\)\"; \"npm: $\\(npm -v\\)\"; \"cwd: $\\(Get-Location\\)\"; \"empty: $\\(\\(Get-ChildItem -Force | Measure-Object\\).Count -eq 0\\)\")",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(node --env-file=.env.local C:/Users/dgodo/AppData/Local/Temp/claude/d--Projet-cod--EniEvent-revamp/3906aec1-a2b3-4a2e-a18d-2bfacfa2bbed/scratchpad/q.mjs '' ' *)",
+      "Bash(node --env-file=.env.local -e ' *)"
     ]
   }
 }

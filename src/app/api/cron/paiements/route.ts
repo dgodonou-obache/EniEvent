@@ -1,5 +1,5 @@
 import { bearerMatches } from "@/lib/auth/bearer";
-import { paymentProvider } from "@/lib/payments/fedapay";
+import { motifLisible, paymentProvider } from "@/lib/payments/fedapay";
 import type { WebhookHealth } from "@/lib/payments/provider";
 import { createServiceRoleClient } from "@/utils/supabase/server";
 
@@ -104,7 +104,8 @@ export async function GET(request: Request) {
       etat_prestataire: tx.rawStatus,
       encaisse: tx.state === "paid",
       montant_constate: tx.amount,
-      detail: tx.state === "paid" ? undefined : `Rattrapage — état ${tx.rawStatus}`,
+      detail:
+        tx.state === "paid" ? undefined : `Rattrapage · ${motifLisible(tx.rawStatus, tx.errorCode)}`,
     });
 
     if (erreur) {

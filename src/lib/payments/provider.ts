@@ -56,6 +56,19 @@ export interface TransactionRead {
   amount: number;
   currency: string;
   metadata: Record<string, unknown>;
+  /**
+   * Motif de l'opérateur, quand il y en a un : `COULD_NOT_PERFORM_TRANSACTION`,
+   * `NOT_ENOUGH_FUNDS`, `API_ERROR`…
+   *
+   * ⚠️ **Un code, jamais un texte.** Le message d'erreur brut de FedaPay
+   * transporte la charge utile complète de l'opérateur — numéro du payeur
+   * compris —, et `payments.last_error` est lisible par le **partenaire**
+   * autant que par le client (`payments_select`, migration 0026). Y recopier
+   * ce message publierait le numéro d'un client à son prestataire, en
+   * contournant d'un coup tout le masquage des coordonnées de la messagerie.
+   * L'adaptateur ne laisse donc passer que ce qui a la **forme** d'un code.
+   */
+  errorCode: string | null;
 }
 
 export type ReadResult =

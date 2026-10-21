@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { money } from "@/lib/money";
-import { fedapayPhone, paymentProvider, toPaymentState } from "@/lib/payments/fedapay";
+import {
+  fedapayErrorCode,
+  fedapayPhone,
+  motifLisible,
+  paymentProvider,
+  toPaymentState,
+} from "@/lib/payments/fedapay";
 
 /**
  * Ouverture d'un paiement chez FedaPay.
@@ -171,6 +177,115 @@ describe("relecture d'une transaction", () => {
     expect(out.ok).toBe(false);
     if (out.ok) return;
     expect(out.reason).toBe("introuvable");
+  });
+});
+
+/**
+ * ⚠️ **Le motif d'un refus, et rien d'autre que le motif.**
+ *
+ * Mesuré le 21 octobre 2026 sur trois règlements refusés en production. Deux
+ * défauts opposés s'y rencontraient :
+ *
+ * - `payments.last_error` portait « État canceled », exact et inutile : la vraie
+ *   cause (`COULD_NOT_PERFORM_TRANSACTION`, refus de MTN) n'existait que dans le
+ *   tableau de bord de FedaPay, alors qu'on relit la transaction et qu'on avait
+ *   donc la réponse sous les yeux ;
+ * - le champ qui la contient, `last_error_message`, transporte **la charge utile
+ *   complète de l'opérateur, numéro du payeur compris**. Or `payments` est
+ *   lisible par le partenaire autant que par le client (`payments_select`,
+ *   migration 0026) : recopier ce message publierait le numéro d'un client à son
+ *   prestataire, durablement, en contournant tout le masquage de la messagerie.
+ *
+ * D'où un filtre **positif** : ne sort que ce qui a la forme d'un code.
+ */
+describe("motif d'un refus", () => {
+  // Capture réelle de la transaction 113799315, numéro remplacé.
+  const MESSAGE_MTN = JSON.stringify({
+    financialTransactionId: "13173414045",
+    externalId: "pi_sPw_1792536831452",
+    amount: "153",
+    currency: "XOF",
+    payer: { partyIdType: "MSISDN", partyId: "2290197873940" },
+    payeeNote: "Payement sur FedaPay",
+    status: "FAILED",
+    reason: "COULD_NOT_PERFORM_TRANSACTION",
+  });
+
+  it("retient le motif que l'opérateur enfouit dans son corps d'erreur", () => {
+    expect(fedapayErrorCode({ last_error_code: "API_ERROR", last_error_message: MESSAGE_MTN })).toBe(
+      "COULD_NOT_PERFORM_TRANSACTION",
+    );
+  });
+
+  it("ne laisse pas sortir le numéro du payeur", () => {
+    // Le contrôle qui compte. Ce qui ressort finit dans une colonne que le
+    // partenaire peut lire.
+    const sorti = fedapayErrorCode({ last_error_code: "API_ERROR", last_error_message: MESSAGE_MTN });
+
+    expect(sorti).not.toMatch(/\d{8}/);
+    expect(sorti).not.toContain("2290197873940");
+  });
+
+  it("écarte un message libre en entier, même s'il explique mieux", () => {
+    // Un texte libre peut contenir n'importe quoi — une adresse, un nom, un
+    // numéro. On préfère ne rien dire à publier ce qu'on n'a pas relu.
+    expect(
+      fedapayErrorCode({
+        last_error_code: null,
+        last_error_message: "Le client 01 97 87 39 40 n'a pas validé à temps",
+      }),
+    ).toBeNull();
+  });
+
+  it("retombe sur le code générique quand le corps ne dit rien", () => {
+    expect(fedapayErrorCode({ last_error_code: "NOT_ENOUGH_FUNDS" })).toBe("NOT_ENOUGH_FUNDS");
+    expect(fedapayErrorCode({ last_error_code: "API_ERROR", last_error_message: "{}" })).toBe(
+      "API_ERROR",
+    );
+  });
+
+  it("ne dit rien plutôt que d'inventer sur une transaction saine", () => {
+    expect(fedapayErrorCode({ last_error_code: null, last_error_message: null })).toBeNull();
+    expect(fedapayErrorCode({})).toBeNull();
+  });
+
+  it("compose un motif qui se lit, et qui se cite au support", () => {
+    expect(motifLisible("canceled", "COULD_NOT_PERFORM_TRANSACTION")).toBe(
+      "État canceled — COULD_NOT_PERFORM_TRANSACTION",
+    );
+    // Sans motif, on n'ajoute pas un tiret vide.
+    expect(motifLisible("canceled", null)).toBe("État canceled");
+  });
+
+  it("remonte le motif jusqu'à la relecture", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          "v1/transaction": {
+            id: 113799315,
+            status: "canceled",
+            amount: 150,
+            last_error_code: "API_ERROR",
+            last_error_message: MESSAGE_MTN,
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const out = await paymentProvider({
+      config: CONFIG,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    }).readTransaction("113799315");
+
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.transaction.errorCode).toBe("COULD_NOT_PERFORM_TRANSACTION");
+    // ⚠️ Le montant retenu reste **le nôtre**, jamais celui débité au client :
+    // FedaPay a demandé 153 à MTN pour une transaction de 150, ses frais étant
+    // à la charge du payeur. Comparer 153 à 150 ferait échouer en base un
+    // paiement réellement encaissé.
+    expect(out.transaction.amount).toBe(150);
   });
 });
 

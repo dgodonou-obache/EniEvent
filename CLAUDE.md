@@ -413,6 +413,31 @@ posé n'éteint pas une fonctionnalité qui marchait.
 - **Le client ne fournit jamais un montant.** `start_payment` le déduit de la commande,
   elle-même figée à l'acceptation du devis. Revérifier un montant côté serveur n'a aucun
   sens si l'on a laissé le navigateur le choisir au départ.
+- ⚠️ **Le montant constaté est `transaction.amount`, jamais ce que le payeur a été
+  débité.** Mesuré le 21 octobre 2026 sur une transaction réelle de 150 F : FedaPay a
+  demandé **153 F** à MTN, soit 2 % de plus — ses frais sont donc, sur ce compte, **à la
+  charge du client**. La transaction porte les deux chiffres dans des champs distincts
+  (`amount`, puis `fees` / `amount_debited`), et c'est `amount` que `readTransaction`
+  retient : comparer le débit au montant ouvert ferait échouer en base un paiement
+  réellement encaissé, et la commande resterait impayée alors que le client a payé — la
+  panne la plus coûteuse du tunnel. ⚠️ **Et ce réglage contredit la règle du prix
+  affiché** : le client règle 153 F pour une réservation annoncée à 150 F. Il ne se change
+  pas dans le dépôt mais dans le tableau de bord de FedaPay (frais à la charge du
+  marchand) — où ils viennent en coût d'exploitation sur la commission, sans toucher à la
+  part du partenaire, qui est calculée sur le montant de la commande.
+- ⚠️ **Un échec de paiement doit dire pourquoi, sans dire qui.** Trois règlements refusés
+  le 20 octobre 2026 portaient « État canceled » : exact, et inutile — la vraie cause
+  (`COULD_NOT_PERFORM_TRANSACTION`, refus de MTN) n'existait que dans le tableau de bord
+  de FedaPay, alors qu'on relit la transaction et qu'on avait donc la réponse sous les
+  yeux. Mais le champ qui la contient, `last_error_message`, transporte **toute la charge
+  utile de l'opérateur, numéro du payeur compris**, et `payments` est lisible par le
+  **partenaire** autant que par le client (`payments_select`, 0026) : y recopier ce
+  message publierait le numéro d'un client à son prestataire, durablement, en contournant
+  d'un coup tout le masquage de la messagerie. `fedapayErrorCode` applique donc un
+  **filtre positif** — ne sort que ce qui a la forme d'un code —, et un message libre est
+  écarté en entier, même s'il explique mieux. Le motif ne s'affiche qu'à l'administration
+  (`PaymentTable showReason`) : c'est du jargon pour un client, et ce n'est pas l'affaire
+  du partenaire.
 
 ### 4. Isolation des espaces
 Les cinq espaces sont étanches. Un partenaire déconnecté est renvoyé sur
