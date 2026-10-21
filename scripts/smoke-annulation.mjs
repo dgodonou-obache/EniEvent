@@ -69,6 +69,16 @@ async function menage(commandeId, annonceId, jour) {
   const ids = (paiements ?? []).map((p) => p.id);
   if (ids.length > 0) await admin.from("refund_lines").delete().in("payment_id", ids);
 
+  // ⚠️ **Les notifications d'abord, et par l'identifiant du _paiement_.**
+  // Depuis la migration 0053, encaisser met deux lignes en file — client et
+  // partenaire — et la base sonne `/api/cron/notifications` par `pg_net` dès
+  // l'écriture. Sans cette suppression, chaque exécution enverrait de vrais
+  // courriels à des adresses de démonstration qui n'existent pas, et chaque
+  // rebond abîme un peu la réputation d'expéditeur du domaine. Même régime que
+  // `smoke:avis` : la course est serrée, la suppression gagne en pratique.
+  if (ids.length > 0) await admin.from("notifications").delete().in("ref_id", ids);
+  await admin.from("notifications").delete().eq("ref_id", commandeId);
+
   await admin.from("refunds").delete().eq("order_id", commandeId);
   await admin.from("payments").delete().eq("order_id", commandeId);
   await admin.from("order_instalments").delete().eq("order_id", commandeId);

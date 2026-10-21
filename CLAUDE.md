@@ -776,6 +776,21 @@ qui appelle une réponse doit déclencher une notification.**
   le contournerait entièrement — il suffirait d'écrire son numéro pour qu'il parte en
   clair dans une boîte de réception. C'est la seule charge utile du dépôt qui ne
   transporte volontairement aucun texte libre.
+- ⚠️ **Un règlement encaissé prévient les deux parties** (migration 0053). Au premier
+  paiement réel abouti — 21 octobre 2026 —, **personne n'a été prévenu** : ni le client,
+  ni le partenaire. Ce n'était pas une panne d'envoi, la file était verte et les courriels
+  du tunnel de devis partaient ; c'était un **événement absent**. `payments` n'avait aucun
+  déclencheur et `KINDS` aucun type de paiement : tout notifiait sauf le moment où l'argent
+  arrive, c'est-à-dire le seul que les deux parties attendent. Et `/paiement/retour`
+  promettait déjà l'inverse au client, mot pour mot — « Votre prestataire en est informé.
+  Vous recevrez un récapitulatif par e-mail. » —, donc au pire endroit : juste après qu'il
+  a sorti de l'argent. ⚠️ **Le `ref_id` est l'identifiant du _paiement_, jamais celui de
+  la commande** : avec la commande, l'unicité `(kind, ref_id, recipient)` aurait avalé en
+  silence l'annonce de tout solde d'échéancier — pas d'erreur, pas de trace, un courriel
+  manquant que personne n'aurait cherché. Deux rédactions pour deux questions : le client
+  veut sa preuve et ce qui lui reste à sortir, le partenaire veut savoir que sa date est
+  tenue, ce qui lui revient, et **quand il sera payé** — cette dernière remplirait le
+  support si on la laissait sans réponse.
 - **Une notification par salve, pas par message.** `send_message` n'alimente la file que
   si le message précédent venait de l'autre partie : dix allers-retours font un seul
   courriel, et la réponse d'en face rouvre le droit d'alerter. Règle sans état, donc sans
