@@ -231,7 +231,18 @@ try {
     body: JSON.stringify({ name: "transaction.approved", entity: { id: tx.id, status: "approved" } }),
   });
 
-  check("le webhook de production répond", envoi.ok, `HTTP ${envoi.status}`);
+  // ⚠️ **Deux réponses sont bonnes, et la meilleure est le refus.** Ce contrôle
+  // n'exigeait qu'un 2xx. Depuis que `FEDAPAY_WEBHOOK_SECRET` est posée en
+  // production, un corps non signé est rejeté en 401 — c'est-à-dire que le
+  // webhook ne le lit même pas, une garantie **plus forte** que celle qu'on
+  // vérifiait. Le laisser compter pour un échec apprendrait à ignorer la ligne
+  // rouge, et le jour où elle a raison personne ne la lit.
+  const refuse = envoi.status === 401;
+  check(
+    "le webhook de production répond",
+    envoi.ok || refuse,
+    refuse ? "HTTP 401 — corps non signé refusé, il n'est pas même lu" : `HTTP ${envoi.status}`,
+  );
 
   const { data: apres } = await admin.from("payments").select("*").eq("idempotency_key", cle).maybeSingle();
 
