@@ -52,7 +52,7 @@ function colonnes(devise: string | null): Colonne[] {
     { cle: "reference", libelle: "Référence" },
     { cle: "demande", libelle: "Demande" },
     { cle: "evenement", libelle: "Événement", secondaire: true },
-    { cle: "montant", libelle: devise ? `Montant en ${devise}` : "Montant", align: "right" },
+    { cle: "montant", libelle: devise ? `Montant (${devise})` : "Montant", align: "right" },
     { cle: "etat", libelle: "État" },
   ];
 }

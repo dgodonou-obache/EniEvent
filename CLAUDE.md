@@ -691,10 +691,10 @@ barrière devant quelqu'un qui n'ouvre pas de navigateur.
   **pas de case à cocher** — aucune action de masse n'existe dans ces écrans, et une
   colonne de cases qui ne commande rien est le défaut de l'interrupteur débranché.
   `tests/data-table.test.ts` garde les trois.
-- ⚠️ **La devise monte dans l'en-tête — « Montant en FCFA » —, et seulement si elle est
+- ⚠️ **La devise monte dans l'en-tête — « Montant (FCFA) » —, et seulement si elle est
   unique sur l'écran.** Répétée sur chaque ligne, elle encombre une colonne dont c'est
   justement le rôle de s'aligner. Mais le schéma est **multi-devise** : une colonne
-  « en FCFA » contenant une ligne en GHS afficherait un montant faux sans qu'aucune erreur
+  « Montant (FCFA) » contenant une ligne en GHS afficherait un montant faux sans qu'aucune erreur
   ne se produise. Les pages comptent donc les devises présentes et ne remontent le libellé
   que s'il n'y en a qu'une ; sinon chaque montant reprend la sienne. `currencyLabel`
   (`money.ts`) est le **seul** endroit qui sait que le XOF se dit « FCFA » — la
