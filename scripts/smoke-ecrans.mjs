@@ -188,7 +188,7 @@ async function fichesDynamiques(compte) {
   // La RLS filtre : ce sont les commandes de sa structure, et d'elle seule.
   const { data } = await client
     .from("orders")
-    .select("id")
+    .select("id, reference")
     .order("created_at", { ascending: false })
     .limit(1);
 
@@ -202,7 +202,13 @@ async function fichesDynamiques(compte) {
     );
   }
 
-  return data.map((o) => `/pro/reservations/${o.id}`);
+  // ⚠️ **Et on exige ce que la page doit _dire_.** Un `<h1>` suffisait jusqu'ici,
+  // or `(dashboard)/[...segments]` attrape toute adresse non construite et rend
+  // un écran d'attente, titre compris : une fiche absente passait donc au vert.
+  // Mesuré le 21 octobre 2026 contre la production, avant déploiement — le
+  // contrôle annonçait « ok — Réservations » sur une page qui n'existait pas
+  // encore. Même angle mort que le « Lot 2 » resté des semaines sur `/compte`.
+  return data.map((o) => ({ chemin: `/pro/reservations/${o.id}`, contient: o.reference }));
 }
 
 let echecs = 0;
@@ -214,7 +220,11 @@ for (const parcours of PARCOURS) {
   const cookie = parcours.compte ? await cookieFor(parcours.compte) : null;
   const routes = [...parcours.routes, ...(await fichesDynamiques(parcours.compte))];
 
-  for (const route of routes) {
+  for (const entree of routes) {
+    // Une route est une adresse, ou une adresse **et ce que la page doit dire**.
+    const route = typeof entree === "string" ? entree : entree.chemin;
+    const contient = typeof entree === "string" ? null : entree.contient;
+
     let verdict;
 
     try {
@@ -238,6 +248,11 @@ for (const parcours of PARCOURS) {
           echecs += 1;
         } else if (!/<h1[^>]*>/.test(html)) {
           verdict = "ÉCHEC — aucun titre, page vide ?";
+          echecs += 1;
+        } else if (contient && !html.includes(contient)) {
+          // L'écran d'attente de `[...segments]` a un titre lui aussi : sans
+          // cette exigence, une fiche absente passerait au vert.
+          verdict = `ÉCHEC — « ${contient} » introuvable, écran d'attente ?`;
           echecs += 1;
         } else {
           const titre = (html.match(/<h1[^>]*>([^<]{0,48})/) ?? [])[1] ?? "";
