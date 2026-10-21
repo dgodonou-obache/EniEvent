@@ -166,6 +166,45 @@ async function cookieFor(email) {
   return `sb-${ref}-auth-token=base64-${jeton}`;
 }
 
+/**
+ * Les fiches, dont l'adresse ne peut pas être écrite en dur.
+ *
+ * ⚠️ **Une liste devenue tableau cache sa fiche derrière un identifiant.**
+ * `/pro/reservations/[id]` est désormais le seul endroit où vivent l'annulation
+ * et le litige d'un prestataire : ne pas le rendre reviendrait à ne plus
+ * contrôler ces gestes du tout. Mais l'identifiant change à chaque
+ * `demo:reset`, et une UUID recopiée ici vieillirait en silence — le contrôle
+ * passerait au vert sur une redirection. On la demande donc à la base, avec la
+ * session du compte lui-même, et on **échoue si on n'en trouve aucune** plutôt
+ * que de sauter l'écran.
+ */
+async function fichesDynamiques(compte) {
+  if (compte !== "demo-partenaire@enievent.bj") return [];
+
+  const client = createClient(url, key, { auth: { persistSession: false } });
+  const { error } = await client.auth.signInWithPassword({ email: compte, password });
+  if (error) throw new Error(`${compte} : ${error.message}`);
+
+  // La RLS filtre : ce sont les commandes de sa structure, et d'elle seule.
+  const { data } = await client
+    .from("orders")
+    .select("id")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  // ⚠️ **Assertion positive.** Rendre `[]` ferait disparaître l'écran du
+  // contrôle sans un mot : il resterait vert en ne vérifiant plus rien, ce qui
+  // est la pire des deux issues. Même leçon que `verdictWebhook`.
+  if (!data || data.length === 0) {
+    throw new Error(
+      "Aucune réservation sur le compte partenaire : la fiche /pro/reservations/[id] " +
+        "n'a pas été rendue. Lancez npm run demo:reset.",
+    );
+  }
+
+  return data.map((o) => `/pro/reservations/${o.id}`);
+}
+
 let echecs = 0;
 
 console.log(`Écrans rendus contre ${BASE}\n`);
@@ -173,8 +212,9 @@ console.log(`Écrans rendus contre ${BASE}\n`);
 for (const parcours of PARCOURS) {
   console.log(parcours.titre);
   const cookie = parcours.compte ? await cookieFor(parcours.compte) : null;
+  const routes = [...parcours.routes, ...(await fichesDynamiques(parcours.compte))];
 
-  for (const route of parcours.routes) {
+  for (const route of routes) {
     let verdict;
 
     try {

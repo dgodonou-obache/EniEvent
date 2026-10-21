@@ -675,6 +675,29 @@ barrière devant quelqu'un qui n'ouvre pas de navigateur.
   d'ajouter `frame-ancestors`, on a vérifié qu'aucune iframe n'existe dans le dépôt.
 - Mobile-first, vérifié à 390 px : pas de débordement de modale ni de menu déroulant.
 - Zones défilables : `overflow-y-auto no-scrollbar`.
+- ⚠️ **Une liste d'exploitation est un tableau, pas une pile de cartes.** `/pro/devis` et
+  `/pro/reservations` empilaient des cartes : lisible à trois lignes, illisible à trente,
+  et on n'y comparait **rien** — ni deux montants, ni deux dates — parce que rien n'était
+  aligné. `DataTable` (`src/components/dashboard/DataTable.tsx`) porte le tri, la
+  pagination et le menu de ligne. Trois règles s'y attachent :
+  **on trie sur la donnée, jamais sur ce qu'on affiche** — « 900 000 FCFA » se range
+  après « 1 100 000 FCFA » en comparaison de chaînes, et « 3 déc. » avant « 5 janv. »,
+  sans la moindre erreur visible ; d'où `valeurs` (ce qu'on lit) et `tris` (ce qui
+  compare), séparés ;
+  **le menu de ligne s'ouvre en position _fixe_** — CSS impose qu'un axe d'`overflow` en
+  `auto` force l'autre à `auto`, donc `overflow-x-auto` rogne **aussi en hauteur** et un
+  menu en absolu y est coupé net, quel que soit son `z-index` (même famille que
+  `backdrop-blur`, `tests/stacking.test.ts`) ;
+  **pas de case à cocher** — aucune action de masse n'existe dans ces écrans, et une
+  colonne de cases qui ne commande rien est le défaut de l'interrupteur débranché.
+  `tests/data-table.test.ts` garde les trois.
+- ⚠️ **Un tableau ne porte que la lecture ; les gestes vivent sur la fiche.** Chaque ligne
+  de `/pro/reservations` dépliait son bloc d'annulation et sa boîte de litige — trois
+  blocs empilés par réservation. D'où `/pro/reservations/[id]`, sur le moule de
+  `/pro/devis/[id]` : la navigation du dépôt est **liste → fiche** partout. ⚠️ Une fiche
+  cachée derrière un identifiant disparaît des contrôles si on l'y écrit en dur, l'UUID
+  changeant à chaque `demo:reset` ; `smoke:ecrans` la demande donc à la base et **échoue**
+  s'il n'en trouve aucune, plutôt que de sauter l'écran en silence.
 - ⚠️ Un `href` n'est qu'une chaîne : **rien ne le confronte à l'arborescence de
   `src/app`**. Le bouton « Devenir partenaire » a renvoyé un 404 en production sans
   qu'aucun outil ne bronche, et six des huit onglets de `/compte` faisaient de même.
