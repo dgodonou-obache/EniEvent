@@ -3,7 +3,13 @@ import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { numerosAutour, trierLignes, type Ligne } from "@/components/dashboard/DataTable";
+import {
+  filtrerLignes,
+  numerosAutour,
+  trierLignes,
+  type Ligne,
+} from "@/components/dashboard/DataTable";
+import { format, money } from "@/lib/money";
 
 /**
  * Le tableau des espaces professionnels.
@@ -102,6 +108,101 @@ describe("on trie sur la donnée, jamais sur ce qu'on affiche", () => {
     trierLignes(lignes, { cle: "x", sens: "asc" });
 
     expect(lignes.map((l) => l.id)).toEqual(["b", "a"]);
+  });
+});
+
+/**
+ * La recherche libre.
+ *
+ * Elle porte sur **ce qu'on affiche et sur la donnée brute** : une date se lit
+ * « 4 janv. 2027 » et se range `2027-01-04`, et les deux sont des recherches
+ * légitimes. Personne ne devrait avoir à deviner laquelle le tableau connaît.
+ */
+describe("recherche", () => {
+  /**
+   * ⚠️ Les montants passent par le **vrai formateur**, et non par une chaîne
+   * tapée à la main. Première version de ces cas : la valeur affichée était
+   * écrite « 1 100 000 » avec des espaces ordinaires, si bien que le cas de
+   * l'espace fine insécable se cherchait lui-même et passait au vert avec la
+   * normalisation retirée. Un test qui ne reçoit pas la donnée réelle ne garde
+   * rien.
+   */
+  const somme = (n: number) => format(money(n, "XOF"), { withCurrency: false });
+
+  const lignes = [
+    {
+      ...ligne(
+        "a",
+        { reference: "CMD-202610-000156", evenement: "4 janv. 2027", montant: somme(1_100_000) },
+        { evenement: "2027-01-04", montant: 1_100_000 },
+      ),
+      details: { reference: "Auditorium Cadjèhoun" },
+    },
+    {
+      ...ligne(
+        "b",
+        { reference: "CMD-202609-000097", evenement: "23 sept. 2026", montant: somme(250_000) },
+        { evenement: "2026-09-23", montant: 250_000 },
+      ),
+      details: { reference: "Jardin de Fidjrossè" },
+    },
+  ];
+
+  it("trouve par référence, même partielle", () => {
+    expect(filtrerLignes(lignes, "000156").map((l) => l.id)).toEqual(["a"]);
+    expect(filtrerLignes(lignes, "CMD-2026").map((l) => l.id)).toEqual(["a", "b"]);
+  });
+
+  it("trouve une date sous ses deux formes", () => {
+    // Le cœur de la demande : chercher « 2027-01 » comme « janv » doit marcher.
+    expect(filtrerLignes(lignes, "janv").map((l) => l.id)).toEqual(["a"]);
+    expect(filtrerLignes(lignes, "2027-01").map((l) => l.id)).toEqual(["a"]);
+    expect(filtrerLignes(lignes, "2026-09-23").map((l) => l.id)).toEqual(["b"]);
+  });
+
+  it("ignore les accents, que personne ne tape dans un champ de recherche", () => {
+    expect(filtrerLignes(lignes, "cadjehoun").map((l) => l.id)).toEqual(["a"]);
+    expect(filtrerLignes(lignes, "fidjrosse").map((l) => l.id)).toEqual(["b"]);
+  });
+
+  /**
+   * ⚠️ **L'espace fine insécable.**
+   *
+   * `Intl.NumberFormat` sépare les milliers par U+202F, et non par l'espace du
+   * clavier. Les deux gestes naturels — **taper** le montant, et le **recopier
+   * depuis l'écran** — n'envoient donc pas du tout la même chaîne, et doivent
+   * pourtant donner le même résultat.
+   */
+  it("trouve un montant, qu'on le tape ou qu'on le recopie de l'écran", () => {
+    // Le contrôle ne vaut que si la mise en forme emploie bien une espace
+    // exotique : sinon il passerait au vert sans rien prouver.
+    expect(somme(1_100_000)).not.toContain(" ");
+    expect(somme(1_100_000)).toMatch(/\s/);
+
+    expect(filtrerLignes(lignes, "1 100 000").map((l) => l.id)).toEqual(["a"]);
+    expect(filtrerLignes(lignes, somme(1_100_000)).map((l) => l.id)).toEqual(["a"]);
+  });
+
+  it("trouve aussi un montant tapé sans séparateur", () => {
+    // « 1100000 » ne ressemble à rien de ce qui est affiché : c'est la donnée
+    // brute qui répond.
+    expect(filtrerLignes(lignes, "1100000").map((l) => l.id)).toEqual(["a"]);
+  });
+
+  it("restreint quand on ajoute un mot, au lieu d'élargir", () => {
+    expect(filtrerLignes(lignes, "cmd 2027").map((l) => l.id)).toEqual(["a"]);
+    expect(filtrerLignes(lignes, "cmd jardin").map((l) => l.id)).toEqual(["b"]);
+  });
+
+  it("rend tout sur une recherche vide, sans toucher à l'ordre", () => {
+    expect(filtrerLignes(lignes, "").map((l) => l.id)).toEqual(["a", "b"]);
+    expect(filtrerLignes(lignes, "   ").map((l) => l.id)).toEqual(["a", "b"]);
+  });
+
+  it("rend une liste vide plutôt que tout, quand rien ne correspond", () => {
+    // Une recherche infructueuse qui rendrait tout ferait croire à un filtre
+    // cassé — ou pire, ferait agir sur la mauvaise ligne.
+    expect(filtrerLignes(lignes, "porto-novo")).toEqual([]);
   });
 });
 

@@ -691,6 +691,28 @@ barrière devant quelqu'un qui n'ouvre pas de navigateur.
   **pas de case à cocher** — aucune action de masse n'existe dans ces écrans, et une
   colonne de cases qui ne commande rien est le défaut de l'interrupteur débranché.
   `tests/data-table.test.ts` garde les trois.
+- ⚠️ **La devise monte dans l'en-tête — « Montant en FCFA » —, et seulement si elle est
+  unique sur l'écran.** Répétée sur chaque ligne, elle encombre une colonne dont c'est
+  justement le rôle de s'aligner. Mais le schéma est **multi-devise** : une colonne
+  « en FCFA » contenant une ligne en GHS afficherait un montant faux sans qu'aucune erreur
+  ne se produise. Les pages comptent donc les devises présentes et ne remontent le libellé
+  que s'il n'y en a qu'une ; sinon chaque montant reprend la sienne. `currencyLabel`
+  (`money.ts`) est le **seul** endroit qui sait que le XOF se dit « FCFA » — la
+  correspondance vivait en dur dans `format`, et la recopier dans un en-tête aurait fait
+  deux sources qui divergent au premier pays voisin. Une tuile isolée (`StatTile`) garde
+  sa devise : rien autour d'elle ne la porte.
+- ⚠️ **Une recherche de tableau cherche dans ce qu'on affiche _et_ dans la donnée brute.**
+  Une date se lit « 4 janv. 2027 » et se range `2027-01-04` ; les deux sont des recherches
+  légitimes, et personne ne devrait avoir à deviner laquelle le tableau connaît. Les
+  accents sont ignorés — personne ne tape « Fidjrossè » dans un champ de recherche, et sur
+  un catalogue béninois c'est la moitié des noms —, et les termes se coupent sur **toute**
+  espace : `Intl.NumberFormat` sépare les milliers par une espace fine insécable, si bien
+  qu'un montant tapé au clavier et le même recopié depuis l'écran n'ont pas le même code.
+- ⚠️ **Une pastille d'état se règle avec `whitespace-nowrap`, `inline-flex items-center`
+  et `leading-none`.** « En attente de paiement » se coupait en deux dans une pastille
+  arrondie — où un texte sur deux lignes paraît de travers —, et l'interligne par défaut
+  d'un `inline-block` le laissait flotter vers le bas du cadre. Rien ne lève, rien ne se
+  voit ailleurs qu'à l'œil.
 - ⚠️ **Un tableau ne porte que la lecture ; les gestes vivent sur la fiche.** Chaque ligne
   de `/pro/reservations` dépliait son bloc d'annulation et sa boîte de litige — trois
   blocs empilés par réservation. D'où `/pro/reservations/[id]`, sur le moule de

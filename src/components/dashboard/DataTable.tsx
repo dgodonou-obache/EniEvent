@@ -2,7 +2,16 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown, MoreHorizontal } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  ChevronsUpDown,
+  MoreHorizontal,
+  Search,
+  X,
+} from "lucide-react";
 
 /**
  * Tableau de pilotage des espaces professionnels.
@@ -103,6 +112,59 @@ function rang(ligne: Ligne, cle: string): string | number {
 }
 
 /**
+ * Met un texte à plat pour la recherche : accents retirés, casse ignorée.
+ *
+ * ⚠️ **Les accents comptent, et pas pour la raison qu'on croit.** Personne ne
+ * tape « Événement » ni « Fidjrossè » dans un champ de recherche — et sur un
+ * catalogue béninois, c'est la moitié des noms.
+ *
+ * Rien ici ne touche aux espaces : le découpage des termes s'en charge, en
+ * coupant sur **toute** espace. `Intl.NumberFormat` sépare les milliers par une
+ * espace fine insécable, si bien qu'un montant tapé au clavier et le même
+ * recopié depuis l'écran n'ont pas le même code — les deux doivent trouver.
+ */
+function aplatir(valeur: string | number): string {
+  return String(valeur)
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .trim();
+}
+
+/**
+ * Filtre les lignes sur une recherche libre.
+ *
+ * ⚠️ **On cherche dans ce qu'on affiche _et_ dans la donnée brute.** Les deux
+ * sont nécessaires et ni l'une ni l'autre ne suffit : une date se lit
+ * « 4 janv. 2027 » et se range `2027-01-04`, et les deux formes sont des
+ * recherches légitimes — personne ne devrait avoir à deviner laquelle le
+ * tableau connaît. Même chose pour un montant, tapé « 1100000 » aussi souvent
+ * que « 1 100 000 ».
+ *
+ * Exporté pour être éprouvé sans navigateur.
+ */
+export function filtrerLignes(lignes: readonly Ligne[], recherche: string): Ligne[] {
+  // Coupe sur **toute** espace, et non sur la seule espace du clavier : un
+  // montant recopié depuis l'écran porte des espaces fines insécables.
+  const termes = aplatir(recherche).split(/\s+/).filter(Boolean);
+  if (termes.length === 0) return [...lignes];
+
+  return lignes.filter((ligne) => {
+    const foin = [
+      ...Object.values(ligne.valeurs),
+      ...Object.values(ligne.details ?? {}),
+      ...Object.values(ligne.tris ?? {}),
+    ]
+      .map(aplatir)
+      .join(" ");
+
+    // Tous les termes, pas l'un d'eux : « cmd 2026 » doit restreindre, pas
+    // élargir — c'est ce qu'on attend en ajoutant un mot.
+    return termes.every((terme) => foin.includes(terme));
+  });
+}
+
+/**
  * Range les lignes, sans toucher à l'original.
  *
  * Exporté pour être éprouvé sans navigateur : un tri faux ne lève aucune
@@ -138,17 +200,21 @@ export function DataTable({ colonnes, lignes, triInitial, objet }: Props) {
   );
   const [taille, setTaille] = React.useState(TAILLES[0]);
   const [page, setPage] = React.useState(1);
+  const [recherche, setRecherche] = React.useState("");
 
-  const triees = React.useMemo(() => trierLignes(lignes, tri), [lignes, tri]);
+  const triees = React.useMemo(
+    () => trierLignes(filtrerLignes(lignes, recherche), tri),
+    [lignes, recherche, tri],
+  );
 
   const pages = Math.max(1, Math.ceil(triees.length / taille));
 
   // ⚠️ Une page courante au-delà du dernier rang afficherait un tableau vide
   // sans rien dire. On s'ajuste **pendant le rendu** plutôt que dans un effet,
   // qui peindrait d'abord le vide — même règle que la barre latérale.
-  const [vueTaille, setVueTaille] = React.useState(taille);
-  if (vueTaille !== taille) {
-    setVueTaille(taille);
+  const [vue, setVue] = React.useState({ taille, recherche });
+  if (vue.taille !== taille || vue.recherche !== recherche) {
+    setVue({ taille, recherche });
     setPage(1);
   }
   const courante = Math.min(page, pages);
@@ -166,6 +232,37 @@ export function DataTable({ colonnes, lignes, triInitial, objet }: Props) {
 
   return (
     <div>
+      {/* La recherche cherche **dans tout ce que la ligne porte**, affiché ou
+          non : une référence, une date sous l'une ou l'autre de ses formes, un
+          nom d'annonce. Demander à l'utilisateur de deviner quelle colonne est
+          indexée serait lui faire faire le travail. */}
+      <div className="mb-4 flex items-center gap-2">
+        <div className="relative w-full sm:max-w-sm">
+          <Search
+            className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+            aria-hidden
+          />
+          <input
+            type="search"
+            value={recherche}
+            onChange={(e) => setRecherche(e.target.value)}
+            placeholder="Rechercher une référence, une date…"
+            aria-label="Rechercher dans le tableau"
+            className="h-11 w-full rounded-full border border-slate-200 bg-white pl-11 pr-10 text-sm text-slate-900 transition-all duration-300 placeholder:text-slate-400 focus-visible:border-orange-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/20"
+          />
+          {recherche ? (
+            <button
+              type="button"
+              onClick={() => setRecherche("")}
+              aria-label="Effacer la recherche"
+              className="absolute right-3 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 transition-all duration-200 hover:bg-orange-50 hover:text-orange-600 active:scale-[0.97]"
+            >
+              <X className="h-4 w-4" aria-hidden />
+            </button>
+          ) : null}
+        </div>
+      </div>
+
       <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white">
         <table className="w-full min-w-[640px] text-sm">
           <thead>
@@ -208,6 +305,18 @@ export function DataTable({ colonnes, lignes, triInitial, objet }: Props) {
           </thead>
 
           <tbody>
+            {visibles.length === 0 ? (
+              <tr>
+                <td colSpan={colonnes.length + 1} className="px-4 py-10 text-center">
+                  <p className="text-sm font-semibold text-slate-900">Aucun résultat</p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Rien ne correspond à « {recherche} ». Essayez une référence, une date, ou
+                    effacez la recherche.
+                  </p>
+                </td>
+              </tr>
+            ) : null}
+
             {visibles.map((ligne) => (
               <tr
                 key={ligne.id}
@@ -227,8 +336,17 @@ export function DataTable({ colonnes, lignes, triInitial, objet }: Props) {
                       } ${colonne.secondaire ? "hidden md:table-cell" : ""}`}
                     >
                       {ton ? (
+                        /* ⚠️ Trois classes, trois raisons, et le défaut venait
+                           des trois à la fois. `whitespace-nowrap` : « En
+                           attente de paiement » se coupait en deux dans une
+                           pastille arrondie, où un texte sur deux lignes paraît
+                           de travers. `inline-flex items-center` +
+                           `leading-none` : l'interligne par défaut d'un
+                           `inline-block` laissait le texte flotter vers le bas
+                           du cadre. Le résultat se voyait à l'œil et ne levait
+                           évidemment rien. */
                         <span
-                          className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${TONS[ton]}`}
+                          className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold uppercase leading-none tracking-wider ${TONS[ton]}`}
                         >
                           {valeur}
                         </span>

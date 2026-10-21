@@ -5,7 +5,7 @@ import { DataTable, type Colonne, type Ligne, type Ton } from "@/components/dash
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { requireSpace } from "@/lib/auth/session";
-import { format, money, type CurrencyCode } from "@/lib/money";
+import { currencyLabel, format, money, type CurrencyCode } from "@/lib/money";
 import { getPartnerQuotes } from "@/lib/quotes";
 import { QUOTE_STATUS_LABELS_PARTNER, type QuoteStatus } from "@/lib/states";
 
@@ -41,19 +41,31 @@ const TONS: Record<QuoteStatus, Ton> = {
   expired: "eteint",
 };
 
-const COLONNES: Colonne[] = [
-  { cle: "reference", libelle: "Référence" },
-  { cle: "demande", libelle: "Demande" },
-  { cle: "evenement", libelle: "Événement", secondaire: true },
-  { cle: "montant", libelle: "Montant", align: "right" },
-  { cle: "etat", libelle: "État" },
-];
+/**
+ * ⚠️ **La devise monte dans l'en-tête, et seulement si elle est unique.**
+ * Répéter « FCFA » sur chaque ligne encombre une colonne dont c'est justement
+ * le rôle de s'aligner. Mais le schéma est multi-devise : dès que deux devises
+ * se côtoient, chaque montant reprend la sienne, sinon la colonne mentirait.
+ */
+function colonnes(devise: string | null): Colonne[] {
+  return [
+    { cle: "reference", libelle: "Référence" },
+    { cle: "demande", libelle: "Demande" },
+    { cle: "evenement", libelle: "Événement", secondaire: true },
+    { cle: "montant", libelle: devise ? `Montant en ${devise}` : "Montant", align: "right" },
+    { cle: "etat", libelle: "État" },
+  ];
+}
 
 export default async function PartnerQuotesPage() {
   const { decision } = await requireSpace("partner", "/pro/connexion");
   if (!decision.granted || !decision.org) return null;
 
   const quotes = await getPartnerQuotes(decision.org.orgId);
+
+  // Une seule devise sur l'écran : elle peut monter dans l'en-tête.
+  const devises = new Set(quotes.map((q) => q.currency ?? "XOF"));
+  const commune = devises.size === 1 ? currencyLabel([...devises][0] as CurrencyCode) : null;
 
   const lignes: Ligne[] = quotes.map((quote) => {
     const item = quote.quote_request_items;
@@ -68,7 +80,10 @@ export default async function PartnerQuotesPage() {
         reference: quote.reference,
         demande: request?.title ?? "Demande retirée",
         evenement: jour(request?.event_date),
-        montant: quote.subtotal > 0 ? format(money(quote.subtotal, devise)) : "—",
+        montant:
+          quote.subtotal > 0
+            ? format(money(quote.subtotal, devise), { withCurrency: commune === null })
+            : "—",
         etat: QUOTE_STATUS_LABELS_PARTNER[status],
       },
       details: {
@@ -117,7 +132,7 @@ export default async function PartnerQuotesPage() {
         />
       ) : (
         <DataTable
-          colonnes={COLONNES}
+          colonnes={colonnes(commune)}
           lignes={lignes}
           objet={{ un: "devis", plusieurs: "devis" }}
         />

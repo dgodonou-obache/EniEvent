@@ -203,7 +203,26 @@ export function split(m: Money, ratios: readonly number[]): Money[] {
 }
 
 /**
+ * Nom d'usage d'une devise.
+ *
+ * ⚠️ **Un seul endroit sait que le XOF se dit « FCFA ».** La correspondance
+ * vivait en dur dans `format`, et un en-tête de colonne qui veut annoncer
+ * « Montant en FCFA » l'aurait recopiée : deux endroits, et le jour où un
+ * second pays arrive, l'un des deux ment.
+ */
+export function currencyLabel(currency: CurrencyCode): string {
+  // Intl rend « XOF 150 000 » ; le marché lit « 150 000 FCFA ».
+  return currency === "XOF" ? "FCFA" : currency;
+}
+
+/**
  * Formate pour l'affichage. En XOF on ne montre aucune décimale : « 150 000 FCFA ».
+ *
+ * `withCurrency: false` rend le seul nombre — pour une colonne de tableau dont
+ * l'en-tête porte déjà la devise. ⚠️ Ce n'est légitime **que** si toutes les
+ * lignes partagent la même devise : le schéma est multi-devise
+ * (`organizations.country`), et une colonne « en FCFA » contenant une ligne en
+ * GHS afficherait un montant faux sans qu'aucune erreur ne se produise.
  */
 export function format(
   m: Money,
@@ -219,9 +238,7 @@ export function format(
 
   if (!withCurrency) return formatted;
 
-  // Intl rend « XOF 150 000 » ; le marché lit « 150 000 FCFA ».
-  const suffix = m.currency === "XOF" ? "FCFA" : m.currency;
-  return `${formatted} ${suffix}`;
+  return `${formatted} ${currencyLabel(m.currency)}`;
 }
 
 /**

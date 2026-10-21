@@ -6,7 +6,7 @@ import { StatTile } from "@/components/money/StatTile";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { requireSpace } from "@/lib/auth/session";
-import { format, money, type CurrencyCode } from "@/lib/money";
+import { currencyLabel, format, money, type CurrencyCode } from "@/lib/money";
 import { getPartnerOrders, type OrderStatus } from "@/lib/orders";
 
 /**
@@ -45,14 +45,26 @@ const TONS: Record<OrderStatus, Ton> = {
   refunded: "alerte",
 };
 
-const COLONNES: Colonne[] = [
-  { cle: "reference", libelle: "Référence" },
-  { cle: "evenement", libelle: "Événement" },
-  { cle: "montant", libelle: "Montant", align: "right" },
-  { cle: "part", libelle: "Vous touchez", align: "right", secondaire: true },
-  { cle: "encaisse", libelle: "Encaissé", align: "right", secondaire: true },
-  { cle: "etat", libelle: "État" },
-];
+/**
+ * ⚠️ **La devise monte dans l'en-tête, et seulement si elle est unique.**
+ * Répéter « FCFA » sur chaque ligne encombre une colonne dont c'est justement
+ * le rôle de s'aligner. Mais le schéma est multi-devise
+ * (`organizations.country`, `money.ts`) : une colonne « en FCFA » contenant
+ * une ligne en GHS afficherait un montant faux, sans la moindre erreur. Dès
+ * que deux devises se côtoient, chaque montant reprend donc la sienne.
+ */
+function colonnes(devise: string | null): Colonne[] {
+  const en = (quoi: string) => (devise ? `${quoi} en ${devise}` : quoi);
+
+  return [
+    { cle: "reference", libelle: "Référence" },
+    { cle: "evenement", libelle: "Événement" },
+    { cle: "montant", libelle: en("Montant"), align: "right" },
+    { cle: "part", libelle: en("Vous touchez"), align: "right", secondaire: true },
+    { cle: "encaisse", libelle: en("Encaissé"), align: "right", secondaire: true },
+    { cle: "etat", libelle: "État" },
+  ];
+}
 
 export default async function PartnerBookingsPage() {
   const { decision } = await requireSpace("partner", "/pro/connexion");
@@ -64,9 +76,13 @@ export default async function PartnerBookingsPage() {
   const encours = orders.filter((o) => o.status === "pending_payment" || o.status === "deposit_paid");
   const soldees = orders.filter((o) => o.status === "paid");
 
+  // Une seule devise sur l'écran : elle peut monter dans les en-têtes.
+  const devises = new Set(orders.map((o) => o.currency));
+  const commune = devises.size === 1 ? currencyLabel([...devises][0] as CurrencyCode) : null;
+
   const lignes: Ligne[] = orders.map((order) => {
     const monnaie = order.currency as CurrencyCode;
-    const somme = (n: number) => format(money(n, monnaie));
+    const somme = (n: number) => format(money(n, monnaie), { withCurrency: commune === null });
     const reglees = order.instalments.filter((i) => i.paid).length;
 
     return {
@@ -157,7 +173,7 @@ export default async function PartnerBookingsPage() {
           </div>
 
           <DataTable
-            colonnes={COLONNES}
+            colonnes={colonnes(commune)}
             lignes={lignes}
             objet={{ un: "réservation", plusieurs: "réservations" }}
           />
