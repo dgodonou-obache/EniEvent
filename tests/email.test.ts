@@ -231,6 +231,74 @@ describe("échéance imminente", () => {
   });
 });
 
+/**
+ * ⚠️ **Le courriel qui n'existait pas.** Au premier paiement réel abouti, ni le
+ * client ni le partenaire n'ont rien reçu : `payments` n'avait aucun
+ * déclencheur et `KINDS` aucun type de paiement — pendant que
+ * `/paiement/retour` promettait au client, mot pour mot, que son prestataire
+ * en était informé.
+ */
+describe("règlement encaissé", () => {
+  const REGLEMENT = {
+    reference: "CMD-202610-000141",
+    paymentReference: "PAY-202610-000158",
+    partner: "Jardin de Fidjrossè",
+    listing: "Jardin de Fidjrossè",
+    label: "Acompte à la réservation",
+    amount: 300_000,
+    currency: "XOF",
+    total: 1_000_000,
+    remaining: 700_000,
+    partnerDue: 270_000,
+    eventDate: "2026-12-24",
+  };
+
+  it("dit au client ce qui lui reste à sortir, pas ce qu'il vient de faire", () => {
+    // Il a payé il y a trente secondes : lui redire son geste n'apprend rien,
+    // lui dire ce qui suit évite qu'il rouvre son espace pour le chercher.
+    const mail = renderEmail("payment.received", { ...REGLEMENT, pour: "client" }, SITE)!;
+
+    expect(mail.subject).toContain("CMD-202610-000141");
+    expect(mail.html).toMatch(/700\s000/);
+    expect(mail.html).toContain("/compte/reservations");
+  });
+
+  it("ne dit jamais au client ce que la plateforme retient", () => {
+    // La part du partenaire voyage dans la charge utile parce que la file est
+    // secrète (§8) — raison de plus pour qu'elle ne ressorte pas ici.
+    const mail = renderEmail("payment.received", { ...REGLEMENT, pour: "client" }, SITE)!;
+
+    expect(mail.html).not.toMatch(/270\s000/);
+    expect(mail.text).not.toMatch(/270\s000/);
+    expect(mail.html).not.toContain("/pro/");
+  });
+
+  it("dit au partenaire sa part, et quand il sera payé", () => {
+    // La question qui remplirait le support si on la laissait sans réponse :
+    // on ne verse qu'après la prestation (migration 0032).
+    const mail = renderEmail("payment.received", { ...REGLEMENT, pour: "partner" }, SITE)!;
+
+    expect(mail.html).toMatch(/270\s000/);
+    expect(mail.html).toContain("après la prestation");
+    expect(mail.html).toContain("/pro/reservations");
+  });
+
+  it("distingue un solde restant d'une réservation entièrement réglée", () => {
+    const partiel = renderEmail("payment.received", { ...REGLEMENT, pour: "client" }, SITE)!;
+    const complet = renderEmail(
+      "payment.received",
+      { ...REGLEMENT, pour: "client", remaining: 0 },
+      SITE,
+    )!;
+
+    expect(partiel.text).toContain("Il reste une échéance");
+    expect(complet.text).toContain("ne vous reste rien");
+    // « Reste à régler : 0 FCFA » se lit comme une dette nulle qu'on réclame
+    // quand même. Voir la règle « zéro n'est pas pas-de-donnée » du guide.
+    expect(complet.html).toContain("tout est réglé");
+  });
+});
+
 describe("garde-fous de rédaction", () => {
   it("rend tous les types déclarés", () => {
     // Un `kind` posé en base sans contenu associé resterait bloqué en file.

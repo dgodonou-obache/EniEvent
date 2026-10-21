@@ -20,6 +20,7 @@ export const KINDS = [
   "quote.accepted",
   "quote.declined",
   "request.deadline",
+  "payment.received",
   "order.cancelled",
   "message.new",
   "member.invited",
@@ -115,6 +116,25 @@ export function renderSms(
       return toGsmSafe(
         `ÉniEvent : votre demande se termine bientôt. ` +
           `${offres > 1 ? `${offres} offres vous attendent` : "Une offre vous attend"} : ${lien}`,
+      );
+    }
+
+    case "payment.received": {
+      // Les deux parties sont prévenues : le client tient sa preuve, le
+      // partenaire apprend que sa date est tenue. ⚠️ Aucun montant de part ni
+      // de commission ici — un SMS se lit par-dessus l'épaule.
+      const pour = payload.pour === "partner" ? "partner" : "client";
+      const ref = short(payload.reference, 20);
+      const solde = typeof payload.remaining === "number" ? payload.remaining : 0;
+
+      return toGsmSafe(
+        pour === "partner"
+          ? `ÉniEvent : règlement reçu sur la réservation ${ref}. ` +
+              `${solde > 0 ? "Un solde reste dû. " : "Elle est intégralement réglée. "}` +
+              `Détails : ${base}/pro/reservations`
+          : `ÉniEvent : votre règlement est confirmé${ref ? ` (${ref})` : ""}. ` +
+              `${solde > 0 ? "Il reste une échéance. " : "Tout est réglé. "}` +
+              `Détails : ${base}/compte/reservations`,
       );
     }
 

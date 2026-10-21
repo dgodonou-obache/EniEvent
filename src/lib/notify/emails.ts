@@ -253,6 +253,83 @@ export function renderEmail(
       });
     }
 
+    /**
+     * ⚠️ **Le courriel qui n'existait pas.**
+     *
+     * Au premier paiement réel abouti, ni le client ni le partenaire n'ont rien
+     * reçu : `payments` n'avait aucun déclencheur et `KINDS` aucun type de
+     * paiement. Tout le tunnel du devis notifiait, l'annulation notifiait, et
+     * l'événement le plus important des deux parcours ne disait rien — pendant
+     * que `/paiement/retour` promettait l'inverse au client, mot pour mot.
+     *
+     * Les deux rédactions répondent à deux questions différentes, et c'est pour
+     * cela qu'elles ne se partagent que les chiffres :
+     *
+     * - le **client** veut une preuve, et savoir s'il lui reste quelque chose à
+     *   sortir. Il a payé il y a trente secondes : lui redire ce qu'il vient de
+     *   faire est inutile, lui dire **ce qui suit** ne l'est pas ;
+     * - le **partenaire** veut savoir que sa date est tenue, combien lui revient,
+     *   et **quand il sera payé**. Cette dernière question est celle qui
+     *   remplirait le support si on la laissait sans réponse : on ne verse
+     *   qu'après la prestation (migration 0032), et le dire ici évite la
+     *   réclamation plutôt que d'y répondre.
+     */
+    case "payment.received": {
+      const pour = payload.pour === "partner" ? "partner" : "client";
+      const ref = text(payload.reference);
+      const quoi = text(payload.listing) || text(payload.partner);
+      const solde = typeof payload.remaining === "number" ? payload.remaining : 0;
+      const regle = amount(payload.amount, payload.currency);
+      const reste = amount(solde, payload.currency);
+
+      const communs: [string, string][] = [
+        ["Référence", ref],
+        [text(payload.label) || "Règlement", regle],
+        ["Reste à régler", solde > 0 ? reste : "Rien — tout est réglé"],
+        ["Date de l'événement", longDate(payload.eventDate)],
+      ];
+
+      if (pour === "partner") {
+        return shell({
+          subject: ref ? `Règlement reçu sur ${ref}` : "Un règlement vient d'être encaissé",
+          preheader:
+            solde > 0 ? "Une échéance reste due par le client." : "La réservation est soldée.",
+          heading: "Votre client vient de régler",
+          intro:
+            (solde > 0
+              ? "Une partie de la réservation est encaissée ; le solde reste dû par le client, à sa date d'échéance. "
+              : "La réservation est intégralement réglée. ") +
+            "Votre versement part après la prestation — c'est ce qui vous protège " +
+            "d'un rappel bancaire autant que cela rassure le client.",
+          details: [
+            ...communs,
+            ["Votre part sur ce règlement", amount(payload.partnerDue, payload.currency)],
+          ],
+          cta: { label: "Voir mes réservations", href: `${base}/pro/reservations` },
+          outro:
+            "Le détail de vos encaissements et de ce qui vous reste dû figure dans vos finances.",
+        });
+      }
+
+      return shell({
+        subject: ref ? `Votre règlement est confirmé — ${ref}` : "Votre règlement est confirmé",
+        preheader:
+          solde > 0 ? "Il reste une échéance à régler." : "Votre réservation est intégralement réglée.",
+        heading: "Règlement confirmé",
+        intro:
+          (quoi ? `Votre règlement pour ${quoi} est bien arrivé. ` : "Votre règlement est bien arrivé. ") +
+          "Votre prestataire en est informé." +
+          (solde > 0
+            ? " Il reste une échéance : vous la retrouvez dans vos réservations, avec sa date."
+            : " Il ne vous reste rien à régler."),
+        details: communs,
+        cta: { label: "Voir ma réservation", href: `${base}/compte/reservations` },
+        outro:
+          "Votre reçu est disponible à tout moment dans vos documents. " +
+          "ÉniEvent ne conserve aucune de vos informations de paiement.",
+      });
+    }
+
     case "order.cancelled": {
       // Le destinataire est **l'autre partie** : celui qui annule le sait déjà.
       const pour = payload.pour === "partner" ? "partner" : "client";
