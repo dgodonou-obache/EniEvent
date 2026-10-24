@@ -93,3 +93,54 @@ describe("liens de navigation", () => {
     expect(known.some((route) => matches(route, "/devenir-partenaire"))).toBe(false);
   });
 });
+
+/**
+ * ⚠️ **La racine d'un espace est une adresse qu'on tape, pas seulement qu'on
+ * clique.**
+ *
+ * `/pro` a rendu un 404 en production — l'écran intégré de Next, en anglais,
+ * sans la moindre marque. Et le défaut était **invisible déconnecté** : le
+ * proxy renvoyait un visiteur vers `/pro/connexion`, si bien que le trou ne
+ * s'ouvrait qu'une fois la session ouverte, c'est-à-dire pour les seuls
+ * partenaires réels. Aucun lien du dépôt ne pointait vers `/pro` : le contrôle
+ * des liens morts ci-dessus ne pouvait donc rien voir, puisqu'il part des liens
+ * et non des adresses.
+ *
+ * Les trois autres espaces rendent leur tableau de bord à leur racine ; le
+ * partenaire était le seul à ne pas avoir d'adresse courte.
+ */
+describe("racines des espaces", () => {
+  const known = routes(appDir);
+
+  // Ce qu'un utilisateur tape de mémoire, ou dicte au téléphone.
+  const RACINES = ["/", "/compte", "/entreprise", "/pro", "/admin"];
+
+  it("construit une page pour chaque racine d'espace", () => {
+    const absentes = RACINES.filter((racine) => !known.includes(racine));
+
+    expect(
+      absentes,
+      `Racine d'espace sans page : un 404 pour qui tape l'adresse.\n${absentes.join("\n")}`,
+    ).toEqual([]);
+  });
+
+  /**
+   * Une adresse inconnue doit tomber sur **notre** page, pas sur celle de Next.
+   * « 404 — This page could not be found » ne se lit pas « cette page n'existe
+   * pas » mais « ce site est cassé » — même faute que l'écran « This page
+   * couldn't load » de la coupure par inactivité.
+   */
+  it("rend sa propre page introuvable", () => {
+    const source = readFileSync(join(projectRoot, "src/app/not-found.tsx"), "utf8");
+
+    // La marque, et dans le bon sens : `Éni` en orange, `Event` en ardoise —
+    // comme l'en-tête public et les courriels, où un test garde déjà la règle.
+    expect(source).toContain('text-orange-500">Éni</span>Event');
+    // Elle dit quoi faire ensuite, comme un état vide.
+    expect(source).toContain('href="/recherche"');
+    // ⚠️ Et jamais vers un espace privé : elle s'affiche aussi sans session.
+    for (const prive of ["/pro", "/admin", "/entreprise", "/compte"]) {
+      expect(source, prive).not.toContain(`href="${prive}"`);
+    }
+  });
+});

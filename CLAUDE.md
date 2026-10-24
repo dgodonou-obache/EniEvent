@@ -720,6 +720,22 @@ barrière devant quelqu'un qui n'ouvre pas de navigateur.
   cachée derrière un identifiant disparaît des contrôles si on l'y écrit en dur, l'UUID
   changeant à chaque `demo:reset` ; `smoke:ecrans` la demande donc à la base et **échoue**
   s'il n'en trouve aucune, plutôt que de sauter l'écran en silence.
+- ⚠️ **La racine d'un espace est une adresse qu'on _tape_, pas seulement qu'on clique.**
+  `/pro` a rendu un 404 en production — l'écran intégré de Next, en anglais, sans la
+  moindre marque — signalé depuis un téléphone le 24 octobre 2026. Le défaut était
+  **invisible déconnecté** : le proxy renvoyait un visiteur vers `/pro/connexion`, si bien
+  que le trou ne s'ouvrait **qu'une fois la session ouverte**, c'est-à-dire pour les seuls
+  partenaires réels. Et aucun lien du dépôt ne pointait vers `/pro`, donc le contrôle des
+  liens morts ne pouvait rien voir : il part des **liens**, pas des adresses. Les trois
+  autres espaces rendent leur tableau de bord à leur racine ; le partenaire, dont le sien
+  vit à `/pro/dashboard`, redirige. `tests/navigation.test.ts` exige une page pour chaque
+  racine, et `smoke:ecrans` rend `/pro` avec une session.
+- ⚠️ **Le site a sa propre page introuvable** (`src/app/not-found.tsx`). Il n'en avait
+  aucune, et Next rendait donc la sienne pour **toute** adresse inconnue, y compris une
+  faute de frappe dans une adresse dictée. C'est la même faute que l'écran « This page
+  couldn't load » de la coupure par inactivité : on n'y lit pas « cette adresse n'existe
+  pas » mais « ce site est cassé ». Elle dit quoi faire ensuite, comme un état vide, et ne
+  porte **aucun lien vers un espace privé** (§4) — elle s'affiche aussi sans session.
 - ⚠️ Un `href` n'est qu'une chaîne : **rien ne le confronte à l'arborescence de
   `src/app`**. Le bouton « Devenir partenaire » a renvoyé un 404 en production sans
   qu'aucun outil ne bronche, et six des huit onglets de `/compte` faisaient de même.

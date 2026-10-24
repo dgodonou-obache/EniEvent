@@ -79,6 +79,10 @@ const PARCOURS = [
     compte: "demo-partenaire@enievent.bj",
     titre: "Partenaire",
     routes: [
+      // ⚠️ L'adresse courte autant que la longue : `/pro` a rendu un 404 en
+      // production, et seulement **une fois connecté** — déconnecté, le proxy
+      // renvoyait vers la connexion et masquait le trou.
+      "/pro",
       "/pro/dashboard",
       "/pro/annonces",
       "/pro/annonces/nouvelle",
