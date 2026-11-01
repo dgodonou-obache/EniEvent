@@ -19,8 +19,6 @@ import {
   Megaphone,
   MessageSquare,
   Newspaper,
-  Percent,
-  Receipt,
   Scale,
   ScrollText,
   Settings,
@@ -116,8 +114,6 @@ export const partnerNav: SpaceNav = {
       items: [
         { label: "Revenus", href: "/pro/finances/revenus", icon: BarChart3 },
         { label: "Versements", href: "/pro/finances/versements", icon: Banknote },
-        { label: "Factures", href: "/pro/finances/factures", icon: Receipt },
-        { label: "Commissions", href: "/pro/finances/commissions", icon: Percent },
       ],
     },
     {
@@ -161,7 +157,6 @@ export const companyNav: SpaceNav = {
       items: [
         { label: "Budgets", href: "/entreprise/budgets", icon: Wallet },
         { label: "Validations", href: "/entreprise/validations", icon: BadgeCheck },
-        { label: "Factures", href: "/entreprise/factures", icon: Receipt },
         { label: "Rapports", href: "/entreprise/rapports", icon: BarChart3 },
       ],
     },
@@ -224,7 +219,6 @@ export const adminNav: SpaceNav = {
         { label: "Versements", href: "/admin/versements", icon: Banknote },
         { label: "Remboursements", href: "/admin/remboursements", icon: Undo2 },
         { label: "Litiges", href: "/admin/litiges", icon: Scale },
-        { label: "Commissions", href: "/admin/commissions", icon: Percent },
       ],
     },
     {

@@ -45,16 +45,25 @@ chiffrer, encaisser et être versé ; l'administration voit passer l'argent.
 
 ## 2. Le décompte des écrans
 
-61 entrées de menu, **50 construites, 11 en attente**. Chaque entrée non
+57 entrées de menu, **50 construites, 7 en attente**. Chaque entrée non
 construite affiche un écran nommant son lot, jamais un 404
 (`src/components/dashboard/roadmap.ts`).
 
 | Espace | Livrés | Reste |
 |---|---|---|
-| Partenaire — `/pro` | 15 / 18 | 3 |
-| Entreprise — `/entreprise` | 9 / 12 | 3 |
-| Back-office — `/admin` | 18 / 23 | 5 |
+| Partenaire — `/pro` | 15 / 16 | 1 |
+| Entreprise — `/entreprise` | 9 / 11 | 2 |
+| Back-office — `/admin` | 18 / 22 | 4 |
 | Particulier — `/compte` | **8 / 8** | — |
+
+⚠️ **Quatre entrées ont été _retirées des menus_ le 1er novembre 2026**, à la
+demande de l'exploitant et pour le moment seulement : `Factures` et
+`Commissions` côté partenaire, `Factures` côté entreprise, `Commissions` au
+back-office. Elles ne sont pas annulées — le lot B les porte toujours — mais un
+menu qui annonce quatre écrans à venir sur une plateforme qui démarre promet
+plus qu'il ne tient. ⚠️ **Leurs lignes survivent dans `roadmap.ts`** : sans
+elles, une adresse mise en favori tomberait sur le repli de son espace et
+annoncerait le mauvais lot.
 
 Le déséquilibre initial est résorbé : le back-office d'exploitation et la
 confiance sont en place, et ce qui reste relève de la facturation, du confort et
@@ -253,9 +262,12 @@ retire rien** — et nettoie derrière lui.
 
 ### Lot B — Facturation · 7 écrans
 
-`/pro/finances/factures` · `/pro/finances/commissions` ·
-`/entreprise/factures` · `/entreprise/reservations` · `/entreprise/rapports` ·
-`/admin/reservations` · `/admin/commissions`
+`/pro/finances/factures`⁽¹⁾ · `/pro/finances/commissions`⁽¹⁾ ·
+`/entreprise/factures`⁽¹⁾ · `/entreprise/reservations` · `/entreprise/rapports` ·
+`/admin/reservations` · `/admin/commissions`⁽¹⁾
+
+⁽¹⁾ Retiré des menus le 1er novembre 2026 — voir §2. L'écran reste à construire,
+il n'est simplement plus annoncé.
 
 Facture PDF pour le client, relevé de commission pour le partenaire, rapports
 de dépenses pour l'entreprise.

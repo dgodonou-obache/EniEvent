@@ -20,7 +20,20 @@ export { NAV_BY_SPACE, type Space };
  * avec cette table.**
  */
 
-/** Lot livrant chaque préfixe de route. Du plus spécifique au plus général. */
+/**
+ * Lot livrant chaque préfixe de route. Du plus spécifique au plus général.
+ *
+ * ⚠️ **Une ligne peut survivre à son entrée de menu, et quatre le font.**
+ * `Factures` et `Commissions` ont été retirées des menus le 1er novembre 2026 —
+ * à la demande de l'exploitant, et pour le moment seulement. Leurs lignes
+ * restent ici : sans elles, `/pro/finances/factures` mis en favori tomberait
+ * sur le repli `/pro` et annoncerait « Lot D — Confort », c'est-à-dire le
+ * mauvais lot sur un écran de facturation.
+ *
+ * Ne pas les supprimer en les croyant orphelines. Elles le seront le jour où le
+ * lot B sera livré — et ce jour-là, c'est la **règle d'en-tête** qui commandera
+ * leur retrait : cette table ne nomme que des lots à venir.
+ */
 const LOT_BY_PREFIX: { prefix: string; lot: string }[] = [
   // — Espace partenaire —
   // `/pro/avis` est livré (lot A).
