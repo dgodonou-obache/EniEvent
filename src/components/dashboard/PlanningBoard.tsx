@@ -21,7 +21,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import {
-  abbreviate,
   format as formatMoney,
   money,
   toMajor,
@@ -380,8 +379,10 @@ function DayCell({
   selected: boolean;
   onToggle: () => void;
 }) {
+  // La case s'élargit pour le montant entier, et non l'inverse : « ajuster les
+  // cases » était la consigne, « rogner le chiffre » ne l'a jamais été.
   const base =
-    "flex h-14 flex-col items-center justify-center rounded-xl border text-center transition-all duration-200 sm:h-16";
+    "flex h-16 flex-col items-center justify-center rounded-xl border px-0.5 text-center transition-all duration-200 sm:h-[4.5rem]";
 
   const tone = day.isPast
     ? "border-transparent bg-transparent text-slate-300"
@@ -394,14 +395,19 @@ function DayCell({
           : "border-dashed border-slate-200 bg-white text-slate-400 hover:border-orange-200 hover:bg-orange-50";
 
   /**
-   * ⚠️ **Le tarif exact n'était lisible nulle part.** La case n'affiche qu'une
-   * forme abrégée, et aucun écran du planning ne montre le chiffre entier d'une
-   * date : un partenaire qui doutait de ce qui avait été enregistré n'avait
-   * aucun moyen de vérifier — c'est précisément ce qui a fait croire que
-   * saisir 1 500 en stockait 2 000. Le porter dans le libellé et l'infobulle
-   * ne coûte rien, et le rend lisible aux lecteurs d'écran du même coup.
+   * ⚠️ **Le montant saisi est le montant affiché.** La case portait une forme
+   * abrégée — « 2k » pour une date saisie à 1 500 F —, et c'était la **seule**
+   * vue qu'un partenaire avait de son tarif : il en concluait, à juste titre,
+   * que le système avait changé son prix. La base, elle, avait toujours raison.
+   *
+   * Sans devise : la colonne entière est en francs, et sept caractères de plus
+   * par case pour redire « FCFA » sur chaque jour du mois coûteraient la place
+   * qui sert au chiffre.
    */
-  const tarif = day.price && !day.isPast ? formatMoney(day.price) : null;
+  const lisible = day.price && !day.isPast ? day.price : null;
+  const tarif = lisible ? formatMoney(lisible, { withCurrency: false }) : null;
+  // L'infobulle et le lecteur d'écran, eux, ont la place de dire la devise.
+  const tarifComplet = lisible ? formatMoney(lisible) : null;
 
   return (
     <button
@@ -409,15 +415,24 @@ function DayCell({
       onClick={onToggle}
       disabled={!day.editable}
       aria-pressed={selected}
-      aria-label={`${day.date.getDate()} — ${STATE_LABELS[day.state]}${tarif ? ` — ${tarif}` : ""}`}
-      title={tarif ?? undefined}
+      aria-label={`${day.date.getDate()} — ${STATE_LABELS[day.state]}${
+        tarifComplet ? ` — ${tarifComplet}` : ""
+      }`}
+      title={tarifComplet ?? undefined}
       className={`${base} ${tone} ${
         selected ? "ring-2 ring-orange-500 ring-offset-1" : ""
       } ${day.editable ? "active:scale-[0.97]" : "cursor-not-allowed"}`}
     >
-      <span className="text-sm font-bold">{day.date.getDate()}</span>
-      {day.price && !day.isPast ? (
-        <span className="text-[10px] font-medium tabular-nums">{abbreviate(day.price)}</span>
+      <span className="text-sm font-bold leading-none">{day.date.getDate()}</span>
+      {tarif ? (
+        /* ⚠️ **Le montant entier, jamais une abréviation.** Décision
+           d'exploitation du 1er novembre 2026 : le tarif affiché est celui
+           saisi. La case a été élargie pour cela plutôt que le chiffre rogné.
+           Mesure à 390 px — la largeur qui compte : la grille laisse ~43 px par
+           case, et « 1 500 000 » en `tabular-nums` à 9 px en occupe ~42. Au-delà
+           de sept chiffres on déborderait, mais la bande de prix (0054) ne
+           laisse pas une journée s'y rendre. */
+        <span className="mt-1 text-[9px] font-semibold leading-none tabular-nums">{tarif}</span>
       ) : null}
     </button>
   );

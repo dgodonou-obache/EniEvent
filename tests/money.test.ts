@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  abbreviate,
   MoneyError,
   add,
   allocate,
@@ -137,65 +136,16 @@ describe("formatage", () => {
   });
 });
 
-describe("abréviation pour un calendrier", () => {
-  it("n'abrège jamais vers zéro", () => {
-    // Le défaut vu à l'usage : `Math.round(10 / 1000)` vaut 0, et un tarif de
-    // 10 francs s'affichait « 0k » dans le calendrier client — un prix qui ne
-    // veut rien dire, sur une date pourtant réservable.
-    expect(abbreviate(money(10, "XOF"))).toBe("10");
-    expect(abbreviate(money(1, "XOF"))).toBe("1");
-    expect(abbreviate(money(999, "XOF"))).toBe("999");
-  });
-
-  it("abrège en milliers au-delà du millier", () => {
-    expect(abbreviate(money(1_000, "XOF"))).toBe("1k");
-    expect(abbreviate(money(150_000, "XOF"))).toBe("150k");
-    expect(abbreviate(money(999_000, "XOF"))).toBe("999k");
-  });
-
-  /**
-   * ⚠️ **Et jamais vers un _autre_ chiffre.**
-   *
-   * `Math.round(1500 / 1000)` vaut 2 : une date saisie à 1 500 F s'affichait
-   * « 2k », dans le planning du partenaire comme dans le calendrier du client.
-   * Signalé le 1er novembre 2026 par un partenaire convaincu que le système
-   * avait changé son prix — la base portait bien 1 500, mais la seule vue qu'il
-   * avait de sa date disait autre chose.
-   *
-   * Un écart de 33 % sur un prix montré à un acheteur n'est pas une
-   * abréviation, c'est un chiffre faux.
-   */
-  it("ne déforme pas les petits milliers", () => {
-    expect(abbreviate(money(1_500, "XOF"))).toMatch(/^1,5k$/);
-    expect(abbreviate(money(2_400, "XOF"))).toMatch(/^2,4k$/);
-    expect(abbreviate(money(9_900, "XOF"))).toMatch(/^9,9k$/);
-  });
-
-  it("garde un écart d'abréviation sous 5 % partout", () => {
-    // Le contrôle qui compte : il ne vérifie pas un libellé mais la **distance
-    // au vrai**. Sans lui, la prochaine retouche pourrait réintroduire un
-    // arrondi large sans qu'aucun cas nommé ne tombe.
-    const lu = (texte: string) =>
-      Number(texte.replace(/\s/g, "").replace(",", ".").replace(/k$/, "")) *
-      (texte.endsWith("k") ? 1000 : texte.endsWith("M") ? 1_000_000 : 1);
-
-    for (let montant = 1; montant <= 2_000_000; montant = Math.ceil(montant * 1.013)) {
-      const texte = abbreviate(money(montant, "XOF")).replace(/\s?M$/, "M");
-      const valeur = texte.endsWith("M")
-        ? Number(texte.replace("M", "").replace(",", ".")) * 1_000_000
-        : lu(texte);
-
-      const ecart = Math.abs(valeur - montant) / montant;
-      expect(ecart, `${montant} → « ${texte} »`).toBeLessThan(0.05);
-    }
-  });
-
-  it("passe aux millions sans déborder d'une case", () => {
-    expect(abbreviate(money(1_200_000, "XOF"))).toMatch(/^1,2\s?M$/);
-    expect(abbreviate(money(12_400_000, "XOF"))).toMatch(/^12\s?M$/);
-  });
-
-  it("reste lisible à zéro", () => {
-    expect(abbreviate(money(0, "XOF"))).toBe("0");
-  });
-});
+/**
+ * ⚠️ **`abbreviate` a été supprimée, et ces cas avec elle.**
+ *
+ * Elle rendait « 2k » pour une date saisie à 1 500 F. Deux correctifs
+ * successifs — « jamais vers zéro », puis « écart sous 5 % » — ont rapiécé
+ * une fonction dont le travail était de rendre un montant qui n'est pas le
+ * montant ; la troisième retouche aurait trouvé une troisième façon de
+ * mentir. Décision d'exploitation du 1er novembre 2026 : le montant affiché
+ * est le montant saisi, et les cases s'élargissent pour lui.
+ *
+ * Ce qui garde la règle désormais : `tests/calendriers.test.ts`, qui exige
+ * qu'aucun calendrier du dépôt n'abrège un tarif.
+ */

@@ -8,7 +8,7 @@ import { bookAndPay, type BookingState } from "@/app/(marketplace)/reserver/acti
 import { CustomDatePicker } from "@/components/shared/CustomDatePicker";
 import { Button } from "@/components/ui/button";
 import { toKey } from "@/lib/calendar";
-import { abbreviate, format, money, type CurrencyCode } from "@/lib/money";
+import { format, money, type CurrencyCode } from "@/lib/money";
 import { quote, type AvailabilityRow, type DayRule } from "@/lib/pricing";
 import { UNIT_CATALOGUE_LABELS, type PriceUnit } from "@/lib/units";
 
@@ -65,10 +65,12 @@ export function BookingBox({
     const map: Record<string, string> = {};
     for (const row of availabilities) {
       if (row.status !== "open" || row.price == null) continue;
-      // `abbreviate` plutôt qu'une division maison : `Math.round(10 / 1000)`
-      // valait `0`, et un tarif de 10 francs s'affichait « 0k » dans le
-      // calendrier — un prix qui ne veut rien dire, sur une date réservable.
-      map[row.date] = abbreviate(money(row.price, currency));
+      // ⚠️ **Le tarif entier, jamais une abréviation.** Ce calendrier a montré
+      // « 2k » sur une date à 1 500 F — un prix faux de 33 %, sous les yeux
+      // d'un acheteur, sur la page où il décide de réserver. La devise n'y est
+      // pas répétée : tout le bloc est dans la même, et elle figure en toutes
+      // lettres sur le total.
+      map[row.date] = format(money(row.price, currency), { withCurrency: false });
     }
     return map;
   }, [availabilities, currency]);

@@ -57,6 +57,16 @@ export function CustomDatePicker(props: DatePickerProps) {
     today,
   } = props;
 
+  /**
+   * Ce calendrier porte-t-il des tarifs ?
+   *
+   * ⚠️ **La question se pose pour le calendrier entier, jamais par case.**
+   * Décider la forme case par case donnerait un mois où les jours tarifés sont
+   * rectangulaires et les autres ronds — un damier, pour une donnée qui ne dit
+   * rien de la date elle-même.
+   */
+  const avecPrix = pricesByDate != null && Object.keys(pricesByDate).length > 0;
+
   // On teste `props.mode` directement partout : passer par une variable
   // intermédiaire ferait perdre à TypeScript le rétrécissement de l'union, et
   // avec lui la garantie que `onChange` reçoit le bon type.
@@ -187,6 +197,13 @@ export function CustomDatePicker(props: DatePickerProps) {
             ))}
           </div>
 
+          {/* ⚠️ **Une pastille ronde de 40 px ne contient pas un prix entier.**
+              Tant que la case abrégeait, le cercle suffisait — et il montrait
+              « 2k » sur une date à 1 500 F. Depuis que le tarif s'écrit en
+              entier, la case prend toute sa colonne et redevient un rectangle
+              arrondi. Le changement ne touche que les calendriers **qui portent
+              des prix** : les autres — demande de devis, dates d'événement —
+              gardent leur pastille, et rien ne les obligeait à changer. */}
           <div className="grid grid-cols-7 gap-y-1">
             {buildMonthGrid(month).map((date, index) => {
               if (!date) return <div key={`vide-${index}`} className="h-10" />;
@@ -201,10 +218,15 @@ export function CustomDatePicker(props: DatePickerProps) {
                   type="button"
                   disabled={!selectable}
                   aria-pressed={selected}
-                  aria-label={format(date, "EEEE d MMMM yyyy", { locale: fr })}
+                  aria-label={`${format(date, "EEEE d MMMM yyyy", { locale: fr })}${
+                    price ? ` — ${price}` : ""
+                  }`}
                   onClick={() => handleSelect(date)}
                   className={cn(
-                    "mx-auto flex h-10 w-10 flex-col items-center justify-center rounded-full text-sm transition-colors",
+                    "mx-auto flex flex-col items-center justify-center text-sm transition-colors",
+                    avecPrix
+                      ? "h-12 w-full rounded-xl px-0.5"
+                      : "h-10 w-10 rounded-full",
                     !selectable && "cursor-not-allowed text-slate-300",
                     selectable && !selected && "text-slate-700 hover:bg-orange-50 hover:text-orange-600",
                     selected && "bg-orange-500 font-bold text-white",
@@ -214,8 +236,8 @@ export function CustomDatePicker(props: DatePickerProps) {
                   {price ? (
                     <span
                       className={cn(
-                        "mt-0.5 text-[9px] leading-none",
-                        selected ? "text-orange-50" : "text-slate-400",
+                        "mt-1 text-[9px] font-semibold leading-none tabular-nums",
+                        selected ? "text-orange-50" : "text-slate-500",
                       )}
                     >
                       {price}

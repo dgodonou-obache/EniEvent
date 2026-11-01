@@ -241,48 +241,29 @@ export function format(
   return `${formatted} ${currencyLabel(m.currency)}`;
 }
 
-/**
- * Forme abrégée pour une case de calendrier : « 1,5k », « 150k », « 1,2 M ».
+/*
+ * ⚠️ **`abbreviate` a été supprimée, et ne doit pas revenir.**
  *
- * ⚠️ **Ne jamais abréger vers zéro.** `Math.round(10 / 1000)` vaut `0`, et un
- * tarif de 10 francs s'affichait « 0k » dans le calendrier client — un prix qui
- * ne veut rien dire, sur une date pourtant réservable. En dessous du millier,
- * le montant s'écrit donc en entier : « 10 » est court, et vrai.
+ * Elle rendait « 150k », « 1,2 M » pour les cases de calendrier, et elle a
+ * montré **« 2k » sur une date saisie à 1 500 F** — `Math.round(1500 / 1000)`
+ * vaut 2. Dans le planning du partenaire, c'était la seule vue qu'il avait de
+ * son tarif : il en a conclu, à juste titre, que le système avait changé son
+ * prix. Dans le calendrier d'une fiche, le même chiffre faux s'affichait sous
+ * les yeux d'un acheteur, sur la page où il décide de réserver.
  *
- * ⚠️ **Et ne jamais abréger vers un _autre_ chiffre.** `Math.round(1500 / 1000)`
- * vaut `2` : une date saisie à **1 500 F s'affichait « 2k »**, dans le planning
- * du partenaire comme dans le calendrier du client. Signalé le 1er novembre
- * 2026 par un partenaire convaincu que le système avait changé son prix —
- * c'était faux, la base portait bien 1 500, mais la seule vue qu'il avait de sa
- * date disait autre chose. Un écart de 33 % sur un prix montré à un acheteur
- * n'est pas une abréviation, c'est un chiffre faux.
+ * Elle avait déjà été rapiécée une fois — « ne jamais abréger vers zéro »,
+ * après qu'un tarif de 10 F se soit affiché « 0k » — puis une seconde, pour
+ * borner l'écart à 5 %. Deux correctifs sur une fonction dont le travail est
+ * de **rendre un montant qui n'est pas le montant** : la troisième retouche
+ * aurait trouvé une troisième façon de mentir.
  *
- * Une décimale en dessous du dix-millier, donc — exactement la règle que la
- * branche des millions appliquait déjà, et pour la même raison. L'écart tombe
- * sous 5 % partout, et la case ne s'élargit que d'un caractère.
+ * Décision d'exploitation du 1er novembre 2026 : **le montant affiché est le
+ * montant saisi**, et les cases s'élargissent pour lui. Un tarif qui ne tient
+ * pas dans une case est un problème de case.
+ *
+ * `format(m, { withCurrency: false })` rend « 1 500 », « 125 000 » — c'est ce
+ * qu'emploient désormais `PlanningBoard` et `BookingBox`.
  */
-export function abbreviate(m: Money): string {
-  const major = toMajor(m);
-  const abs = Math.abs(major);
-
-  if (abs >= 1_000_000) {
-    const millions = major / 1_000_000;
-    // Une décimale en dessous de dix millions : « 1,2 M » reste lisible,
-    // « 12,4 M » déborde d'une case.
-    return `${new Intl.NumberFormat("fr-FR", {
-      maximumFractionDigits: abs < 10_000_000 ? 1 : 0,
-    }).format(millions)} M`;
-  }
-
-  if (abs >= 1000) {
-    const milliers = major / 1000;
-    return `${new Intl.NumberFormat("fr-FR", {
-      maximumFractionDigits: abs < 10_000 ? 1 : 0,
-    }).format(milliers)}k`;
-  }
-
-  return String(major);
-}
 
 /**
  * Arrondi au demi supérieur, symétrique autour de zéro.

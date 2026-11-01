@@ -725,17 +725,23 @@ barrière devant quelqu'un qui n'ouvre pas de navigateur.
   un catalogue béninois c'est la moitié des noms —, et les termes se coupent sur **toute**
   espace : `Intl.NumberFormat` sépare les milliers par une espace fine insécable, si bien
   qu'un montant tapé au clavier et le même recopié depuis l'écran n'ont pas le même code.
-- ⚠️ **`abbreviate` n'abrège jamais vers un _autre_ chiffre.** `Math.round(1500 / 1000)`
-  vaut `2` : une date saisie à **1 500 F s'affichait « 2k »**, dans le planning du
-  partenaire comme dans le calendrier du client. Signalé le 1er novembre 2026 par un
-  partenaire convaincu que le système avait changé son prix — c'était faux, la base
-  portait bien 1 500, mais la case était **la seule vue qu'il avait de sa date**. Un écart
-  de 33 % sur un prix montré à un acheteur n'est pas une abréviation, c'est un chiffre
-  faux. Une décimale en dessous du dix-millier, donc, comme la branche des millions le
-  faisait déjà ; `tests/money.test.ts` borne l'écart à 5 % sur toute la plage, ce qu'aucun
-  cas nommé ne garderait. Et la case du planning porte désormais le montant **entier**
-  dans son `title` et son `aria-label` : aucun écran ne le montrait, et douter de ce qui
-  avait été enregistré ne laissait aucun moyen de vérifier.
+- ⚠️ **Un montant affiché est le montant saisi — aucun calendrier n'abrège un tarif.**
+  Décision d'exploitation du 1er novembre 2026. `abbreviate` rendait « 150k », « 1,2 M » ;
+  elle a affiché **« 2k » sur une date saisie à 1 500 F** (`Math.round(1500 / 1000)` vaut
+  2), dans le planning du partenaire — où la case était **la seule vue qu'il avait de son
+  tarif**, d'où sa conclusion, juste, que le système avait changé son prix — et dans le
+  calendrier d'une fiche, sous les yeux d'un acheteur, sur la page où il décide de
+  réserver. Elle avait déjà été rapiécée deux fois (« jamais vers zéro » après un « 0k »
+  pour 10 F, puis un écart borné à 5 %) : une fonction dont le travail est de rendre un
+  montant qui n'est pas le montant trouve toujours une troisième façon de mentir. Elle a
+  donc été **supprimée**, pas réglée — comme `PlaceholderPage`, parce qu'une fonction
+  inutilisée remet le piège à portée du prochain calendrier. Les deux calendriers passent
+  par `format(m, { withCurrency: false })`, et **les cases se sont élargies pour le
+  chiffre** : un tarif qui ne tient pas dans une case est un problème de case. Le
+  `CustomDatePicker` abandonne sa pastille ronde de 40 px pour un rectangle pleine colonne
+  **quand il porte des prix**, et seulement là — les calendriers sans tarif n'avaient
+  aucune raison de changer. `tests/calendriers.test.ts` interdit le retour de
+  l'abréviation, sous ce nom ou sous un autre.
 - ⚠️ **Une pastille d'état se règle avec `whitespace-nowrap`, `inline-flex items-center`
   et `leading-none`.** « En attente de paiement » se coupait en deux dans une pastille
   arrondie — où un texte sur deux lignes paraît de travers —, et l'interligne par défaut
