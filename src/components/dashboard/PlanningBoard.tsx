@@ -393,13 +393,24 @@ function DayCell({
           ? "border-slate-200 bg-slate-100 text-slate-400 hover:border-slate-300"
           : "border-dashed border-slate-200 bg-white text-slate-400 hover:border-orange-200 hover:bg-orange-50";
 
+  /**
+   * ⚠️ **Le tarif exact n'était lisible nulle part.** La case n'affiche qu'une
+   * forme abrégée, et aucun écran du planning ne montre le chiffre entier d'une
+   * date : un partenaire qui doutait de ce qui avait été enregistré n'avait
+   * aucun moyen de vérifier — c'est précisément ce qui a fait croire que
+   * saisir 1 500 en stockait 2 000. Le porter dans le libellé et l'infobulle
+   * ne coûte rien, et le rend lisible aux lecteurs d'écran du même coup.
+   */
+  const tarif = day.price && !day.isPast ? formatMoney(day.price) : null;
+
   return (
     <button
       type="button"
       onClick={onToggle}
       disabled={!day.editable}
       aria-pressed={selected}
-      aria-label={`${day.date.getDate()} — ${STATE_LABELS[day.state]}`}
+      aria-label={`${day.date.getDate()} — ${STATE_LABELS[day.state]}${tarif ? ` — ${tarif}` : ""}`}
+      title={tarif ?? undefined}
       className={`${base} ${tone} ${
         selected ? "ring-2 ring-orange-500 ring-offset-1" : ""
       } ${day.editable ? "active:scale-[0.97]" : "cursor-not-allowed"}`}

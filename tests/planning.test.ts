@@ -9,6 +9,7 @@ import {
   monthLabel,
   planningWindow,
   presetSelection,
+  priceBand,
   summarizeMonth,
   validateBulkEdit,
   type PlanningDay,
@@ -296,6 +297,81 @@ describe("contrôle d'une modification en masse", () => {
     );
 
     expect(check.ok).toBe(true);
+  });
+
+  /**
+   * ⚠️ **Le plafond ne se bâtit pas sur un minimum.**
+   *
+   * Signalé le 1er novembre 2026. Plancher et plafond se déduisaient tous deux
+   * de `price_from`, qui est le **plus bas** des tarifs de base. « Jardin de
+   * Fidjrossè » portait une règle à 500 F posée pour éprouver les paiements
+   * réels : son plafond valait donc 2 500 F, alors que son calendrier contenait
+   * au même instant 125 dates à 100 000 F et 6 à 150 000 F. La bande
+   * contredisait les données de l'annonce qu'elle prétendait protéger.
+   *
+   * Et il n'y avait pas de retour : chaque baisse rabaissait le plafond, et le
+   * plafond interdisait de remonter.
+   */
+  describe("plafond", () => {
+    const fidjrosse = {
+      current: rows,
+      // Une règle à 500 F, et un calendrier déjà vendu jusqu'à 150 000 F.
+      minPrice: 250,
+      referencePrice: 500,
+      peakPrice: 150_000,
+      today: TODAY,
+    };
+
+    it("suit le tarif le plus haut de l'annonce, pas son tarif d'entrée", () => {
+      // Le cas de production, rejoué : 250 000 F était refusé à 2 500 F près.
+      expect(
+        validateBulkEdit({ action: "open", dates: ["2026-09-19"], price: 250_000 }, fidjrosse).ok,
+      ).toBe(true);
+    });
+
+    it("attrape toujours le zéro de trop", () => {
+      // La bande n'est pas désarmée pour autant : 5 × 150 000 = 750 000.
+      const check = validateBulkEdit(
+        { action: "open", dates: ["2026-09-19"], price: 1_500_000 },
+        fidjrosse,
+      );
+
+      expect(check.ok).toBe(false);
+      if (check.ok) return;
+      expect(check.message).toContain("zéro de trop");
+    });
+
+    it("laisse le plancher sur le tarif d'entrée", () => {
+      // Les deux bornes répondent à deux questions : le sommet ne doit pas
+      // relever le plancher, sinon une annonce à large éventail deviendrait
+      // impossible à ouvrir à son prix d'appel.
+      expect(priceBand(fidjrosse)).toEqual({
+        floor: 250,
+        ceiling: 750_000,
+        explicitFloor: true,
+      });
+    });
+
+    it("vaut ce qu'elle valait sur une annonce neuve", () => {
+      // Un seul tarif de base : il est à la fois le plus bas et le plus haut.
+      expect(priceBand({ minPrice: null, referencePrice: 100_000, peakPrice: 100_000 })).toEqual({
+        floor: 20_000,
+        ceiling: 500_000,
+        explicitFloor: false,
+      });
+
+      // Et sans sommet connu, on retombe exactement sur l'ancienne bande.
+      expect(priceBand({ minPrice: null, referencePrice: 100_000 })).toEqual({
+        floor: 20_000,
+        ceiling: 500_000,
+        explicitFloor: false,
+      });
+    });
+
+    it("ne pose aucun plafond quand l'annonce n'a aucun tarif connu", () => {
+      expect(priceBand({ minPrice: null, referencePrice: null }).ceiling).toBeNull();
+      expect(priceBand({ minPrice: null, referencePrice: null, peakPrice: 0 }).ceiling).toBeNull();
+    });
   });
 
   it("dédoublonne et trie les dates retenues", () => {

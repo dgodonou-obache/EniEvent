@@ -87,9 +87,39 @@ export async function applyPlanning(
   const selected = new Set(dates);
   const existing = (window ?? []).filter((row) => selected.has(row.date));
 
+  // ⚠️ **Le sommet, et non le tarif d'entrée.** Le plafond de la bande se
+  // déduisait de `price_from`, qui est un *minimum* : une seule règle à 500 F
+  // plafonnait tout le calendrier à 2 500 F, y compris pour une annonce dont
+  // 125 dates se vendaient déjà 100 000 F. Deux lectures, l'une sur les tarifs
+  // de base, l'autre sur les dates déjà saisies — voir `priceBand`.
+  const [{ data: regleHaute }, { data: dateHaute }] = await Promise.all([
+    supabase
+      .from("pricing_rules")
+      .select("base_price")
+      .eq("listing_id", listingId)
+      .order("base_price", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("availabilities")
+      .select("price")
+      .eq("listing_id", listingId)
+      .not("price", "is", null)
+      .order("price", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  const peakPrice = Math.max(regleHaute?.base_price ?? 0, dateHaute?.price ?? 0) || null;
+
   const check = validateBulkEdit(
     { action, dates, price },
-    { current: existing, minPrice: listing.min_price, referencePrice: listing.price_from },
+    {
+      current: existing,
+      minPrice: listing.min_price,
+      referencePrice: listing.price_from,
+      peakPrice,
+    },
   );
 
   if (!check.ok) return { message: check.message };

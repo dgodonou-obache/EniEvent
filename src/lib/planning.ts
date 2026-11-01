@@ -193,8 +193,16 @@ export interface BulkEditGuard {
   current: readonly AvailabilityRow[];
   /** Prix plancher saisi par le partenaire, en unité mineure. Souvent absent. */
   minPrice?: number | null;
-  /** Tarif de référence de l'annonce : tarif de base, ou prix affiché. */
+  /**
+   * Tarif d'entrée de l'annonce — `listings.price_from`, soit le **plus bas**
+   * de ses tarifs de base. C'est le « à partir de » du catalogue.
+   */
   referencePrice?: number | null;
+  /**
+   * Le tarif le **plus haut** que cette annonce pratique déjà : son tarif de
+   * base le plus cher, ou sa date la plus chère. Voir `priceBand`.
+   */
+  peakPrice?: number | null;
   currency?: CurrencyCode;
   today?: Date;
 }
@@ -207,17 +215,34 @@ export interface BulkEditGuard {
  * conditionnée à un champ que personne ne remplit : elle n'a jamais empêché
  * quoi que ce soit. Un tarif de 10 francs est passé sans un mot.
  *
- * La bande se déduit donc du tarif de l'annonce elle-même, sans rien demander
- * au partenaire :
+ * La bande se déduit donc de l'annonce elle-même, sans rien demander au
+ * partenaire :
  *
  * - **plancher absolu** : aucune date ne se vend en dessous, même sans
  *   référence connue ;
- * - **plancher relatif** : un cinquième du tarif de référence, ce qui attrape
+ * - **plancher relatif** : un cinquième du tarif d'entrée, ce qui attrape
  *   la faute de frappe classique — 15 000 saisi pour 150 000 ;
- * - **plafond** : cinq fois le tarif de référence, qui attrape le zéro de trop.
+ * - **plafond** : cinq fois le tarif **le plus haut** de l'annonce, qui attrape
+ *   le zéro de trop.
  *
- * Un `min_price` explicitement saisi **prime** : le partenaire qui l'a réglé a
- * pris une décision, et elle vaut mieux qu'une déduction.
+ * ⚠️ **Le plancher et le plafond ne partagent pas la même référence, et c'est
+ * tout le correctif du 1er novembre 2026.** Les deux se déduisaient de
+ * `price_from`, qui est un **minimum** — le plus bas des tarifs de base. Bâtir
+ * un maximum sur un minimum donne une bande qui se referme toute seule :
+ * « Jardin de Fidjrossè » portait une règle à 500 F posée pour éprouver les
+ * paiements, et son plafond valait donc 2 500 F — alors que son calendrier
+ * contenait déjà **125 dates à 100 000 F et 6 à 150 000 F**. La bande
+ * contredisait les données de l'annonce qu'elle prétendait protéger, et le
+ * partenaire ne pouvait plus remonter ses prix : chaque baisse rabaissait le
+ * plafond, sans retour possible.
+ *
+ * Le plancher reste donc sur le tarif d'entrée — c'est bien un minimum —, et le
+ * plafond passe sur le **sommet** de ce que l'annonce pratique déjà. Les deux
+ * répondent à deux questions différentes ; les faire tenir sur un seul chiffre
+ * était l'erreur.
+ *
+ * Un `min_price` explicitement saisi **prime** sur le plancher : le partenaire
+ * qui l'a réglé a pris une décision, et elle vaut mieux qu'une déduction.
  */
 export const ABSOLUTE_FLOOR = 1_000;
 const RELATIVE_FLOOR = 0.2;
@@ -230,15 +255,19 @@ export interface PriceBand {
   explicitFloor: boolean;
 }
 
-export function priceBand(guard: Pick<BulkEditGuard, "minPrice" | "referencePrice">): PriceBand {
+export function priceBand(
+  guard: Pick<BulkEditGuard, "minPrice" | "referencePrice" | "peakPrice">,
+): PriceBand {
   const reference = guard.referencePrice ?? null;
 
+  // Le sommet connu de l'annonce. À défaut, le tarif d'entrée : une annonce
+  // toute neuve n'a qu'un seul tarif, qui est à la fois son plus bas et son
+  // plus haut — la bande vaut alors exactement ce qu'elle valait avant.
+  const sommet = Math.max(guard.peakPrice ?? 0, reference ?? 0) || null;
+  const ceiling = sommet ? Math.round(sommet * RELATIVE_CEILING) : null;
+
   if (guard.minPrice != null) {
-    return {
-      floor: guard.minPrice,
-      ceiling: reference ? Math.round(reference * RELATIVE_CEILING) : null,
-      explicitFloor: true,
-    };
+    return { floor: guard.minPrice, ceiling, explicitFloor: true };
   }
 
   return {
@@ -249,7 +278,7 @@ export function priceBand(guard: Pick<BulkEditGuard, "minPrice" | "referencePric
     // relative suffit dès qu'un tarif de référence existe — elle s'adapte au
     // prix de l'annonce au lieu de lui imposer le nôtre.
     floor: reference ? Math.round(reference * RELATIVE_FLOOR) : ABSOLUTE_FLOOR,
-    ceiling: reference ? Math.round(reference * RELATIVE_CEILING) : null,
+    ceiling,
     explicitFloor: false,
   };
 }

@@ -150,9 +150,12 @@ describe("une échéance ne naît jamais déjà échue", () => {
       ["Solde", "before_event", 7, null],
     ]);
 
-    // Le tarif minimum d'une annonce est de 1 000 F : le cas de production
-    // portait sur 500 F, né du tunnel de devis, qui n'a pas ce plancher.
-    const { lignes, total } = await reserver(1, 5_000);
+    // ⚠️ Le montant est à l'échelle des autres cas de ce fichier, et ce n'est
+    // pas cosmétique : depuis la migration 0054, le plafond d'une annonce suit
+    // le plus haut tarif qu'elle pratique déjà. Une première date à 5 000 F
+    // plafonnait tout le reste du fichier à 25 000 F. Le cas de production
+    // portait sur 500 F, né du tunnel de devis, qui n'a pas de bande.
+    const { lignes, total } = await reserver(1, 500_000);
 
     expect(lignes).toHaveLength(1);
     expect(Number(lignes[0].amount)).toBe(total);

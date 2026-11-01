@@ -169,6 +169,23 @@ supabase/migrations/    schéma, une migration par domaine
   comme tel : le défaut était à la naissance. `src/lib/fees.ts` porte la même règle —
   sans `bookingDate` il n'a aucun présent à opposer aux dates et ne fusionne rien, ce qui
   est le cas de l'aperçu de `ScheduleEditor`.
+- ⚠️ **Le plancher et le plafond d'un tarif ne partagent pas la même référence**
+  (migration 0054). Les deux se déduisaient de `listings.price_from`, qui est un
+  **minimum** — `min(pricing_rules.base_price)`, le « à partir de » du catalogue. Bâtir
+  un maximum sur un minimum donne une bande qui se referme toute seule : une règle à
+  500 F posée sur « Jardin de Fidjrossè » pour éprouver les paiements réels a fait tomber
+  son plafond à **2 500 F**, alors que son calendrier portait au même instant 125 dates à
+  100 000 F et 6 à 150 000 F. La bande contredisait les données de l'annonce qu'elle
+  prétendait protéger, **et il n'y avait pas de retour** : chaque baisse rabaissait le
+  plafond, et le plafond interdisait de remonter. Le plancher reste donc sur le tarif
+  d'entrée ; le plafond passe sur le **sommet** de ce que l'annonce pratique déjà —
+  `greatest(price_from, max(pricing_rules.base_price), max(availabilities.price))`.
+  ⚠️ Le déclencheur est `before` : la ligne en cours d'écriture ne compte pas dans ce
+  maximum, sans quoi tout tarif se justifierait lui-même. La bande **suit** l'annonce,
+  donc elle bouge : une date ouverte au plafond élargit le plafond suivant, et un
+  partenaire décidé monte par paliers de cinq. C'est assumé — elle attrape **un doigt qui
+  glisse**, pas une politique tarifaire. `tests/rls-bande-de-prix.test.ts` éprouve les
+  deux bornes en base et les compare à `priceBand`.
 - ⚠️ **FedaPay refuse `/payouts` (403) et `/refunds` (401)** sur ce compte, avec la clé
   même qui obtient 200 sur `/transactions` : virements et remboursements demandent un
   compte marchand validé. Les deux sont donc des **registres** — `mark_payout_sent` et
@@ -708,6 +725,17 @@ barrière devant quelqu'un qui n'ouvre pas de navigateur.
   un catalogue béninois c'est la moitié des noms —, et les termes se coupent sur **toute**
   espace : `Intl.NumberFormat` sépare les milliers par une espace fine insécable, si bien
   qu'un montant tapé au clavier et le même recopié depuis l'écran n'ont pas le même code.
+- ⚠️ **`abbreviate` n'abrège jamais vers un _autre_ chiffre.** `Math.round(1500 / 1000)`
+  vaut `2` : une date saisie à **1 500 F s'affichait « 2k »**, dans le planning du
+  partenaire comme dans le calendrier du client. Signalé le 1er novembre 2026 par un
+  partenaire convaincu que le système avait changé son prix — c'était faux, la base
+  portait bien 1 500, mais la case était **la seule vue qu'il avait de sa date**. Un écart
+  de 33 % sur un prix montré à un acheteur n'est pas une abréviation, c'est un chiffre
+  faux. Une décimale en dessous du dix-millier, donc, comme la branche des millions le
+  faisait déjà ; `tests/money.test.ts` borne l'écart à 5 % sur toute la plage, ce qu'aucun
+  cas nommé ne garderait. Et la case du planning porte désormais le montant **entier**
+  dans son `title` et son `aria-label` : aucun écran ne le montrait, et douter de ce qui
+  avait été enregistré ne laissait aucun moyen de vérifier.
 - ⚠️ **Une pastille d'état se règle avec `whitespace-nowrap`, `inline-flex items-center`
   et `leading-none`.** « En attente de paiement » se coupait en deux dans une pastille
   arrondie — où un texte sur deux lignes paraît de travers —, et l'interligne par défaut

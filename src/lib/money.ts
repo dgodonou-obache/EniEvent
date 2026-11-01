@@ -242,12 +242,24 @@ export function format(
 }
 
 /**
- * Forme abrégée pour une case de calendrier : « 150k », « 1,2 M ».
+ * Forme abrégée pour une case de calendrier : « 1,5k », « 150k », « 1,2 M ».
  *
  * ⚠️ **Ne jamais abréger vers zéro.** `Math.round(10 / 1000)` vaut `0`, et un
  * tarif de 10 francs s'affichait « 0k » dans le calendrier client — un prix qui
  * ne veut rien dire, sur une date pourtant réservable. En dessous du millier,
  * le montant s'écrit donc en entier : « 10 » est court, et vrai.
+ *
+ * ⚠️ **Et ne jamais abréger vers un _autre_ chiffre.** `Math.round(1500 / 1000)`
+ * vaut `2` : une date saisie à **1 500 F s'affichait « 2k »**, dans le planning
+ * du partenaire comme dans le calendrier du client. Signalé le 1er novembre
+ * 2026 par un partenaire convaincu que le système avait changé son prix —
+ * c'était faux, la base portait bien 1 500, mais la seule vue qu'il avait de sa
+ * date disait autre chose. Un écart de 33 % sur un prix montré à un acheteur
+ * n'est pas une abréviation, c'est un chiffre faux.
+ *
+ * Une décimale en dessous du dix-millier, donc — exactement la règle que la
+ * branche des millions appliquait déjà, et pour la même raison. L'écart tombe
+ * sous 5 % partout, et la case ne s'élargit que d'un caractère.
  */
 export function abbreviate(m: Money): string {
   const major = toMajor(m);
@@ -262,7 +274,12 @@ export function abbreviate(m: Money): string {
     }).format(millions)} M`;
   }
 
-  if (abs >= 1000) return `${Math.round(major / 1000)}k`;
+  if (abs >= 1000) {
+    const milliers = major / 1000;
+    return `${new Intl.NumberFormat("fr-FR", {
+      maximumFractionDigits: abs < 10_000 ? 1 : 0,
+    }).format(milliers)}k`;
+  }
 
   return String(major);
 }
