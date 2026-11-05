@@ -247,9 +247,22 @@ export function ListingDetail({
                   <Building2 className="h-6 w-6 text-orange-500" aria-hidden />
                 </div>
                 <div className="min-w-0">
+                  {/* ⚠️ **La coche était codée en dur.** Elle s'affichait pour
+                      *tout* prestataire, sur la page même où un acheteur décide
+                      de réserver — y compris une structure dont aucune pièce
+                      n'avait jamais été regardée. Une garantie affichée sans
+                      condition n'est pas une garantie, c'est une affirmation.
+                      Elle suit désormais `is_verified`, que seule la validation
+                      d'un dossier allume (migration 0055), comme le fait déjà
+                      la vignette du catalogue. */}
                   <p className="flex items-center gap-1.5 font-bold text-slate-900">
                     {org.brand_name ?? org.legal_name}
-                    <BadgeCheck className="h-4 w-4 text-teal-600" aria-hidden />
+                    {profil?.is_verified ? (
+                      <BadgeCheck
+                        className="h-4 w-4 shrink-0 text-teal-600"
+                        aria-label="Prestataire vérifié"
+                      />
+                    ) : null}
                   </p>
                   <p className="mt-0.5 text-sm text-slate-500">{org.city}</p>
 

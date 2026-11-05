@@ -45,7 +45,7 @@ chiffrer, encaisser et être versé ; l'administration voit passer l'argent.
 
 ## 2. Le décompte des écrans
 
-57 entrées de menu, **50 construites, 7 en attente**. Chaque entrée non
+58 entrées de menu, **51 construites, 7 en attente**. Chaque entrée non
 construite affiche un écran nommant son lot, jamais un 404
 (`src/components/dashboard/roadmap.ts`).
 
@@ -53,8 +53,15 @@ construite affiche un écran nommant son lot, jamais un 404
 |---|---|---|
 | Partenaire — `/pro` | 15 / 16 | 1 |
 | Entreprise — `/entreprise` | 9 / 11 | 2 |
-| Back-office — `/admin` | 18 / 22 | 4 |
+| Back-office — `/admin` | 19 / 23 | 4 |
 | Particulier — `/compte` | **8 / 8** | — |
+
+⚠️ **`/admin/documents` s'est ajouté le 5 novembre 2026**, et son absence était
+invisible : le tableau de bord annonçait « Dossiers KYC à vérifier » en comptant
+un drapeau booléen sans rapport avec un document, et renvoyait vers l'écran des
+**commissions**. Toute la plomberie existait depuis la migration 0002 — pièces,
+états, motif de refus, droit de trancher réservé à l'administration — sauf
+l'écran qui les regarde.
 
 ⚠️ **Quatre entrées ont été _retirées des menus_ le 1er novembre 2026**, à la
 demande de l'exploitant et pour le moment seulement : `Factures` et

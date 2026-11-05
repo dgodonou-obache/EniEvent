@@ -1,5 +1,6 @@
 import "server-only";
 
+import { KYC_REQUIRED } from "@/lib/validation/partner";
 import type { Database } from "@/types/database";
 import { createClient } from "@/utils/supabase/server";
 
@@ -13,7 +14,8 @@ export async function getModerationQueue() {
     .select(
       `id, slug, title, description, city, district, kind, status, price_from, min_price,
        payment_terms, updated_at, cover_url,
-       categories(name), organizations(slug, brand_name, legal_name, city),
+       categories(name),
+       organizations(slug, brand_name, legal_name, city, partner_profiles(is_verified)),
        venue_details(capacity_seated, capacity_standing),
        service_details(min_guests, max_guests),
        pricing_rules(unit, base_price)`,
@@ -33,7 +35,7 @@ export type ModerationItem = Awaited<ReturnType<typeof getModerationQueue>>[numb
 export async function getAdminOverview() {
   const supabase = await createClient();
 
-  const [pending, approved, partners, unverified] = await Promise.all([
+  const [pending, approved, partners, piecesEnAttente] = await Promise.all([
     supabase.from("listings").select("id", { count: "exact", head: true }).eq("status", "pending"),
     supabase
       .from("listings")
@@ -44,17 +46,23 @@ export async function getAdminOverview() {
       .from("organizations")
       .select("id", { count: "exact", head: true })
       .eq("type", "partner"),
+    // ⚠️ **Les pièces réellement déposées et pas encore tranchées**, et non
+    // `partner_profiles.is_verified = false`. La tuile comptait ce drapeau et
+    // s'intitulait « Dossiers KYC à vérifier » : elle annonçait quatre dossiers
+    // alors que la base n'en contenait aucun — ces quatre structures n'avaient
+    // jamais rien déposé. Un chiffre qui désigne autre chose que ce que dit son
+    // libellé envoie l'exploitant chercher un travail qui n'existe pas.
     supabase
-      .from("partner_profiles")
-      .select("org_id", { count: "exact", head: true })
-      .eq("is_verified", false),
+      .from("kyc_documents")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending"),
   ]);
 
   return {
     pending: pending.count ?? 0,
     published: approved.count ?? 0,
     partners: partners.count ?? 0,
-    unverifiedPartners: unverified.count ?? 0,
+    kycPending: piecesEnAttente.count ?? 0,
   };
 }
 
@@ -532,4 +540,101 @@ export async function getFeatureFlags(): Promise<FeatureFlag[]> {
     enabled: f.enabled,
     updatedAt: f.updated_at,
   }));
+}
+
+// -----------------------------------------------------------------------------
+// Dossiers des partenaires
+// -----------------------------------------------------------------------------
+
+export interface KycPiece {
+  id: string;
+  type: string;
+  status: Database["public"]["Enums"]["kyc_status"];
+  rejectionReason: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+}
+
+export interface KycDossier {
+  orgId: string;
+  name: string;
+  city: string | null;
+  /** Vrai quand chaque pièce obligatoire a une version approuvée. */
+  verified: boolean;
+  /** Pièces obligatoires encore sans version approuvée. */
+  missing: string[];
+  pieces: KycPiece[];
+  /** Pièces déposées et pas encore tranchées : ce qui appelle une décision. */
+  pending: number;
+  /** Nombre d'annonces que la validation du dossier débloquerait. */
+  listingsWaiting: number;
+}
+
+/**
+ * Les dossiers des partenaires, pour l'écran de contrôle.
+ *
+ * ⚠️ **Toutes les structures, pas seulement celles qui ont déposé.** Un écran
+ * qui ne montre que les dossiers commencés laisse invisibles exactement ceux
+ * qu'il faut relancer — et c'est là qu'était le trou : la tuile du tableau de
+ * bord annonçait « 4 dossiers à vérifier » alors que ces quatre structures
+ * n'avaient **rien** déposé. On compte donc aussi ce que chacune n'a pas fait.
+ *
+ * ⚠️ **Aucune URL de fichier ici.** Le seau est privé : une adresse ne s'obtient
+ * que par une URL signée d'une minute, émise à la demande dans l'action
+ * `signKycDocument`. La faire figurer dans la charge de la page la ferait
+ * voyager dans les journaux et les caches.
+ */
+export async function getKycDossiers(): Promise<KycDossier[]> {
+  const supabase = await createClient();
+
+  const [orgs, pieces, annonces] = await Promise.all([
+    supabase
+      .from("organizations")
+      .select("id, legal_name, brand_name, city, partner_profiles(is_verified)")
+      .eq("type", "partner")
+      .order("legal_name"),
+    supabase
+      .from("kyc_documents")
+      .select("id, org_id, type, status, rejection_reason, created_at, reviewed_at")
+      .order("created_at", { ascending: false }),
+    supabase.from("listings").select("id, org_id").eq("status", "pending"),
+  ]);
+
+  if (orgs.error) throw new Error(`Partenaires illisibles : ${orgs.error.message}`);
+
+  const parOrg = new Map<string, KycPiece[]>();
+  for (const p of pieces.data ?? []) {
+    const liste = parOrg.get(p.org_id) ?? [];
+    liste.push({
+      id: p.id,
+      type: p.type,
+      status: p.status,
+      rejectionReason: p.rejection_reason,
+      createdAt: p.created_at,
+      reviewedAt: p.reviewed_at,
+    });
+    parOrg.set(p.org_id, liste);
+  }
+
+  const enAttente = new Map<string, number>();
+  for (const l of annonces.data ?? []) {
+    enAttente.set(l.org_id, (enAttente.get(l.org_id) ?? 0) + 1);
+  }
+
+  return (orgs.data ?? []).map((o) => {
+    const liste = parOrg.get(o.id) ?? [];
+    const approuvees = new Set(liste.filter((p) => p.status === "approved").map((p) => p.type));
+    const profil = Array.isArray(o.partner_profiles) ? o.partner_profiles[0] : o.partner_profiles;
+
+    return {
+      orgId: o.id,
+      name: o.brand_name ?? o.legal_name,
+      city: o.city,
+      verified: profil?.is_verified ?? false,
+      missing: KYC_REQUIRED.filter((t) => !approuvees.has(t)),
+      pieces: liste,
+      pending: liste.filter((p) => p.status === "pending").length,
+      listingsWaiting: enAttente.get(o.id) ?? 0,
+    };
+  });
 }

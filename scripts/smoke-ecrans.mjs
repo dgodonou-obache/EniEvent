@@ -127,6 +127,7 @@ const PARCOURS = [
       "/admin/demandes?etat=open",
       "/admin/demandes?etat=awarded",
       "/admin/partenaires",
+      "/admin/documents",
       "/admin/entreprises",
       "/admin/utilisateurs",
       // La recherche est un chemin distinct : elle appelle `admin_users` avec

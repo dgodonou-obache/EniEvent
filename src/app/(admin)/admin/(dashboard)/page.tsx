@@ -45,11 +45,17 @@ export default async function AdminOverviewPage() {
           value={stats.partners}
           href="/admin/partenaires"
         />
+        {/* ⚠️ **Le chiffre et le libellé doivent désigner la même chose.**
+            Cette tuile comptait `partner_profiles.is_verified = false` tout en
+            s'intitulant « Dossiers KYC à vérifier », et renvoyait vers l'écran
+            des commissions : elle annonçait quatre dossiers alors que la base
+            n'en contenait aucun. Elle compte désormais les pièces réellement
+            déposées et pas encore tranchées, et mène là où on les tranche. */}
         <Stat
           icon={BadgeCheck}
-          label="Dossiers KYC à vérifier"
-          value={stats.unverifiedPartners}
-          href="/admin/partenaires"
+          label="Pièces à vérifier"
+          value={stats.kycPending}
+          href="/admin/documents"
         />
       </div>
     </div>

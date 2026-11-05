@@ -69,6 +69,17 @@ beforeAll(async () => {
   catTraiteur = catBySlug["traiteur"];
   catSalle = catBySlug["salle-de-reception"];
 
+  // ⚠️ Depuis la migration 0055, une annonce ne passe en ligne que si le
+  // dossier de son prestataire est validé. Ce fichier mesure le **catalogue**,
+  // pas les dossiers : on pose donc la condition une fois pour toutes, plutôt
+  // que de la laisser faire échouer des cas qui n'ont rien à voir.
+  await db.query(
+    `insert into partner_profiles (org_id, is_verified, verified_at)
+     values ($1, true, now()), ($2, true, now())
+     on conflict (org_id) do nothing`,
+    [orgA, orgB],
+  );
+
   // Les annonces naissent en brouillon : la validation est un acte d'administration.
   const listings = await db.query(`
     insert into listings (org_id, category_id, kind, title, slug, city, min_price) values

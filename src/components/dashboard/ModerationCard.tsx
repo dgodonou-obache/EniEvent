@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Check, Loader2, X } from "lucide-react";
+import Link from "next/link";
+import { Check, Loader2, ShieldAlert, X } from "lucide-react";
 
 import {
   approveListing,
@@ -40,6 +41,15 @@ export function ModerationCard({ item }: { item: ModerationItem }) {
   const [reason, setReason] = React.useState("");
 
   const org = item.organizations;
+
+  // La jointure imbriquée rend tantôt un objet, tantôt un tableau selon que
+  // PostgREST voit une relation unique ou multiple — même précaution que dans
+  // `ListingDetail`.
+  const profil = Array.isArray(org?.partner_profiles)
+    ? org?.partner_profiles[0]
+    : org?.partner_profiles;
+  const dossierValide = profil?.is_verified ?? false;
+
   const venue = item.venue_details;
   const service = item.service_details;
   const rule = item.pricing_rules?.[0];
@@ -106,10 +116,29 @@ export function ModerationCard({ item }: { item: ModerationItem }) {
         ))}
       </ul>
 
+      {/* ⚠️ **Le refus s'annonce avant le clic.** Depuis la migration 0055, une
+          annonce ne passe en ligne que si le dossier de son prestataire est
+          validé — et c'est un déclencheur de table qui tranche, donc le bouton
+          échouerait sur un message Postgres. Proposer un geste que la base
+          refusera fait passer un produit pour cassé (`CLAUDE.md` §5). */}
+      {!dossierValide ? (
+        <p className="mt-5 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm leading-relaxed text-amber-900">
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <span>
+            <span className="font-semibold">Le dossier de ce prestataire n&apos;est pas validé.</span>{" "}
+            L&apos;annonce peut être relue, mais elle ne pourra être mise en ligne qu&apos;une
+            fois ses pièces justificatives contrôlées.{" "}
+            <Link href="/admin/documents" className="font-semibold underline">
+              Ouvrir son dossier
+            </Link>
+          </span>
+        </p>
+      ) : null}
+
       <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
         <form action={approve}>
           <input type="hidden" name="listingId" value={item.id} />
-          <Button type="submit" size="sm" disabled={approving}>
+          <Button type="submit" size="sm" disabled={approving || !dossierValide}>
             {approving ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
             ) : (

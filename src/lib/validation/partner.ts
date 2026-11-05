@@ -63,3 +63,21 @@ export const KYC_TYPES = [
 export const KYC_TYPE_LABELS: Record<string, string> = Object.fromEntries(
   KYC_TYPES.map((t) => [t.value, t.label]),
 );
+
+/**
+ * Les pièces **sans lesquelles un dossier est incomplet**.
+ *
+ * ⚠️ **L'assurance n'en fait pas partie, et ce n'est pas un oubli.** L'écran du
+ * partenaire la présente comme conditionnelle — « si votre activité l'exige ».
+ * L'exiger rendrait tout dossier incomplet à jamais, puisque la plupart des
+ * prestataires n'en déposeront aucune : le badge « vérifié » serait inatteignable
+ * et, depuis la migration 0055, **plus aucune annonce ne pourrait être publiée**.
+ * Une pièce facultative ne se glisse pas dans une condition d'accès.
+ *
+ * Double de `app.kyc_required_types()` (migration 0055), qui décide en base.
+ * `tests/rls-kyc.test.ts` compare les deux listes — une divergence donnerait un
+ * écran qui réclame une pièce que la base ignore, ou l'inverse.
+ */
+export const KYC_REQUIRED: readonly string[] = KYC_TYPES.filter(
+  (t) => t.value !== "insurance",
+).map((t) => t.value);

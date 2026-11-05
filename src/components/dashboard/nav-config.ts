@@ -198,6 +198,9 @@ export const adminNav: SpaceNav = {
       title: "Comptes",
       items: [
         { label: "Partenaires", href: "/admin/partenaires", icon: Building2 },
+        // Les pièces justificatives, et la décision qui allume le badge
+        // « vérifié ». Séparé de « Partenaires », qui ne règle que la commission.
+        { label: "Dossiers", href: "/admin/documents", icon: FileCheck },
         { label: "Entreprises", href: "/admin/entreprises", icon: Handshake },
         { label: "Utilisateurs", href: "/admin/utilisateurs", icon: Users },
       ],

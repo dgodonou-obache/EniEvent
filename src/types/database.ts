@@ -17,7 +17,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   graphql_public: {
     Tables: {
@@ -3502,6 +3502,31 @@ export type Database = {
         Returns: undefined
       }
       restore_review_body: { Args: { avis: string }; Returns: undefined }
+      review_kyc_document: {
+        Args: {
+          decision: Database["public"]["Enums"]["kyc_status"]
+          motif?: string
+          piece: string
+        }
+        Returns: {
+          created_at: string
+          file_path: string
+          id: string
+          org_id: string
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["kyc_status"]
+          type: Database["public"]["Enums"]["kyc_document_type"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "kyc_documents"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       save_payment_schedule: {
         Args: { lignes: Json; org: string }
         Returns: {

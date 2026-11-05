@@ -505,6 +505,34 @@ barrière devant quelqu'un qui n'ouvre pas de navigateur.
   « 42 personnes ont aimé » n'existe, et `favorites_own` (migration 0042) empêche
   l'agrégat d'être calculé, même par quelqu'un qui écrirait la requête exprès. Ne pas
   ajouter de fonction rendant un nombre de favoris par annonce.
+- ⚠️ **Le badge « vérifié » se gagne, et il ne pouvait pas l'être** (migration 0055).
+  Mesuré le 5 novembre 2026 : **zéro pièce déposée** dans toute la base, zéro fichier dans
+  le coffre, et six partenaires marqués « vérifiés » — les six organisations de
+  démonstration, par le *seed*. `is_verified` ayant été retirée du `grant update` par la
+  migration 0021, **aucune fonction du dépôt ne pouvait l'écrire** : le badge n'était pas
+  mal attribué, il n'existait aucun chemin pour l'attribuer. Et aucun écran
+  d'administration ne lisait `kyc_documents`, si bien qu'un partenaire qui déposait ses
+  pièces lisait « En cours de vérification » **indéfiniment**. ⚠️ Pire, la coche de la
+  **fiche annonce** était **codée en dur** : elle s'affichait pour tout prestataire, sur
+  la page même où un acheteur décide de réserver. `review_kyc_document` est désormais la
+  seule porte, sur le moule de `set_commission_rate`, et elle **recalcule** le badge
+  depuis `app.kyc_validated` au lieu de le décréter — refuser une pièce déjà approuvée
+  l'éteint. ⚠️ `insurance` n'entre pas dans les pièces obligatoires : conditionnelle à
+  l'écran, l'exiger rendrait tout dossier incomplet à jamais.
+- ⚠️ **Une annonce ne devient visible qu'après validation du dossier de son prestataire**
+  (migration 0055). Décision d'exploitation du 5 novembre 2026, dans ces termes : « le
+  partenaire peut faire sa demande pour publier une annonce, mais l'annonce ne sera
+  visible qu'après la validation par ÉniEvent ». Le **dépôt reste libre** — `draft` et
+  `pending` ne changent pas —, c'est le passage en `approved` qui exige le dossier, et le
+  refus vit dans un **déclencheur de table** : la file de modération écrit
+  `listings.status` par un `update` direct, un contrôle posé dans la Server Action serait
+  contourné par le premier autre chemin. ⚠️ La condition porte sur `is_verified` et non
+  sur les pièces : les deux reviennent au même pour un partenaire réel, mais exiger les
+  pièces aurait obligé à **inventer de faux documents en production** pour que le jeu de
+  démonstration continue de fonctionner. ⚠️ Les annonces **déjà publiées ne bougent pas** —
+  le déclencheur ne regarde que la transition. Et `ModerationCard` annonce le refus
+  **avant** le clic, bouton désactivé : proposer un geste que la base refusera fait passer
+  un produit pour cassé.
 - ⚠️ **Un avis exige une prestation réellement rendue, et rien dans les données ne dit
   qu'elle l'a été.** `order_status` ne connaît que `pending_payment`, `deposit_paid`,
   `paid`, `cancelled`, `refunded` : aucun état ne signifie « réalisée », et **on n'en
