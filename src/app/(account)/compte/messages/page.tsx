@@ -16,7 +16,7 @@ export const metadata = { title: "Messages" };
 export default async function AccountMessagesPage() {
   await requireUser();
 
-  const conversations = await getMyConversations();
+  const conversations = await getMyConversations("client");
   const nonLus = conversations.reduce((total, c) => total + c.unread, 0);
 
   return (

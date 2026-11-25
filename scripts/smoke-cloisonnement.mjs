@@ -339,6 +339,47 @@ for (const { table, cle, colonne, valeur, quoi } of INECRIVABLES) {
   else console.log(`  ✓ ${`${table}.${colonne}`.padEnd(44)} refusé à tous — ${quoi}`);
 }
 
+// ---------------------------------------------------------------------------
+// 6. L'espace client ne montre que ce qui appartient à l'utilisateur
+//
+// ⚠️ La RLS ouvre une commande à son client, **au partenaire qui la reçoit et à
+// l'administration**. Le 25 novembre 2026, un administrateur arrivé sur
+// `/compte` après une réinitialisation de mot de passe y a lu les réservations
+// d'un client réel sous le titre « Mes réservations », et le partenaire de
+// démonstration y voyait 18 commandes de ses propres clients. Un contrôle mené
+// en particulier ne pouvait rien voir : il faut les comptes qui ont **plus** de
+// droits. On compare chaque référence affichée à celles que l'administration
+// sait appartenir au compte.
+console.log("\n6. L'espace client ne montre que ce qui appartient à l'utilisateur");
+
+const ECRANS_CLIENT = ["/compte", "/compte/reservations", "/compte/paiements", "/compte/documents", "/projets"];
+const { data: toutes, error: eToutes } = await admin.client.from("orders").select("reference, client_id");
+if (eToutes) rate(`Lecture des commandes par l'administration impossible : ${eToutes.message}`);
+
+for (const compte of [...COMPTES, { titre: "Admin", email: "demo-admin@enievent.bj" }]) {
+  const { cookie, userId } = await session(compte.email);
+  const siennes = new Set((toutes ?? []).filter((o) => o.client_id === userId).map((o) => o.reference));
+  const etrangeres = new Set();
+  let refuse = 0;
+
+  for (const ecran of ECRANS_CLIENT) {
+    const r = await fetch(BASE + ecran, { headers: { cookie }, redirect: "manual" });
+    const html = r.status === 200 ? await r.text() : "";
+    if (html.includes("compte d&#x27;administration")) refuse += 1;
+    for (const ref of html.match(/CMD-\d{6}-\d{6}/g) ?? []) if (!siennes.has(ref)) etrangeres.add(ref);
+  }
+
+  if (etrangeres.size > 0) {
+    rate(`${compte.titre} voit ${etrangeres.size} commande(s) d'autrui dans son espace client`);
+  } else if (compte.titre === "Admin" && refuse !== ECRANS_CLIENT.length) {
+    rate(`Admin : l'espace client n'est refusé que sur ${refuse}/${ECRANS_CLIENT.length} écrans`);
+  } else {
+    console.log(
+      `  ✓ ${compte.titre.padEnd(12)} ${compte.titre === "Admin" ? "refusé sur l'espace client" : `aucune commande d'autrui (${siennes.size} à lui)`}`,
+    );
+  }
+}
+
 console.log("");
 if (echecs > 0) {
   console.error(`${echecs} faille(s).`);

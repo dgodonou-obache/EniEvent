@@ -6,7 +6,7 @@ import { StatTile } from "@/components/money/StatTile";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { requireUser } from "@/lib/auth/session";
-import { getMyOrders, getPayments } from "@/lib/orders";
+import { getMyOrders, getMyPayments } from "@/lib/orders";
 
 /**
  * Règlements du client.
@@ -21,7 +21,7 @@ export const metadata = { title: "Mes paiements" };
 export default async function AccountPaymentsPage() {
   await requireUser();
 
-  const [lines, orders] = await Promise.all([getPayments(), getMyOrders()]);
+  const [lines, orders] = await Promise.all([getMyPayments(), getMyOrders()]);
   const devise = lines[0]?.currency ?? orders[0]?.currency ?? "XOF";
 
   const regles = lines.filter((l) => l.status === "paid");

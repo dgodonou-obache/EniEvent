@@ -64,7 +64,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL(interne, origin));
   }
 
-  const accountType = data.user?.user_metadata?.account_type;
+  // ⚠️ Le type de compte se lit dans `profiles`, **jamais** dans
+  // `user_metadata` : celui-ci s'écrit par `auth.updateUser`, donc par
+  // l'utilisateur lui-même, et le compte `demo-admin` y porte « particulier ».
+  // Ce n'est qu'une destination — le proxy et les layouts décident de l'accès —,
+  // mais une destination fausse dépose quelqu'un dans le mauvais espace.
+  const { data: profil } = data.user
+    ? await supabase.from("profiles").select("account_type").eq("id", data.user.id).maybeSingle()
+    : { data: null };
+  const accountType = profil?.account_type;
 
   // **Un particulier qui vient de s'inscrire n'a rien à voir dans son espace.**
   // Il n'a encore rien réservé : « Mes réservations » est vide, « Mes projets »
@@ -81,7 +89,7 @@ export async function GET(request: NextRequest) {
 
   // À défaut, chacun chez soi : envoyer un partenaire sur `/compte` lui ferait
   // croire qu'il s'est trompé de compte.
-  const destination = typeof accountType === "string" ? homeFor(accountType as never) : "/compte";
+  const destination = accountType ? homeFor(accountType) : "/compte";
 
   return NextResponse.redirect(new URL(destination, origin));
 }

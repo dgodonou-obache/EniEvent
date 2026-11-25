@@ -115,17 +115,34 @@ export async function updateSession(request: NextRequest) {
   // s'exécute jamais, et l'URL reste la même, ce qui évite de faire croire à
   // une session expirée.
   // -------------------------------------------------------------------------
-  if (user && (pathname === "/admin" || pathname.startsWith("/admin/"))) {
+  const espaceAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
+
+  // -------------------------------------------------------------------------
+  // Et l'espace client se refuse **à l'administration**, ici aussi.
+  //
+  // Un administrateur voit par la RLS les commandes de tous les clients. Arrivé
+  // sur `/compte` — au retour d'une réinitialisation de mot de passe, le
+  // 25 novembre 2026 —, il y a lu les réservations d'un client réel sous le
+  // titre « Mes réservations ». Les écrans filtrent désormais sur l'auteur,
+  // mais la page ne doit pas s'exécuter du tout : même raison que ci-dessus.
+  // -------------------------------------------------------------------------
+  const espaceClient = ["/compte", "/projets"].some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+
+  if (user && (espaceAdmin || espaceClient)) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("account_type")
       .eq("id", user.id)
       .maybeSingle();
 
-    if (profile?.account_type !== "admin") {
+    const estAdmin = profile?.account_type === "admin";
+
+    if (espaceAdmin ? !estAdmin : estAdmin) {
       const refus = new URL("/acces-refuse", request.url);
-      refus.searchParams.set("espace", "admin");
-      refus.searchParams.set("motif", "not-admin");
+      refus.searchParams.set("espace", espaceAdmin ? "admin" : "account");
+      refus.searchParams.set("motif", espaceAdmin ? "not-admin" : "admin-account");
 
       const reponse = NextResponse.rewrite(refus);
 

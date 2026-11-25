@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getUser } from "@/lib/auth/session";
 import { createClient } from "@/utils/supabase/server";
 
 /**
@@ -25,7 +26,41 @@ const BY_ITEM = "!quotes_item_id_fkey";
 // Côté client
 // -----------------------------------------------------------------------------
 
+/**
+ * Les demandes qui sont **les miennes** : celles que j'ai déposées, et celles de
+ * l'entreprise dont je suis membre actif (un valideur n'en est pas l'auteur).
+ *
+ * ⚠️ `quote_requests_select` en laisse voir bien davantage : à
+ * **l'administration** toutes les demandes, et au **partenaire** chaque
+ * demande ouverte à laquelle il peut répondre (`partner_can_see_request`).
+ * C'est le bon périmètre de *lecture* ; ce n'est pas « Mes projets ». Un
+ * administrateur arrivé sur `/projets` y voyait les projets de tous les
+ * clients, et un partenaire ceux de ses concurrents potentiels.
+ *
+ * Rend le filtre PostgREST à poser, ou `null` sans session.
+ */
+async function myRequestsFilter(): Promise<string | null> {
+  const user = await getUser();
+  if (!user) return null;
+
+  const supabase = await createClient();
+  const { data: members } = await supabase
+    .from("organization_members")
+    .select("org_id")
+    .eq("user_id", user.id)
+    .eq("org_type", "company")
+    .eq("status", "active");
+
+  const orgIds = (members ?? []).map((m) => m.org_id);
+  return orgIds.length
+    ? `requester_id.eq.${user.id},org_id.in.(${orgIds.join(",")})`
+    : `requester_id.eq.${user.id}`;
+}
+
 export async function getMyRequests() {
+  const perimetre = await myRequestsFilter();
+  if (!perimetre) return [];
+
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -39,6 +74,7 @@ export async function getMyRequests() {
          quotes${BY_ITEM}(id, status)
        )`,
     )
+    .or(perimetre)
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`Demandes illisibles : ${error.message}`);
@@ -48,7 +84,11 @@ export async function getMyRequests() {
 
 export type RequestSummary = Awaited<ReturnType<typeof getMyRequests>>[number];
 
+/** Une demande, **seulement** si elle est la mienne (voir `myRequestsFilter`). */
 export async function getRequestDetail(requestId: string) {
+  const perimetre = await myRequestsFilter();
+  if (!perimetre) return null;
+
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -70,6 +110,7 @@ export async function getRequestDetail(requestId: string) {
        )`,
     )
     .eq("id", requestId)
+    .or(perimetre)
     .maybeSingle();
 
   if (error) throw new Error(`Demande illisible : ${error.message}`);

@@ -3,6 +3,7 @@ import "server-only";
 import { canCancel, canReview } from "@/lib/cancellation";
 import { splitPayment } from "@/lib/fees";
 import { money, type CurrencyCode } from "@/lib/money";
+import { getUser } from "@/lib/auth/session";
 import { createClient } from "@/utils/supabase/server";
 
 import type { Database } from "@/types/database";
@@ -210,13 +211,28 @@ export async function getOrder(orderId: string): Promise<OrderView | null> {
   return vue ?? null;
 }
 
-/** Commandes du client connecté. La RLS fait le filtrage. */
+/**
+ * Commandes **passées par** l'utilisateur connecté — et rien d'autre.
+ *
+ * ⚠️ **La RLS ne suffit pas à dire « les miennes ».** `orders_select` laisse
+ * aussi voir une commande au **partenaire** qui la reçoit et à
+ * **l'administration** : c'est le bon périmètre pour *lire*, pas pour un écran
+ * intitulé « Mes réservations ». Sans ce filtre, un administrateur arrivé sur
+ * `/compte` après une réinitialisation de mot de passe y a vu les commandes de
+ * tous les clients, présentées comme les siennes (25 novembre 2026) — et un
+ * partenaire y voyait celles de ses propres clients. La RLS borne ce qu'on
+ * *peut* lire ; l'écran décide de ce qu'il *montre*.
+ */
 export async function getMyOrders(): Promise<OrderView[]> {
+  const user = await getUser();
+  if (!user) return [];
+
   const supabase = await createClient();
 
   const { data } = await supabase
     .from("orders")
     .select(SELECT)
+    .eq("client_id", user.id)
     .order("created_at", { ascending: false });
 
   return hydrate(data ?? []);
@@ -340,7 +356,33 @@ export async function getPartnerTakings(orgId: string): Promise<{
   };
 }
 
-/** Paiements visibles par l'appelant. La RLS décide du périmètre. */
+/**
+ * Paiements des commandes **passées par** l'utilisateur connecté.
+ *
+ * Même raison que `getMyOrders` : `payments_select` ouvre aussi la ligne au
+ * partenaire et à l'administration. La jointure `!inner` sur `orders` fait du
+ * filtre une condition sur la commande, pas un tri à l'affichage.
+ */
+export async function getMyPayments(limit = 200): Promise<MoneyLine[]> {
+  const user = await getUser();
+  if (!user) return [];
+
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("payments")
+    .select("*, orders!inner(reference, client_id), order_instalments(label)")
+    .eq("orders.client_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  return ((data ?? []) as PaymentJoined[]).map(toMoneyLine);
+}
+
+/**
+ * Tous les paiements que la RLS laisse voir — **réservé à l'administration**.
+ * Un écran « mes paiements » passe par `getMyPayments`.
+ */
 export async function getPayments(limit = 200): Promise<MoneyLine[]> {
   const supabase = await createClient();
 

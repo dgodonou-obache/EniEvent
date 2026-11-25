@@ -36,7 +36,8 @@ export type DenialReason =
   | "membership-inactive"
   | "org-pending"
   | "org-suspended"
-  | "not-admin";
+  | "not-admin"
+  | "admin-account";
 
 /**
  * Les mêmes valeurs, utilisables à l'exécution.
@@ -53,6 +54,7 @@ export const DENIAL_REASONS = [
   "org-pending",
   "org-suspended",
   "not-admin",
+  "admin-account",
 ] as const satisfies readonly DenialReason[];
 
 export type AccessDecision =
@@ -67,8 +69,16 @@ interface AccessInput {
 
 export function decideAccess({ space, accountType, memberships }: AccessInput): AccessDecision {
   if (space === "account") {
-    // Tout compte authentifié a son espace personnel, y compris un partenaire
-    // qui réserve pour son propre mariage.
+    // ⚠️ **Sauf l'administration.** Un compte d'administration voit, par la
+    // RLS, les commandes, paiements et projets de tous les clients : posé dans
+    // un écran « Mes réservations », il les présentait comme les siens. C'est
+    // arrivé le 25 novembre 2026, au retour d'une réinitialisation de mot de
+    // passe. Un administrateur ne réserve pas avec son compte d'équipe : il en
+    // ouvre un autre, ce qui sépare aussi ses traces de ses décisions.
+    if (accountType === "admin") return { granted: false, reason: "admin-account" };
+
+    // Tout autre compte authentifié a son espace personnel, y compris un
+    // partenaire qui réserve pour son propre mariage.
     return { granted: true, org: null, available: [] };
   }
 
@@ -108,6 +118,11 @@ export function decideAccess({ space, accountType, memberships }: AccessInput): 
 /** Message destiné à l'utilisateur. Pas de jargon, et une action possible. */
 export function denialMessage(reason: DenialReason, space: Space): { title: string; body: string } {
   switch (reason) {
+    case "admin-account":
+      return {
+        title: "Ce compte est un compte d'administration",
+        body: "Il donne accès au back-office, pas à un espace client. Pour réserver ou suivre un projet personnel, utilisez un compte distinct.",
+      };
     case "not-admin":
       return {
         title: "Cet espace est réservé à l'équipe ÉniEvent",

@@ -21,7 +21,7 @@ export default async function CompanyMessagesPage() {
   const { decision } = await requireSpace("company", "/connexion");
   if (!decision.granted || !decision.org) return null;
 
-  const conversations = await getMyConversations();
+  const conversations = await getMyConversations("client");
   const nonLus = conversations.reduce((total, c) => total + c.unread, 0);
 
   return (

@@ -46,8 +46,17 @@ export interface MessageView {
   createdAt: string;
 }
 
-/** Fils visibles par l'appelant, le plus récent d'abord. */
-export async function getMyConversations(): Promise<ConversationSummary[]> {
+/**
+ * Fils de l'appelant **du côté demandé**, le plus récent d'abord.
+ *
+ * ⚠️ `my_conversations` rend les deux côtés à la fois : un partenaire qui
+ * réserve aussi pour lui-même est client de certains fils et prestataire
+ * d'autres. Sans le côté, `/compte/messages` mêlait les conversations de son
+ * entreprise avec ses clients à ses propres échanges de client. Chaque espace
+ * dit donc lequel il montre ; sans côté, on rend les deux (usage interne :
+ * retrouver un fil précis, compter les non-lus).
+ */
+export async function getMyConversations(side?: MessageSide): Promise<ConversationSummary[]> {
   const supabase = await createClient();
 
   const { data } = await supabase.rpc("my_conversations");
@@ -76,7 +85,7 @@ export async function getMyConversations(): Promise<ConversationSummary[]> {
     lastMessageAt: c.last_message_at,
     unread: c.unread,
     unmasked: c.unmasked,
-  }));
+  })).filter((c) => !side || c.side === side);
 }
 
 /** Un fil précis, avec ses messages. `null` si l'appelant n'y a pas accès. */

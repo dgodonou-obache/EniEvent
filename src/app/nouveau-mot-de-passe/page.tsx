@@ -1,6 +1,8 @@
 import { KeyRound } from "lucide-react";
 
 import { PasswordForm } from "@/components/auth/PasswordForm";
+import { getSessionContext } from "@/lib/auth/session";
+import { homeFor } from "@/lib/auth/home";
 import { safeInternalPath } from "@/lib/validation/redirect";
 
 export const metadata = { title: "Nouveau mot de passe", robots: { index: false } };
@@ -23,10 +25,20 @@ export default async function NewPasswordPage({
 }) {
   const { retour } = await searchParams;
 
+  // ⚠️ **Par défaut, chacun chez soi — d'après le profil, pas d'après le lien.**
+  // Le courriel de réinitialisation est commun à tous les espaces et n'emporte
+  // pas `retour` : le repli décidait donc seul, et il valait `/compte` pour
+  // tout le monde. Un administrateur qui venait de changer son mot de passe
+  // atterrissait dans l'espace client (25 novembre 2026). Le type de compte se
+  // lit dans `profiles`, jamais dans `user_metadata`, que l'utilisateur écrit
+  // lui-même.
+  const context = await getSessionContext();
+  const chezSoi = context ? homeFor(context.accountType) : "/connexion";
+
   // Une destination venue de l'URL ne doit jamais sortir du site.
   // ⚠️ Cinquième exemplaire du contrôle à la main, et le seul que l'audit du
   // 8 octobre 2026 avait d'abord manqué : il laissait passer `/\evil.com`.
-  const apres = safeInternalPath(retour, "/compte");
+  const apres = safeInternalPath(retour, chezSoi);
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-slate-50 px-4 py-12">

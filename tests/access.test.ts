@@ -21,13 +21,20 @@ function membership(overrides: Partial<Membership> = {}): Membership {
 }
 
 describe("espace personnel", () => {
-  it("est ouvert à tout compte authentifié", () => {
-    const decision = decideAccess({
-      space: "account",
-      accountType: "partenaire",
-      memberships: [],
-    });
-    expect(decision.granted).toBe(true);
+  it.each(["particulier", "entreprise", "partenaire"] as const)(
+    "est ouvert à un compte %s",
+    (accountType) => {
+      const decision = decideAccess({ space: "account", accountType, memberships: [] });
+      expect(decision.granted).toBe(true);
+    },
+  );
+
+  it("est refusé à un compte d'administration", () => {
+    // La RLS lui ouvre les commandes de tous les clients : dans « Mes
+    // réservations », il les lisait comme les siennes (25 novembre 2026).
+    const decision = decideAccess({ space: "account", accountType: "admin", memberships: [] });
+    expect(decision).toEqual({ granted: false, reason: "admin-account" });
+    expect(denialMessage("admin-account", "account").title).toMatch(/administration/);
   });
 });
 

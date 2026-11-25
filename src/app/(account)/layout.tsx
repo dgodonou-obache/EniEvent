@@ -3,13 +3,16 @@ import { Search } from "lucide-react";
 
 import { signOut } from "@/app/auth/actions";
 import { AccountNav } from "@/components/account/AccountNav";
+import { AccessDenied } from "@/components/auth/AccessDenied";
 import { SessionTimeout } from "@/components/auth/SessionTimeout";
 import { identityOf, requireSpace } from "@/lib/auth/session";
 
 export default async function AccountLayout({ children }: { children: React.ReactNode }) {
-  // L'espace personnel est ouvert à tout compte authentifié : la décision ne
-  // peut pas refuser ici, mais elle passe par le même chemin que les autres.
-  const { context } = await requireSpace("account");
+  // Ouvert à tout compte authentifié **sauf l'administration** (voir
+  // `decideAccess`). Le refus vit d'abord dans le proxy, qui empêche la page de
+  // s'exécuter ; celui-ci n'en est que la seconde ligne.
+  const { context, decision } = await requireSpace("account");
+  if (!decision.granted) return <AccessDenied reason={decision.reason} space="account" />;
   const identity = identityOf(context);
 
   return (

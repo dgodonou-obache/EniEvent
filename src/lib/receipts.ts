@@ -1,6 +1,7 @@
 import "server-only";
 
 import { type CurrencyCode } from "@/lib/money";
+import { getUser } from "@/lib/auth/session";
 import { createClient } from "@/utils/supabase/server";
 
 /**
@@ -56,7 +57,7 @@ interface ReceiptRow {
 
 const SELECT =
   "id, reference, amount, currency, paid_at, " +
-  "orders(reference, listing_title, event_date, organizations(legal_name, brand_name)), " +
+  "orders!inner(reference, listing_title, event_date, client_id, organizations(legal_name, brand_name)), " +
   "order_instalments(label)";
 
 function toReceipt(row: ReceiptRow): Receipt {
@@ -80,19 +81,28 @@ function toReceipt(row: ReceiptRow): Receipt {
 }
 
 /**
- * Les reçus du client connecté.
+ * Les reçus du client connecté — ceux des commandes **qu'il a passées**.
  *
- * La RLS de `payments` fait le tri : un client ne voit que les paiements de
- * ses propres commandes. Aucun filtre applicatif sur l'identité, donc — en
- * ajouter un donnerait l'illusion que c'est lui qui protège.
+ * ⚠️ Ce module affirmait que la RLS de `payments` suffisait, « un client ne
+ * voit que les paiements de ses propres commandes ». C'est vrai d'un client,
+ * faux de tout le reste : `payments_select` ouvre aussi la ligne au partenaire
+ * et à l'administration. Un administrateur ou un partenaire passé par
+ * `/compte/documents` y lisait donc des reçus émis **au nom d'autres
+ * personnes** — et pouvait les ouvrir un par un par leur adresse. Le filtre
+ * sur `orders.client_id` (jointure `!inner`) n'est pas une illusion de
+ * protection : c'est ce qui fait d'un reçu *le sien*.
  */
 export async function getMyReceipts(): Promise<Receipt[]> {
+  const user = await getUser();
+  if (!user) return [];
+
   const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("payments")
     .select(SELECT)
     .eq("status", "paid")
+    .eq("orders.client_id", user.id)
     .order("paid_at", { ascending: false });
 
   if (error) throw new Error(`Lecture des reçus impossible : ${error.message}`);
@@ -100,7 +110,11 @@ export async function getMyReceipts(): Promise<Receipt[]> {
   return ((data ?? []) as unknown as ReceiptRow[]).map(toReceipt);
 }
 
+/** Un reçu, **seulement** s'il porte sur une commande de l'utilisateur connecté. */
 export async function getReceipt(id: string): Promise<Receipt | null> {
+  const user = await getUser();
+  if (!user) return null;
+
   const supabase = await createClient();
 
   const { data } = await supabase
@@ -108,6 +122,7 @@ export async function getReceipt(id: string): Promise<Receipt | null> {
     .select(SELECT)
     .eq("id", id)
     .eq("status", "paid")
+    .eq("orders.client_id", user.id)
     .maybeSingle();
 
   return data ? toReceipt(data as unknown as ReceiptRow) : null;

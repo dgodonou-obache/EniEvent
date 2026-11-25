@@ -21,7 +21,11 @@ export function AccessDenied({ reason, space }: AccessDeniedProps) {
   // Chaque espace renvoie vers sa propre porte : sortir un administrateur sur la
   // connexion grand public lui proposerait de créer un compte client.
   const signOutTo =
-    space === "partner" ? "/pro/connexion" : space === "admin" ? "/admin/connexion" : "/connexion";
+    space === "partner"
+      ? "/pro/connexion"
+      : space === "admin" || reason === "admin-account"
+        ? "/admin/connexion"
+        : "/connexion";
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-slate-50 px-4 py-12">
@@ -37,6 +41,14 @@ export function AccessDenied({ reason, space }: AccessDeniedProps) {
           {reason === "no-organization" && space === "partner" ? (
             <Link href="/pro/inscription">
               <Button className="w-full sm:w-auto">Créer mon compte partenaire</Button>
+            </Link>
+          ) : null}
+
+          {/* Un administrateur égaré dans l'espace client retourne chez lui —
+              la seule destination qui ait un sens pour ce compte. */}
+          {reason === "admin-account" ? (
+            <Link href="/admin">
+              <Button className="w-full sm:w-auto">Aller au back-office</Button>
             </Link>
           ) : null}
 
